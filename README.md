@@ -7,11 +7,16 @@ Plataforma interna de gestão de ecrãs OOH: **servidor** (API, base de dados, f
 
 ## Arrancar
 
+1. Ao lado do `server.js`, crie o ficheiro `enif-config.json` com os dados do administrador (este ficheiro **nunca vai para o GitHub**):
+
 ```
-node server.js
+{ "nome": "O seu nome", "email": "o.seu@email.pt", "palavraPasse": "uma palavra-passe forte" }
 ```
 
-Abra http://localhost:8080/. Na **primeira vez** pede para criar a conta de administrador. Depois faz-se tudo na aplicação:
+2. `node server.js` e abra http://localhost:8080/. A conta é criada no primeiro arranque; depois pode apagar a palavra-passe do ficheiro.
+3. Esquecida a palavra-passe? Ponha uma nova no ficheiro e corra `node server.js --reset-admin`.
+
+Não há registo público: **só um administrador cria contas**, em **Utilizadores**, e quem não tiver conta não entra. Depois faz-se tudo na aplicação:
 
 1. **Ecrãs → Novo ecrã**: mostra o código e a chave do player.
 2. **Conteúdos**: carregar imagens, vídeos e páginas HTML5 (mede a resolução e a duração sozinho).

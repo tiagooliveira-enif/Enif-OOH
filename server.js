@@ -407,23 +407,35 @@ function playsApi(res, u, user) {
   send(res, 200, { rows, now: S.lisbonNow(TZ) });
 }
 
+
+/* ---------- administrador inicial (vem de ficheiro ou variáveis; nunca da internet) ---------- */
+function adminFromConfig() {
+  let c = {};
+  const file = process.env.CONFIG_FILE || path.join(__dirname, 'enif-config.json');
+  try { if (fs.existsSync(file)) c = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { console.error('Não consegui ler ' + file + ': ' + e.message); }
+  const name = String(process.env.ADMIN_NAME || c.nome || '').trim(), email = String(process.env.ADMIN_EMAIL || c.email || '').trim().toLowerCase(), pass = String(process.env.ADMIN_PASS || c.palavraPasse || '');
+  return name && validEmail(email) && pass.length >= 6 ? { name, email, pass, file } : null;
+}
+function seedAdmin(reset) {
+  const a = adminFromConfig();
+  if (userCount() > 0 && !reset) return 'existe';
+  if (!a) return userCount() > 0 ? 'sem-config' : 'falta';
+  const old = docs('users').find(u => u.email === a.email), id = old ? old.id : 'u' + uid(4), h = A.hashPassword(a.pass);
+  db.exec('BEGIN');
+  try {
+    putDoc('users', id, Object.assign({}, old || {}, { id, name: old ? old.name : a.name, email: a.email, admin: true, perms: A.PERMS.slice(), until: null, active: true }));
+    setSecret('users', id, h.salt, h.hash); run('DELETE FROM sessions WHERE user=?', id); db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
+  return old ? 'reposto' : 'criado';
+}
+const SEED = seedAdmin(process.argv.includes('--reset-admin'));
+
 /* ---------- rotas ---------- */
 const router = async (req, res) => {
   const u = new URL(req.url, 'http://x'), p = u.pathname, m = req.method;
   if (p === '/health') return send(res, 200, { ok: true });
   if (p === '/') { res.writeHead(302, { Location: '/app/' }); return res.end(); }
-  if (p === '/api/status') return send(res, 200, { setup: userCount() === 0 });
-  if (p === '/api/setup' && m === 'POST') {
-    if (userCount() > 0) throw new HttpError(403, 'A plataforma já foi configurada.');
-    const b = await readJson(req), name = str(b.name || '', 120, 'Nome'), email = str(b.email || '', 160, 'E-mail').toLowerCase(), pass = String(b.pass || '');
-    if (!name) throw bad('Indique o nome.');
-    if (!validEmail(email)) throw bad('Indique um e-mail válido.');
-    if (pass.length < 6) throw bad('A palavra-passe precisa de pelo menos 6 caracteres.');
-    const id = 'u' + uid(4), h = A.hashPassword(pass);
-    db.exec('BEGIN');
-    try { putDoc('users', id, { id, name, email, admin: true, perms: A.PERMS.slice(), until: null, active: true }); setSecret('users', id, h.salt, h.hash); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
-    return send(res, 200, { token: newSession(id) });
-  }
+  if (p === '/api/status') return send(res, 200, { setup: false });
   if (p === '/api/login' && m === 'POST') {
     const b = await readJson(req), email = String(b.email || '').trim().toLowerCase();
     if (loginLimit.blocked(email)) throw new HttpError(429, 'Demasiadas tentativas. Tente daqui a alguns minutos.');
@@ -461,9 +473,14 @@ const server = http.createServer((req, res) => {
   });
 });
 if (require.main === module) {
+  if (SEED === 'falta') {
+    console.error('\nFalta a conta de administrador. Crie o ficheiro enif-config.json ao lado do server.js com:\n\n  { "nome": "O seu nome", "email": "o.seu@email.pt", "palavraPasse": "uma palavra-passe forte" }\n\ne volte a arrancar. (Este ficheiro nunca vai para o GitHub.)\n');
+    process.exit(1);
+  }
   server.listen(PORT, () => {
     console.log('Enif OOH a correr em http://localhost:' + PORT + '/');
-    if (userCount() === 0) console.log('Primeiro acesso: abra o endereço acima para criar o administrador.');
+    if (SEED === 'criado') console.log('Conta de administrador criada. Pode apagar a palavra-passe do enif-config.json.');
+    if (SEED === 'reposto') console.log('Palavra-passe do administrador reposta. Pode apagá-la do enif-config.json.');
   });
 }
 module.exports = { server, db, playlistFor, buildState };

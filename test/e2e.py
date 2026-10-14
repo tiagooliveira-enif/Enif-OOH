@@ -10,7 +10,7 @@ def ff(*a): subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', *a], check=Tru
 ff('-f', 'lavfi', '-i', 'color=c=0x1D5FE5:s=640x360', '-frames:v', '1', f'{tmp}/azul.png')
 ff('-f', 'lavfi', '-i', 'color=c=0xB4501B:s=640x360', '-frames:v', '1', f'{tmp}/laranja.png')
 ff('-f', 'lavfi', '-i', 'testsrc=size=640x360:rate=25', '-t', '2', '-c:v', 'libvpx', '-b:v', '300k', f'{tmp}/video.webm')
-env = dict(os.environ, PORT=str(PORT), DATA_DIR=f'{tmp}/data')
+env = dict(os.environ, PORT=str(PORT), DATA_DIR=f'{tmp}/data', ADMIN_NAME='Tiago', ADMIN_EMAIL='tiago@enif.pt', ADMIN_PASS='segredo1')
 srv = subprocess.Popen(['node', '--disable-warning=ExperimentalWarning', 'server.js'], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 res = []
 def ok(n, c): res.append(('PASS ' if c else 'FAIL ') + n); print(res[-1], flush=True); return c
@@ -28,12 +28,13 @@ try:
         pg.on('pageerror', lambda e: errs.append(str(e)))
         pg.on('console', lambda m: errs.append(m.text) if m.type == 'error' and 'favicon' not in m.text and 'Failed to load resource' not in m.text else None)
 
-        # ---- primeiro acesso
-        pg.goto(BASE + '/'); pg.wait_for_selector('#lg-name')
-        ok('primeiro acesso pede para criar o administrador', 'Criar conta de administrador' in pg.inner_text('#login'))
-        pg.fill('#lg-name', 'Tiago'); pg.fill('#lg-email', 'tiago@enif.pt'); pg.fill('#lg-pass', 'segredo1')
-        pg.click('#login button[type=submit]'); pg.wait_for_selector('#nav button')
-        ok('entra no painel, sem dados de exemplo', 'Painel' in pg.inner_text('#nav') and 'Ainda não há' not in pg.inner_text('#view') or True)
+        # ---- entrada do administrador inicial
+        pg.goto(BASE + '/'); pg.wait_for_selector('#lg-email')
+        ok('não oferece criar conta', 'Criar conta' not in pg.inner_text('#login') and pg.locator('#lg-name').count() == 0)
+        pg.fill('#lg-email', 'tiago@enif.pt'); pg.fill('#lg-pass', 'errada'); pg.click('#login button[type=submit]'); pg.wait_for_timeout(500)
+        ok('palavra-passe errada recusada', 'incorretos' in pg.inner_text('#login'))
+        pg.fill('#lg-pass', 'segredo1'); pg.click('#login button[type=submit]'); pg.wait_for_selector('#nav button')
+        ok('entra no painel', 'Painel' in pg.inner_text('#nav'))
         tok = pg.evaluate("localStorage.getItem('enif.token')"); ok('sessão guardada', bool(tok))
         ok('painel vazio sem erros', not errs)
 

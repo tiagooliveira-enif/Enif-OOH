@@ -3,7 +3,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'enif-'));
-process.env.DATA_DIR = tmp; process.env.PORT = '0';
+process.env.DATA_DIR = tmp; process.env.ADMIN_NAME = 'Tiago'; process.env.ADMIN_EMAIL = 'Tiago@Enif.pt'; process.env.ADMIN_PASS = 'segredo1'; process.env.PORT = '0';
 const { server, db } = require('../server');
 const S = require('../lib/schedule');
 
@@ -20,14 +20,12 @@ async function main() {
   const today = S.lisbonNow('Europe/Lisbon').date, plus = n => S.addDay(today, n);
 
   // ---- primeiro acesso e login
-  ok('precisa de configuração', (await call('GET', '/api/status')).j.setup === true);
+  ok('não há página pública de criação de conta', (await call('GET', '/api/status')).j.setup === false);
   ok('state sem sessão recusado', (await call('GET', '/api/state')).s === 401);
-  ok('setup recusa palavra-passe curta', (await call('POST', '/api/setup', { name: 'A', email: 'a@x.pt', pass: '123' })).s === 400);
-  let r = await call('POST', '/api/setup', { name: 'Tiago', email: 'Tiago@Enif.pt', pass: 'segredo1' });
-  ok('setup cria administrador', r.s === 200 && r.j.token);
+  ok('criar conta pela internet recusado', (await call('POST', '/api/setup', { name: 'B', email: 'b@x.pt', pass: 'segredo1' })).s === 404);
+  let r = await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'segredo1' });
+  ok('o administrador inicial entra', r.s === 200 && r.j.token);
   const adm = r.j.token;
-  ok('já não precisa de configuração', (await call('GET', '/api/status')).j.setup === false);
-  ok('segundo setup recusado', (await call('POST', '/api/setup', { name: 'B', email: 'b@x.pt', pass: 'segredo1' })).s === 403);
   ok('login errado', (await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'x' })).s === 401);
   r = await call('POST', '/api/login', { email: 'TIAGO@enif.pt', pass: 'segredo1' });
   ok('login certo (e-mail sem maiúsculas)', r.s === 200);
