@@ -7,6 +7,7 @@
 <style>
   html,body{margin:0;height:100%;background:#000;color:#fff;overflow:hidden;cursor:none;font-family:system-ui,Segoe UI,sans-serif}
   #stage{position:fixed;inset:0;background:#000}
+  #stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
   #stage img,#stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#000}
   #idle{position:fixed;inset:0;display:none;place-items:center;text-align:center;color:#556;font-size:22px}
   #dbg{position:fixed;left:8px;bottom:8px;font:12px/1.4 ui-monospace,Consolas,monospace;color:#9fb;background:rgba(0,0,0,.7);padding:6px 8px;border-radius:6px;display:none;white-space:pre}
@@ -24,7 +25,7 @@
 <script>
 (function(){
 'use strict';
-var VERSION='1';
+var VERSION='2';
 var Q=new URLSearchParams(location.search);
 var ls=function(k,v){try{if(v===undefined){var x=localStorage.getItem(k);return x==null?null:x}if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v)}catch(e){return null}};
 var code=Q.get('code')||ls('enif.code'),key=Q.get('key')||ls('enif.key');
@@ -64,7 +65,7 @@ function flush(){
   }).catch(function(e){stats.net='sem ligação'});
 }
 function heartbeat(){
-  return post('/api/player/heartbeat',{c:cur.c,f:cur.f,queue:queue.length,ver:VERSION}).then(function(){stats.net='ok'}).catch(function(){stats.net='sem ligação'});
+  return post('/api/player/heartbeat',{c:cur.c,f:cur.f,queue:queue.length,ver:VERSION,w:screen.width,h:screen.height}).then(function(){stats.net='ok'}).catch(function(){stats.net='sem ligação'});
 }
 /* ---------- playlist e ficheiros em cache ---------- */
 var mediaUrl=function(id){return '/media/'+id+'?code='+encodeURIComponent(code)+'&key='+encodeURIComponent(key)};
@@ -95,6 +96,8 @@ async function refresh(){
     if(!r.ok)throw new Error('HTTP '+r.status);
     var j=await r.json();stats.net='ok';stats.err='';
     if(j.playerVersion!==VERSION){location.reload();return}
+    var rl=ls('enif.reload');if(rl!==null&&+rl!==j.reload){ls('enif.reload',String(j.reload));location.reload();return}
+    ls('enif.reload',String(j.reload));
     PL=j;ls('enif.playlist',JSON.stringify(j));
   }catch(e){stats.net='sem ligação';if(!PL){try{PL=JSON.parse(ls('enif.playlist')||'null')}catch(x){PL=null}}}
   await ensureFiles();
@@ -105,7 +108,7 @@ async function srcFor(id,f){
   if(cache){var r=await cache.match(cacheKey(id,f));if(r){var b=await r.blob();return {url:URL.createObjectURL(b),revoke:true}}}
   return null;
 }
-async function playOne(c,id){
+async function playOne(c,id,secs){
   var f=PL.files[id];if(!f)return false;
   var s=await srcFor(id,f);
   if(!s){ if(stats.net==='ok'&&!cache)s={url:mediaUrl(id),revoke:false}; else return false }
@@ -119,10 +122,13 @@ async function playOne(c,id){
       setTimeout(function(){end(false)},Math.max(20,(f.dur||10)*2+10)*1000);
       var pr=v.play();if(pr&&pr.catch)pr.catch(function(){end(false)});
     });
+  }else if(f.type==='HTML5'){
+    var fr=document.createElement('iframe');fr.setAttribute('sandbox','allow-scripts');fr.src=s.url;stage.appendChild(fr);
+    await sleep(Math.max(1,secs||f.dur||10)*1000);
   }else{
     var im=document.createElement('img');im.src=s.url;stage.appendChild(im);
     await new Promise(function(d){im.onload=d;im.onerror=function(){ok=false;d()}});
-    await sleep(Math.max(1,f.dur||10)*1000);
+    await sleep(Math.max(1,secs||f.dur||10)*1000);
   }
   if(s.revoke)setTimeout(function(){URL.revokeObjectURL(s.url)},3000);
   logPlay(c,id,(Date.now()-t0)/1000,ok);
@@ -141,7 +147,7 @@ async function loop(){
       var e=entries[idx%entries.length];idx++;
       var n=(counter[e.c]||0);counter[e.c]=n+1;ls('enif.counter',JSON.stringify(counter));
       var id=e.items[n%e.items.length];
-      var ok=await playOne(e.c,id);
+      var ok=await playOne(e.c,id,e.dur);
       if(!ok)await sleep(1500);                                              // evita ciclo apertado se faltar um ficheiro
     }catch(err){stats.err=String(err&&err.message||err);await sleep(2000)}
   }
