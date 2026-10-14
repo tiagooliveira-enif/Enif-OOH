@@ -1,0 +1,11 @@
+{
+  "name": "enif-ooh",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Enif OOH – servidor e player (sem dependências externas, requer Node 22.13+)",
+  "scripts": {
+    "start": "node --disable-warning=ExperimentalWarning server.js",
+    "test": "node --disable-warning=ExperimentalWarning test/schedule.test.js"
+  },
+  "engines": { "node": ">=22.13" }
+}
