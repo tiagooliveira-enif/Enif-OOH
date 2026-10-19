@@ -4,6 +4,7 @@ const http = require('node:http'), fs = require('node:fs'), path = require('node
 const { DatabaseSync } = require('node:sqlite');
 const S = require('./lib/schedule');
 const A = require('./lib/auth');
+const M = require('./lib/media');
 
 const PORT = +process.env.PORT || 8080;
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -11,7 +12,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 1024) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const SESSION_MS = 30 * 864e5;
-const PLAYER_VERSION = '2';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '3';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -27,11 +28,20 @@ CREATE TABLE IF NOT EXISTS beats(screen TEXT NOT NULL, minute INTEGER NOT NULL, 
 CREATE TABLE IF NOT EXISTS plays(pid TEXT PRIMARY KEY, screen TEXT, camp TEXT, file TEXT, ts INTEGER, day TEXT, hour INTEGER, dur REAL, ok INTEGER);
 CREATE INDEX IF NOT EXISTS plays_day ON plays(day);
 CREATE TABLE IF NOT EXISTS resolved(id TEXT PRIMARY KEY, ts INTEGER);
+CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, who TEXT, ip TEXT, what TEXT NOT NULL, detail TEXT);
+CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT, 'O registo de auditoria só se acrescenta'); END;
+CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT, 'O registo de auditoria só se acrescenta'); END;
+CREATE TABLE IF NOT EXISTS cmds(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL);
 `);
+for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const q1 = (sql, ...a) => db.prepare(sql).get(...a);
 const run = (sql, ...a) => db.prepare(sql).run(...a);
 const uid = (n = 8) => crypto.randomBytes(n).toString('hex');
+/* registo de auditoria: só se acrescenta (a base de dados recusa alterar ou apagar) */
+function audit(who, what, detail, ip) {
+  run('INSERT INTO audit(ts,who,ip,what,detail) VALUES(?,?,?,?,?)', Date.now(), who ? (typeof who === 'string' ? who : who.name) : '—', ip || '', String(what).slice(0, 200), String(detail || '').slice(0, 500));
+}
 
 /* ---------- documentos ---------- */
 const nextSeq = () => q1('SELECT COALESCE(MAX(seq),0)+1 n FROM docs').n;
@@ -108,29 +118,52 @@ const num = (v, lo, hi, what) => { const n = +v; if (!(n >= lo && n <= hi)) thro
 const ids = (v, what) => { if (!Array.isArray(v) || v.length > 500) throw bad(what + ' inválido.'); return v.map(x => str(x, 120, what)); };
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
-function cleanScreen(o, id) {
+const FITS = ['caber', 'preencher', 'esticar'];
+function cleanBri(b, old) {
+  if (b === undefined) return old || null;
+  if (b === null) return null;
+  if (typeof b !== 'object') throw bad('Brilho inválido.');
+  const pc = (v, what) => { const n = Math.round(+v); if (!(n >= 10 && n <= 100)) throw bad(what + ' inválido (10 a 100 %).'); return n; };
+  const hr = (v, what) => { const n = Math.round(+v); if (!(n >= 0 && n <= 23)) throw bad(what + ' inválida.'); return n; };
+  const out = { mode: b.mode === 'manual' ? 'manual' : 'auto', day: pc(b.day == null ? 100 : b.day, 'Brilho de dia'), night: pc(b.night == null ? 40 : b.night, 'Brilho de noite'), from: hr(b.from == null ? 8 : b.from, 'Hora'), to: hr(b.to == null ? 20 : b.to, 'Hora'), manual: pc(b.manual == null ? 80 : b.manual, 'Brilho manual') };
+  if (out.mode === 'auto' && out.from === out.to) throw bad('O início e o fim do dia não podem ser à mesma hora.');
+  return out;
+}
+function cleanScreen(o, id, old) {
   const loc = o.loc && typeof o.loc === 'object' ? o.loc : {};
   const out = {
     id, venue: str(o.venue, 120, 'Local'), city: optStr(o.city, 80), spot: str(o.spot, 120, 'Posição'), type: optStr(o.type, 60) || 'Outro',
     res: optStr(o.res, 20) || 'auto', limit: Math.round(num(o.limit, 1, 99, 'Limite')), order: ids(o.order || [], 'Ordem'),
     draft: null, loc: { addr: optStr(loc.addr, 200), lat: loc.lat == null ? null : num(loc.lat, -90, 90, 'Latitude'), lng: loc.lng == null ? null : num(loc.lng, -180, 180, 'Longitude'), env: optStr(loc.env, 40), pop: loc.pop == null ? null : Math.round(num(loc.pop, 0, 2e6, 'Pessoas por dia')) },
     on: num(o.on == null ? 0 : o.on, 0, 24, 'Hora de ligar'), off: num(o.off == null ? 24 : o.off, 0, 24, 'Hora de desligar'),
-    onT: optStr(o.onT, 5) || '00:00', offT: optStr(o.offT, 5) || '23:59'
+    onT: optStr(o.onT, 5) || '00:00', offT: optStr(o.offT, 5) || '23:59',
+    fit: FITS.indexOf(o.fit) > -1 ? o.fit : ((old && old.fit) || 'caber'),
+    bri: cleanBri(o.bri, old && old.bri)
   };
   if (!out.venue || !out.spot) throw bad('Indique o local e a posição do ecrã.');
   if (o.draft) out.draft = { order: ids(o.draft.order || [], 'Rascunho'), limit: Math.round(num(o.draft.limit, 1, 99, 'Limite')) };
   return out;
 }
-function cleanCampaign(o, id) {
+function cleanCampaign(o, id, old) {
   const out = {
     id, name: str(o.name, 160, 'Nome'), client: optStr(o.client, 160) || 'Sem cliente', venues: ids(o.venues || [], 'Locais'),
+    sector: optStr(o.sector, 40), sales: optStr(o.sales, 160).toLowerCase(),
     start: o.start, end: o.end, h0: num(o.h0, 0, 23, 'Hora de início'), h1: num(o.h1, 1, 24, 'Hora de fim'),
-    ppm: num(o.ppm, 0.25, 12, 'Passagens por minuto'), dur: Math.round(num(o.dur == null ? 10 : o.dur, 3, 60, 'Duração')),
-    priority: ['Alta', 'Normal', 'Baixa'].includes(o.priority) ? o.priority : 'Normal', manual: !!o.manual, color: Math.round(num(o.color == null ? 1 : o.color, 1, 6, 'Cor')), items: []
+    ppm: num(o.ppm, 0.2, 12, 'Passagens por minuto'), dur: Math.round(num(o.dur == null ? 10 : o.dur, 3, 60, 'Duração')),
+    priority: ['Alta', 'Normal', 'Baixa'].includes(o.priority) ? o.priority : 'Normal', manual: !!o.manual, color: Math.round(num(o.color == null ? 1 : o.color, 1, 6, 'Cor')), items: [],
+    pauses: []
   };
   if (!out.name) throw bad('Dê um nome à campanha.');
+  if (out.sales && !validEmail(out.sales)) throw bad('O e-mail do comercial não parece válido.');
   if (!isDate(out.start) || !isDate(out.end) || out.end < out.start) throw bad('Datas inválidas.');
   if (out.h1 <= out.h0) throw bad('A hora de fim tem de ser depois da hora de início.');
+  if (o.pauses != null) {
+    if (!Array.isArray(o.pauses) || o.pauses.length > 200) throw bad('Pausas inválidas.');
+    out.pauses = o.pauses.map(x => {
+      if (!x || !isDate(x.from) || (x.to != null && !isDate(x.to)) || (x.to != null && x.to < x.from)) throw bad('Pausas inválidas.');
+      return { from: x.from, to: x.to == null ? null : x.to };
+    });
+  }
   if (!Array.isArray(o.items) || o.items.length > 200) throw bad('Conteúdos inválidos.');
   out.items = o.items.map(i => {
     const it = { f: str(i.f, 40, 'Conteúdo'), h0: i.h0 == null ? null : num(i.h0, 0, 24, 'Hora do vídeo'), h1: i.h1 == null ? null : num(i.h1, 0, 24, 'Hora do vídeo'), d0: i.d0 || null, d1: i.d1 || null, ppm: Math.round(num(i.ppm == null ? 1 : i.ppm, 1, 12, 'Vezes por minuto')) };
@@ -138,6 +171,8 @@ function cleanCampaign(o, id) {
     if (!getDoc('contents', it.f)) throw bad('Conteúdo inexistente.');
     return it;
   });
+  // campos que só o servidor escreve (avisos e relatório final já enviados ao comercial)
+  ['warnFor', 'salesSentAt'].forEach(k => { if (old && old[k] != null) out[k] = old[k]; });
   return out;
 }
 function cleanUserDoc(o, id, old) {
@@ -155,20 +190,50 @@ function cleanUserDoc(o, id, old) {
   if (notif) { if (typeof notif !== 'object' || JSON.stringify(notif).length > 200000) throw bad('Preferências inválidas.'); out.notif = notif; }
   const ui = o.ui === undefined ? (old && old.ui) : o.ui;
   if (ui) { if (typeof ui !== 'object' || JSON.stringify(ui).length > 50000) throw bad('Preferências inválidas.'); out.ui = ui; }
+  // dados de segurança: só o servidor os escreve
+  ['recovery', 'twoFA'].forEach(k => { if (old && old[k] != null) out[k] = old[k]; });
   return out;
+}
+
+/* ---------- conteúdos: ecrãs permitidos e spot da Enif ---------- */
+const sharedCtx = () => ({ contents: docs('contents') });
+/* valida os ecrãs de um conteúdo (e o limite de spots por ecrã). Devolve a lista limpa. */
+function checkContentScreens(cand, screenIds) {
+  if (!Array.isArray(screenIds) || !screenIds.length) throw bad('Escolha pelo menos um ecrã.');
+  const all = docs('screens'), list = ids(screenIds, 'Ecrãs');
+  list.forEach(id => {
+    const sc = all.find(x => x.id === id);
+    if (!sc) throw bad('O ecrã ' + id + ' não existe.');
+    if (!S.fitOf(cand, sc).ok) throw bad('O ecrã ' + id + ' (' + sc.venue + ') não serve a este conteúdo: a proporção difere mais de ' + S.FIT_PX + ' px.');
+  });
+  if (cand.house) {
+    const others = docs('contents').filter(f => f.id !== cand.id), c2 = Object.assign({}, cand, { screens: list });
+    all.forEach(sc => {
+      if (!S.okFor(c2, sc)) return;
+      if (S.houseCnt(sc, { contents: others }, cand.id) >= S.HOUSE_MAX) throw bad('O ecrã ' + sc.id + ' (' + sc.venue + ') já tem ' + S.HOUSE_MAX + ' spots da Enif. Tire este ecrã ou deixe de usar outro spot.');
+    });
+  }
+  return list;
 }
 
 /* ---------- sincronização (alterações vindas da interface) ---------- */
 const PL_FIELDS = ['order', 'limit', 'draft'];
+const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(n[k], old[k]));
 function applyOp(user, op) {
   if (!op || typeof op !== 'object') throw bad('Pedido inválido.');
   const { coll, id } = op;
   if (typeof id !== 'string' || !id || id.length > 80 || !/^[\w.\-]+$/.test(id)) throw bad('Identificador inválido.');
   if (op.op === 'del') {
     if (coll === 'alerts') { need(user, 'alertas.resolver'); run('INSERT OR IGNORE INTO resolved(id,ts) VALUES(?,?)', id, Date.now()); return; }
-    if (coll === 'folders') { need(user, 'conteudos.gerir'); delDoc('folders', id); return; }
-    if (coll === 'campaigns') { need(user, 'campanhas.gerir'); delDoc('campaigns', id); return; }
-    if (coll === 'screens') { need(user, 'ecras.gerir'); delDoc('screens', id); run('DELETE FROM secrets WHERE coll=? AND id=?', 'screens', id); return; }
+    if (coll === 'folders') { need(user, 'conteudos.gerir'); const f = getDoc('folders', id); delDoc('folders', id); if (f) audit(user, 'Eliminou a pasta', f.name); return; }
+    if (coll === 'campaigns') { need(user, 'campanhas.gerir'); const c = getDoc('campaigns', id); delDoc('campaigns', id); if (c) audit(user, 'Eliminou a campanha', c.name); return; }
+    if (coll === 'screens') {
+      need(user, 'ecras.gerir'); const sc = getDoc('screens', id);
+      delDoc('screens', id); run('DELETE FROM secrets WHERE coll=? AND id=?', 'screens', id);
+      docs('contents').forEach(f => { if (Array.isArray(f.screens) && f.screens.indexOf(id) > -1) putDoc('contents', f.id, Object.assign({}, f, { screens: f.screens.filter(x => x !== id) })); });
+      if (sc) audit(user, 'Eliminou o ecrã', id + ' · ' + sc.venue);
+      return;
+    }
     throw new HttpError(403, 'Não é possível apagar isto.');
   }
   if (op.op !== 'put' || !op.doc || typeof op.doc !== 'object') throw bad('Pedido inválido.');
@@ -179,28 +244,54 @@ function applyOp(user, op) {
     op.keys.slice(0, 40).forEach(k => { if (typeof k === 'string' && k !== '__proto__') d[k] = op.doc[k]; });
   }
   if (coll === 'screens') {
-    const n = cleanScreen(d, id);
-    if (!old) { need(user, 'ecras.gerir'); putDoc('screens', id, n); setSecret('screens', id, uid(10)); return; }
-    const ch = Object.keys(n).filter(k => !same(n[k], old[k]));
+    const n = cleanScreen(d, id, old);
+    if (!old) { need(user, 'ecras.gerir'); putDoc('screens', id, n); setSecret('screens', id, uid(10)); audit(user, 'Criou o ecrã', id + ' · ' + n.venue); return; }
+    const ch = diffKeys(n, old);
     ch.forEach(k => need(user, PL_FIELDS.indexOf(k) > -1 ? 'playlist.gerir' : 'ecras.gerir'));
-    if (ch.length) putDoc('screens', id, n);
+    if (ch.length) {
+      putDoc('screens', id, n);
+      const plOnly = ch.every(k => PL_FIELDS.indexOf(k) > -1);
+      audit(user, plOnly ? 'Alterou a playlist do ecrã' : 'Alterou o ecrã', id + ' · ' + ch.join(', '));
+    }
   } else if (coll === 'campaigns') {
-    const n = cleanCampaign(d, id);
-    if (!old) { need(user, 'campanhas.gerir'); putDoc('campaigns', id, n); return; }
-    const ch = Object.keys(n).filter(k => !same(n[k], old[k]));
+    const n = cleanCampaign(d, id, old);
+    if (!old) { need(user, 'campanhas.gerir'); putDoc('campaigns', id, n); audit(user, 'Criou a campanha', n.name); return; }
+    const ch = diffKeys(n, old);
     if (ch.length && !(ch.length === 1 && ch[0] === 'items' && A.can(user, 'conteudos.gerir'))) need(user, 'campanhas.gerir');
-    if (ch.length) putDoc('campaigns', id, n);
+    if (ch.length) {
+      // se a data de fim mudou, o aviso de fim volta a poder sair para a nova data
+      if (ch.indexOf('end') > -1) delete n.warnFor;
+      putDoc('campaigns', id, n);
+      const op0 = (old.pauses || []).filter(p => !p.to).length, op1 = n.pauses.filter(p => !p.to).length;
+      if (ch.indexOf('pauses') > -1 && op1 > op0) audit(user, 'Pausou a campanha', n.name);
+      else if (ch.indexOf('pauses') > -1 && op1 < op0) audit(user, 'Retomou a campanha', n.name);
+      else audit(user, 'Atualizou a campanha', n.name);
+    }
   } else if (coll === 'contents') {
     need(user, 'conteudos.gerir');
     if (!old) throw bad('Os conteúdos entram pelo carregamento de ficheiros.');
-    const folder = d.folder || null;
+    const folder = d.folder === undefined ? (old.folder || null) : (d.folder || null);
     if (folder && !getDoc('folders', folder)) throw bad('Pasta inexistente.');
-    if (folder !== (old.folder || null)) putDoc('contents', id, Object.assign({}, old, { folder }));
+    const n = Object.assign({}, old, { folder });
+    const wantHouse = d.house === undefined ? !!old.house : !!d.house;
+    if (wantHouse !== !!old.house) {
+      if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
+      n.house = wantHouse;
+    }
+    const scr = d.screens === undefined ? null : d.screens;
+    const changedScreens = scr !== null && !same(scr, old.screens || null);
+    if (changedScreens && (old.house || n.house) && !user.admin) throw new HttpError(403, 'Só o administrador pode alterar este conteúdo.');
+    if (changedScreens || (n.house && !old.house)) n.screens = checkContentScreens(n, changedScreens ? scr : (old.screens || docs('screens').map(x => x.id)));
+    putDoc('contents', id, n);
+    if (folder !== (old.folder || null)) audit(user, 'Moveu um conteúdo de pasta', old.name);
+    if (n.house !== !!old.house) audit(user, n.house ? 'Marcou como spot da Enif' : 'Deixou de ser spot da Enif', old.name);
+    if (changedScreens) audit(user, 'Alterou os ecrãs de um conteúdo', old.name + ' → ' + n.screens.join(', '));
   } else if (coll === 'folders') {
     need(user, 'conteudos.gerir');
     const name = str(d.name, 80, 'Nome da pasta'); if (!name) throw bad('Dê um nome à pasta.');
     if (docs('folders').some(p => p.id !== id && p.name.toLowerCase() === name.toLowerCase())) throw bad('Já existe uma pasta com esse nome.');
     putDoc('folders', id, { id, name });
+    audit(user, old ? 'Renomeou a pasta' : 'Criou a pasta', name);
   } else if (coll === 'users') {
     const self = user.id === id;
     if (!user.admin) {
@@ -219,6 +310,8 @@ function applyOp(user, op) {
     putDoc('users', id, n);
     if (pass) { const h = A.hashPassword(pass); setSecret('users', id, h.salt, h.hash); }
     if (!self && (pass || !n.active || (old && !same(old.perms, n.perms)) || (old && old.admin !== n.admin))) run('DELETE FROM sessions WHERE user=?', id);
+    if (!old) audit(user, 'Criou o utilizador', n.name);
+    else if (!self || pass) audit(user, 'Atualizou o utilizador', n.name + (pass ? ' (palavra-passe redefinida pelo administrador)' : ''));
   } else throw bad('Coleção desconhecida.');
 }
 function sync(user, ops) {
@@ -252,6 +345,10 @@ function screenViews(withKeys) {
     if (!lv || !lv.last_seen) { o.status = 'novo'; o.ping = ''; o.uptime = ''; return o; }
     const age = now - lv.last_seen, mins = Math.max(1, Math.round(age / 60000));
     o.lastSeen = lv.last_seen; o.ver = lv.ver; o.queue = lv.queue;
+    if (lv.disk_total > 0) {
+      o.disk = { free: lv.disk_free, total: lv.disk_total };
+      if (lv.disk_free / lv.disk_total < 0.1) { const dk = 'disk-' + s.id + '-' + ln.date; if (!resolved.has(dk)) alerts.push({ id: dk, sev: 'warn', screen: s.id, title: 'Disco quase cheio', detail: 'Só restam ' + lv.disk_free + ' GB livres no PC deste ecrã (de ' + lv.disk_total + ' GB). Liberte espaço ou use um disco maior.', time: fmtHM(now) }); }
+    }
     o.nowCamp = age < ONLINE_MS ? lv.now_c : null; o.nowFile = age < ONLINE_MS ? lv.now_f : null;
     o.ping = age < 90000 ? 'há ' + Math.max(1, Math.round(age / 1000)) + ' s' : 'há ' + mins + ' min';
     const tt = tmap[s.id], total = tt ? tt.total : 0, failed = tt ? total - tt.good : 0;
@@ -285,24 +382,32 @@ function buildState(user) {
 }
 
 /* ---------- playlist de um ecrã (player) ---------- */
+/* Para cada hora de hoje e de amanhã: { seq:[entradas da volta, por ordem], spot5 } ou null (ecrã desligado).
+   Entrada de campanha: { c, n, dur, items:[ficheiros, por ordem de alternância] }.
+   Entrada de spot da Enif: { c:'__spot', spot:true, dur, files:[…] } (com 2 spots, alternam volta a volta).
+   spot5: o spot que interrompe o loop a cada SPOT_GAP segundos quando o ecrã está cheio. */
 function playlistFor(scr) {
-  const camps = docs('campaigns');
-  const sch = { venue: scr.venue, on_h: scr.on, off_h: scr.off, lim: scr.limit, ord: JSON.stringify(scr.order || []) };
+  const camps = docs('campaigns'), ctx = sharedCtx();
   const now = S.lisbonNow(TZ), days = {}, used = {};
   [now.date, S.addDay(now.date, 1)].forEach(d => {
-    days[d] = S.dayLoops(sch, camps, d);
-    Object.values(days[d]).forEach(l => (l || []).forEach(e => e.items.forEach(f => { used[f] = 1; })));
+    days[d] = S.dayLoops(scr, camps, d, ctx, now.date);
+    Object.values(days[d]).forEach(l => { if (l) l.seq.concat(l.spot5 ? [l.spot5] : []).forEach(e => (e.spot ? e.files : e.items).forEach(f => { used[f] = 1; })); });
   });
   const files = {};
   Object.keys(used).forEach(id => {
     const f = getDoc('contents', id), fl = q1('SELECT * FROM files WHERE id=?', id);
-    if (f && fl) files[id] = { name: f.name, type: f.type, dur: f.secs || 10, size: fl.size, mime: fl.mime };
+    if (f && fl) files[id] = { name: f.name, type: f.type, dur: f.secs || 10, size: fl.size, mime: fl.mime, res: f.res, spot: !!f.house };
   });
-  Object.values(days).forEach(day => Object.keys(day).forEach(h => {      // retira vídeos que já não existem
-    if (day[h]) day[h] = day[h].map(e => Object.assign(e, { items: e.items.filter(f => files[f]) })).filter(e => e.items.length);
+  const keep = e => { if (e.spot) e.files = e.files.filter(f => files[f]); else e.items = e.items.filter(f => files[f]); return e.spot ? e.files.length > 0 : e.items.length > 0; };
+  Object.values(days).forEach(day => Object.keys(day).forEach(h => {      // retira ficheiros que já não existem
+    const l = day[h]; if (!l) return;
+    l.seq = l.seq.filter(keep);
+    if (l.spot5 && !keep(l.spot5)) l.spot5 = null;
+    if (!l.seq.length) l.spot5 = null;
   }));
   const lv = q1('SELECT reload FROM live WHERE screen=?', scr.id);
-  return { playerVersion: PLAYER_VERSION, tz: TZ, generated: Date.now(), reload: lv ? lv.reload : 0, screen: { code: scr.id, venue: scr.venue, spot: scr.spot }, days, files };
+  return { playerVersion: PLAYER_VERSION, tz: TZ, generated: Date.now(), reload: lv ? lv.reload : 0, spotGap: S.SPOT_GAP,
+    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', bri: scr.bri || null }, days, files };
 }
 function screenAuth(code, key) {
   const s = getDoc('screens', String(code || '')); if (!s) return null;
@@ -319,12 +424,16 @@ function playerApi(req, res, u, body) {
   if (req.method === 'POST' && p === '/api/player/heartbeat') {
     const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
     const now = Date.now(), w = Math.round(+body.w) || null, h = Math.round(+body.h) || null;
-    run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h) VALUES(?,?,?,?,?,?,?,?,?)
-         ON CONFLICT(screen) DO UPDATE SET last_seen=excluded.last_seen, now_c=excluded.now_c, now_f=excluded.now_f, ver=excluded.ver, queue=excluded.queue, w=excluded.w, h=excluded.h`,
-      s.id, now, now, body.c || null, body.f || null, String(body.ver || ''), +body.queue || 0, w, h);
+    const dk = body.disk && +body.disk.total > 0 ? { f: Math.round(+body.disk.free) || 0, t: Math.round(+body.disk.total) } : null;
+    run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h,disk_free,disk_total) VALUES(?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(screen) DO UPDATE SET last_seen=excluded.last_seen, now_c=excluded.now_c, now_f=excluded.now_f, ver=excluded.ver, queue=excluded.queue, w=excluded.w, h=excluded.h,
+         disk_free=COALESCE(excluded.disk_free,disk_free), disk_total=COALESCE(excluded.disk_total,disk_total)`,
+      s.id, now, now, body.c || null, body.f || null, String(body.ver || ''), +body.queue || 0, w, h, dk ? dk.f : null, dk ? dk.t : null);
+    if (+body.ack > 0) run('DELETE FROM cmds WHERE screen=? AND id<=?', s.id, +body.ack);
     run('INSERT OR IGNORE INTO beats(screen,minute) VALUES(?,?)', s.id, Math.floor(now / 60000));
     if (s.res === 'auto' && w && h && w >= 240 && h >= 240) putDoc('screens', s.id, Object.assign({}, s, { res: w + '×' + h }));
-    return send(res, 200, { ok: true, serverTime: now });
+    const lv2 = q1('SELECT reload FROM live WHERE screen=?', s.id);
+    return send(res, 200, { ok: true, serverTime: now, reload: lv2 ? lv2.reload : 0, cmds: q('SELECT id,kind FROM cmds WHERE screen=? ORDER BY id', s.id) });
   }
   if (req.method === 'POST' && p === '/api/player/plays') {
     const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
@@ -373,10 +482,12 @@ async function upload(req, res, u) {
   if (!type) throw bad('Tipo de ficheiro não suportado. Use imagens, vídeos ou HTML5.');
   if (html) mime = 'text/html; charset=utf-8';
   if (!/^[\w.+\-]+\/[\w.+\-]+(;.*)?$/.test(mime)) throw bad('Tipo de ficheiro inválido.');
+  const wantHouse = u.searchParams.get('house') === '1';
+  if (wantHouse && !user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
+  const screenIds = String(u.searchParams.get('screens') || '').split(',').map(x => x.trim()).filter(Boolean);
+  if (!screenIds.length) throw bad('Escolha pelo menos um ecrã.');
   const declared = +req.headers['content-length'] || 0;
   if (declared > MAX_UPLOAD) throw new HttpError(413, 'O ficheiro é demasiado grande (máximo ' + Math.round(MAX_UPLOAD / 1048576) + ' MB).');
-  const secs = Math.round((+u.searchParams.get('secs') || 0) * 10) / 10;
-  const resTxt = html ? 'Responsivo' : (/^\d{2,5}×\d{2,5}$/.test(u.searchParams.get('res') || '') ? u.searchParams.get('res') : '—');
   const folder = u.searchParams.get('folder') || null;
   if (folder && !getDoc('folders', folder)) throw bad('Pasta inexistente.');
   const id = 'F' + uid(5), file = path.join(MEDIA, id);
@@ -386,11 +497,19 @@ async function upload(req, res, u) {
     req.on('data', c => { n += c.length; if (n > MAX_UPLOAD) { ko(new HttpError(413, 'O ficheiro é demasiado grande.')); req.destroy(); w.destroy(); } });
     req.pipe(w); w.on('finish', ok); w.on('error', ko); req.on('error', ko); req.on('aborted', () => ko(bad('Envio interrompido.')));
   }).catch(e => { try { fs.unlinkSync(file); } catch (x) { } throw e; });
-  if (!n) { fs.unlinkSync(file); throw bad('Ficheiro vazio.'); }
-  const dur = type === 'Imagem' ? 10 : (secs > 0 ? secs : 10);
-  const doc = { id, name, type, res: resTxt, dur: type === 'Imagem' ? '' : Math.round(dur) + ' s', secs: dur, size: sizeTxt(n), folder, ready: true };
+  const drop = () => { try { fs.unlinkSync(file); } catch (x) { } };
+  if (!n) { drop(); throw bad('Ficheiro vazio.'); }
+  // o servidor lê a resolução e a duração do próprio ficheiro; só se não conseguir usa o que o browser disse
+  const got = await M.probe(file, type);
+  const hint = /^\d{2,5}×\d{2,5}$/.test(u.searchParams.get('res') || '') ? u.searchParams.get('res') : '';
+  const resTxt = html ? 'Responsivo' : (got.res || hint || 'Por detetar');
+  const secs0 = got.secs || Math.round((+u.searchParams.get('secs') || 0) * 10) / 10;
+  const dur = type === 'Imagem' ? 10 : (secs0 > 0 ? secs0 : 10);
+  const doc = { id, name, type, res: resTxt, dur: type === 'Imagem' ? '' : Math.round(dur) + ' s', secs: dur, size: sizeTxt(n), bytes: n, folder, ready: true, house: wantHouse };
+  try { doc.screens = checkContentScreens(doc, screenIds); } catch (e) { drop(); throw e; }
   db.exec('BEGIN');
-  try { run('INSERT INTO files(id,mime,size) VALUES(?,?,?)', id, mime, n); putDoc('contents', id, doc); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); throw e; }
+  try { run('INSERT INTO files(id,mime,size) VALUES(?,?,?)', id, mime, n); putDoc('contents', id, doc); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); drop(); throw e; }
+  audit(user, 'Carregou conteúdos', name + (wantHouse ? ' (spot da Enif)' : ''));
   send(res, 200, doc);
 }
 
@@ -458,6 +577,16 @@ const router = async (req, res) => {
     const user = needUser(req, u); need(user, 'ecras.gerir');
     if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
     run('INSERT INTO live(screen,reload) VALUES(?,1) ON CONFLICT(screen) DO UPDATE SET reload=reload+1', r[1]);
+    audit(user, 'Reiniciou o player', r[1]);
+    return send(res, 200, { ok: true });
+  }
+  if ((r = /^\/api\/screens\/([\w.\-]+)\/(sync-now|test)$/.exec(p)) && m === 'POST') {
+    const user = needUser(req, u);
+    if (r[2] === 'test') need(user, 'ecras.gerir'); else if (!A.can(user, 'ecras.gerir') && !A.can(user, 'playlist.gerir')) throw new HttpError(403, 'Não tem permissão para esta ação.');
+    const sc = getDoc('screens', r[1]); if (!sc) throw new HttpError(404, 'Ecrã não existe');
+    run('DELETE FROM cmds WHERE screen=? AND kind=?', sc.id, r[2]);
+    run('INSERT INTO cmds(screen,kind,ts) VALUES(?,?,?)', sc.id, r[2], Date.now());
+    audit(user, r[2] === 'test' ? 'Teste no ecrã' : 'Atualizar agora no ecrã', sc.id + ' · ' + sc.venue);
     return send(res, 200, { ok: true });
   }
   if (p.startsWith('/api/player/')) return playerApi(req, res, u, m === 'POST' ? await readJson(req, 5e6) : {});

@@ -80,17 +80,18 @@ async function main() {
 
   // ---- conteúdos
   const up = async (tk, name, mime, bytes, q) => {
-    const r = await fetch(base + '/api/upload?name=' + encodeURIComponent(name) + '&mime=' + encodeURIComponent(mime) + (q || ''), { method: 'PUT', headers: { Authorization: 'Bearer ' + tk }, body: bytes });
+    const r = await fetch(base + '/api/upload?name=' + encodeURIComponent(name) + '&mime=' + encodeURIComponent(mime) + (q && q.indexOf('screens=') > -1 ? '' : '&screens=ECR-001') + (q || ''), { method: 'PUT', headers: { Authorization: 'Bearer ' + tk }, body: bytes });
     return { s: r.status, j: await r.json() };
   };
-  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', 'base64');
+  const mkPng = (w, h) => { const b = Buffer.alloc(33 + 12); Buffer.from('89504e470d0a1a0a', 'hex').copy(b, 0); b.writeUInt32BE(13, 8); b.write('IHDR', 12); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20); b[24] = 8; b[25] = 2; b.write('IEND', 37); return b; };
+  const png = mkPng(1920, 1080);
   ok('só consulta não carrega ficheiros', (await up(tpl2, 'a.png', 'image/png', png)).s === 403);
   ok('tipos perigosos recusados', (await up(top, 'x.exe', 'application/octet-stream', png)).s === 400);
   ok('ficheiro vazio recusado', (await up(top, 'a.png', 'image/png', Buffer.alloc(0))).s === 400);
-  let f1 = await up(top, 'logo.png', 'image/png', png, '&res=1920%C3%971080');
-  ok('imagem carregada', f1.s === 200 && f1.j.type === 'Imagem' && f1.j.res === '1920×1080' && f1.j.secs === 10);
+  let f1 = await up(top, 'logo.png', 'image/png', png, '&res=800%C3%97600');
+  ok('imagem carregada (a resolução é lida do próprio ficheiro)', f1.s === 200 && f1.j.type === 'Imagem' && f1.j.res === '1920×1080' && f1.j.secs === 10 && f1.j.screens.join() === 'ECR-001' && f1.j.house === false);
   let f2 = await up(top, 'spot.mp4', 'video/mp4', Buffer.alloc(5000, 1), '&secs=15.4&res=1280%C3%97720');
-  ok('vídeo com duração', f2.s === 200 && f2.j.type === 'Vídeo' && f2.j.dur === '15 s');
+  ok('vídeo com duração (dica do browser quando não há ffprobe)', f2.s === 200 && f2.j.type === 'Vídeo' && f2.j.dur === '15 s' && f2.j.bytes === 5000);
   let f3 = await up(top, 'oferta.html', 'text/plain', Buffer.from('<h1>olá</h1>'));
   ok('HTML5 reconhecido pelo nome', f3.s === 200 && f3.j.type === 'HTML5' && f3.j.res === 'Responsivo');
   ok('listagem de conteúdos', (await call('GET', '/api/state', undefined, top)).j.contents.length === 3);
@@ -118,7 +119,7 @@ async function main() {
   ok('playlist exige a chave', (await call('GET', '/api/player/playlist?code=ECR-001&key=errada')).s === 401);
   r = await call('GET', '/api/player/playlist?code=ECR-001&key=' + key);
   const hNow = S.lisbonNow('Europe/Lisbon').h, loop = r.j.days[today][hNow];
-  ok('playlist tem o loop desta hora com duração e ficheiros', r.s === 200 && loop.length === 1 && loop[0].dur === 10 && loop[0].items.length === 2 && Object.keys(r.j.files).length === 2);
+  ok('playlist tem o loop desta hora com duração e ficheiros', r.s === 200 && loop.seq.length === 1 && loop.seq[0].dur === 10 && loop.seq[0].items.length === 2 && Object.keys(r.j.files).length === 2 && r.j.screen.fit === 'caber');
   ok('playlist tem hoje e amanhã', Object.keys(r.j.days).length === 2);
   ok('ficheiro do player acessível com a chave do ecrã', (await fetch(base + `/media/${f1.j.id}?code=ECR-001&key=${key}`)).status === 200);
   const hb = (o) => call('POST', '/api/player/heartbeat', Object.assign({ code: 'ECR-001', key, c: 'C1', f: f1.j.id, queue: 0, ver: '2', w: 1080, h: 1920 }, o || {}));
