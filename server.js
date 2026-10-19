@@ -3,6 +3,7 @@
 const http = require('node:http'), fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const S = require('./lib/schedule');
+const MAIL = require('./lib/mail'), REPORT = require('./lib/report');
 const A = require('./lib/auth');
 const M = require('./lib/media');
 
@@ -60,7 +61,7 @@ const setSecret = (coll, id, a, b) => run('INSERT INTO secrets(coll,id,a,b) VALU
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const bad = (msg) => new HttpError(400, msg);
 const send = (res, code, body, type = 'application/json; charset=utf-8', extra = {}) => {
-  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin' }, extra));
+  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' }, extra));
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 };
 function readJson(req, limit = 3e6) {
@@ -172,7 +173,7 @@ function cleanCampaign(o, id, old) {
     return it;
   });
   // campos que só o servidor escreve (avisos e relatório final já enviados ao comercial)
-  ['warnFor', 'salesSentAt'].forEach(k => { if (old && old[k] != null) out[k] = old[k]; });
+  ['warnFor', 'salesSentAt', 'salesSentFor', 'salesTries', 'salesTryAt', 'salesTryFor'].forEach(k => { if (old && old[k] != null) out[k] = old[k]; });
   return out;
 }
 function cleanUserDoc(o, id, old) {
@@ -374,11 +375,16 @@ function screenViews(withKeys) {
 }
 function buildState(user) {
   const sv = screenViews(A.can(user, 'ecras.gerir'));
-  return {
+  const st = {
     me: publicUser(user), now: S.lisbonNow(TZ), serverTime: Date.now(), tz: TZ,
     screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: docs('contents', true), folders: docs('folders'),
-    users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION
+    users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady()
   };
+  if (user.admin) {
+    st.auditLog = q('SELECT ts,who,ip,what,detail FROM audit ORDER BY id DESC LIMIT 300').map(a => ({ t: a.ts, who: a.who, what: a.what, detail: a.detail }));
+    st.backups = backupList(10); st.emailLog = emailList();
+  }
+  return st;
 }
 
 /* ---------- playlist de um ecrã (player) ---------- */
@@ -542,27 +548,283 @@ function seedAdmin(reset) {
   const old = docs('users').find(u => u.email === a.email), id = old ? old.id : 'u' + uid(4), h = A.hashPassword(a.pass);
   db.exec('BEGIN');
   try {
-    putDoc('users', id, Object.assign({}, old || {}, { id, name: old ? old.name : a.name, email: a.email, admin: true, perms: A.PERMS.slice(), until: null, active: true }));
+    putDoc('users', id, Object.assign({}, old || {}, { id, name: old ? old.name : a.name, email: a.email, admin: true, perms: A.PERMS.slice(), until: null, active: true }, reset ? { twoFA: false } : {}));
     setSecret('users', id, h.salt, h.hash); run('DELETE FROM sessions WHERE user=?', id); db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   return old ? 'reposto' : 'criado';
 }
 const SEED = seedAdmin(process.argv.includes('--reset-admin'));
+/* e-mail de recuperação do administrador: vem do ficheiro de configuração, se ainda não houver um guardado */
+(function () {
+  const rec = String(readConfig().emailRecuperacao || '').trim().toLowerCase(); if (!validEmail(rec)) return;
+  docs('users').filter(x => x.admin && !x.recovery).forEach(x => putDoc('users', x.id, Object.assign({}, x, { recovery: rec })));
+})();
+
+/* ---------- tabelas de segurança e de envios ---------- */
+db.exec(`
+CREATE TABLE IF NOT EXISTS chal(id TEXT PRIMARY KEY, kind TEXT NOT NULL, user TEXT, salt TEXT, hash TEXT, exp INTEGER NOT NULL, tries INTEGER DEFAULT 0, data TEXT);
+CREATE TABLE IF NOT EXISTS emails(id TEXT PRIMARY KEY, ts INTEGER NOT NULL, kind TEXT NOT NULL, camp TEXT, camp_name TEXT, to_addr TEXT NOT NULL, subject TEXT NOT NULL, msg_id TEXT, file TEXT, bytes INTEGER, sha TEXT);
+CREATE TRIGGER IF NOT EXISTS emails_no_update BEFORE UPDATE ON emails BEGIN SELECT RAISE(ABORT, 'O registo de envios só se acrescenta'); END;
+CREATE TRIGGER IF NOT EXISTS emails_no_delete BEFORE DELETE ON emails BEGIN SELECT RAISE(ABORT, 'O registo de envios só se acrescenta'); END;
+CREATE TABLE IF NOT EXISTS email_events(id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, ts INTEGER NOT NULL, st TEXT NOT NULL, txt TEXT);
+CREATE TRIGGER IF NOT EXISTS email_events_no_update BEFORE UPDATE ON email_events BEGIN SELECT RAISE(ABORT, 'O registo de envios só se acrescenta'); END;
+CREATE TRIGGER IF NOT EXISTS email_events_no_delete BEFORE DELETE ON email_events BEGIN SELECT RAISE(ABORT, 'O registo de envios só se acrescenta'); END;
+`);
+const BACKUPS = path.join(DATA, 'backups'), REPORTS = path.join(DATA, 'reports');
+fs.mkdirSync(BACKUPS, { recursive: true }); fs.mkdirSync(REPORTS, { recursive: true });
+const END_WARN = 7;                      // dias antes do fim em que se avisa o comercial
+
+/* ---------- configuração do e-mail (ficheiro enif-config.json ou variáveis; nunca vai para o GitHub) ---------- */
+function readConfig() {
+  const file = process.env.CONFIG_FILE || path.join(__dirname, 'enif-config.json');
+  try { if (fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8')); } catch (e) { /* já avisado no arranque */ }
+  return {};
+}
+function smtpCfg() {
+  const c = readConfig().smtp || {}, e = process.env;
+  const host = String(e.SMTP_HOST || c.servidor || '').trim(); if (!host) return null;
+  const port = +(e.SMTP_PORT || c.porta) || 587, secure = e.SMTP_SECURE != null ? e.SMTP_SECURE === '1' : (c.seguro != null ? !!c.seguro : port === 465);
+  const user = String(e.SMTP_USER || c.utilizador || ''), pass = String(e.SMTP_PASS || c.palavraPasse || ''), from = String(e.SMTP_FROM || c.de || user || '').trim();
+  if (!from || !/@/.test(from)) return null;
+  return { host, port, secure, user, pass, from, allowPlain: e.SMTP_PLAIN === '1' || c.semCifra === true, rejectUnauthorized: e.SMTP_INSECURE !== '1' };
+}
+const smtpReady = () => !!smtpCfg();
+
+/* ---------- desafios (códigos de 6 dígitos): entrada em dois passos, recuperação, mudança do e-mail de recuperação ---------- */
+const sha = b => crypto.createHash('sha256').update(b).digest('hex');
+function newChallenge(kind, userId, ttlMs, data) {
+  const id = uid(16), code = String(crypto.randomInt(0, 1e6)).padStart(6, '0'), salt = uid(8);
+  run('DELETE FROM chal WHERE exp<?', Date.now());
+  if (userId) run('DELETE FROM chal WHERE user=? AND kind=?', userId, kind);
+  run('INSERT INTO chal(id,kind,user,salt,hash,exp,tries,data) VALUES(?,?,?,?,?,?,0,?)', id, kind, userId || null, salt, sha(salt + code), Date.now() + ttlMs, data ? JSON.stringify(data) : null);
+  return { id, code };
+}
+/* confere o código; 5 erros ou expirado = desafio apagado. Não apaga quando certo (quem chama apaga depois de agir). */
+function checkChallenge(id, kind, code) {
+  const c = q1('SELECT * FROM chal WHERE id=? AND kind=?', String(id || ''), kind);
+  if (!c) throw new HttpError(400, 'Código incorreto ou expirado. Peça um novo.');
+  if (c.exp < Date.now()) { run('DELETE FROM chal WHERE id=?', c.id); throw new HttpError(400, 'O código expirou. Peça um novo.'); }
+  const a = Buffer.from(sha(c.salt + String(code || '').trim())), b = Buffer.from(c.hash);
+  if (!(a.length === b.length && crypto.timingSafeEqual(a, b))) {
+    run('UPDATE chal SET tries=tries+1 WHERE id=?', c.id);
+    if (c.tries + 1 >= 5) { run('DELETE FROM chal WHERE id=?', c.id); audit(null, 'Código falhado 5 vezes', kind + ' · ' + (c.user || '')); throw new HttpError(400, 'Demasiadas tentativas. Peça um novo código.'); }
+    throw new HttpError(400, 'Código incorreto.');
+  }
+  return Object.assign({}, c, { data: c.data ? JSON.parse(c.data) : null });
+}
+async function mailCode(to, subject, text) {
+  const cfg = smtpCfg(); if (!cfg) throw new HttpError(503, 'O envio de e-mail ainda não está configurado no servidor.');
+  try { await MAIL.send(cfg, { to, subject, text }); } catch (e) { console.error('E-mail de código falhou:', e.message); throw new HttpError(503, 'Não foi possível enviar o e-mail com o código. Tente de novo daqui a pouco.'); }
+}
+const codeText = (code, why, min) => 'Olá,\n\n' + why + '\n\nCódigo: ' + code + '\n\nÉ válido durante ' + min + ' minutos. Se não foi você, ignore esta mensagem e não partilhe o código com ninguém.\n\nEnif DOOH';
+const ipOf = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+const minPass = p => { if (String(p || '').length < 10) throw bad('A palavra-passe precisa de pelo menos 10 caracteres.'); return String(p); };
+function setPassword(userId, pass) {
+  const h = A.hashPassword(pass); setSecret('users', userId, h.salt, h.hash); run('DELETE FROM sessions WHERE user=?', userId);
+}
+
+/* ---------- registo de envios ao comercial (imutável; só se acrescentam passos) ---------- */
+function emailEvent(id, st, txt) { run('INSERT INTO email_events(email,ts,st,txt) VALUES(?,?,?,?)', id, Date.now(), st, String(txt || '').slice(0, 500)); }
+function emailList() {
+  const evs = q('SELECT email,ts,st,txt FROM email_events ORDER BY id'), by = {};
+  evs.forEach(e => { (by[e.email] = by[e.email] || []).push({ st: e.st, t: e.ts, txt: e.txt }); });
+  return q('SELECT * FROM emails ORDER BY ts DESC LIMIT 500').map(e => ({ id: e.id, kind: e.kind, camp: e.camp, campName: e.camp_name, to: e.to_addr, subject: e.subject, msgId: e.msg_id, file: e.file || '', kb: e.bytes ? Math.max(1, Math.round(e.bytes / 1024)) : 0, sha: e.sha || '', events: by[e.id] || [] }));
+}
+const slug = n => String(n).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const dPt = d => d.slice(8, 10) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4);
+const dayDiff = (a, b) => Math.round((new Date(a + 'T00:00:00Z') - new Date(b + 'T00:00:00Z')) / 864e5);
+
+async function finalReportPdf(c) {
+  const scrs = docs('screens').filter(s => c.venues.indexOf(s.venue) > -1);
+  const rows = scrs.length ? q(`SELECT screen s, camp c, file f, day d, hour h, SUM(ok) n, COUNT(*)-SUM(ok) bad, ROUND(SUM(CASE WHEN ok=1 THEN dur ELSE 0 END)) sec FROM plays WHERE day>=? AND day<=? AND screen IN (${scrs.map(() => '?').join(',')}) GROUP BY screen,camp,file,day,hour`, c.start, c.end, ...scrs.map(s => s.id)) : [];
+  const files = {}, tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'enif-pdf-'));
+  try {
+    const ids = [...new Set(rows.filter(r => r.c === c.id).map(r => r.f))];
+    for (const id of ids) {
+      const f = getDoc('contents', id); if (!f) continue;
+      const out = path.join(tmp, id + '.jpg'); let jpg = null;
+      try { if (await M.jpegStill(path.join(MEDIA, path.basename(id)), f.type, out, 2)) jpg = fs.readFileSync(out); } catch (e) { }
+      files[id] = { name: f.name, jpg };
+    }
+    return REPORT.buildReport(c, rows, scrs, files, Date.now());
+  } finally { fs.rmSync(tmp, { recursive: true, force: true }); }
+}
+/* envia (ou tenta) uma mensagem ao comercial e regista cada passo. Devolve o id do registo. */
+async function sendToSales(c, kind, to) {
+  const cfg = smtpCfg(); if (!cfg) return null;
+  const av = kind === 'aviso', n = dayDiff(c.end, todayStr());
+  const subject = av ? 'A campanha «' + c.name + '» termina ' + (n <= 0 ? 'hoje' : n === 1 ? 'amanhã' : 'a ' + dPt(c.end)) : 'Relatório final da campanha «' + c.name + '»';
+  const text = av
+    ? 'Olá,\n\nA campanha «' + c.name + '» (' + c.client + ') termina ' + (n <= 0 ? 'hoje' : 'a ' + dPt(c.end)) + '. Se o cliente quiser renovar ou continuar, esta é a altura de falar com ele.\n\nO relatório final com as imagens da campanha segue na manhã a seguir ao fim.\n\nEnif DOOH - Visibilidade com Inteligência'
+    : 'Olá,\n\nSegue em anexo o relatório final da campanha «' + c.name + '» (' + c.client + '), de ' + dPt(c.start) + ' a ' + dPt(c.end) + ', com as passagens, as visualizações estimadas e as imagens dos conteúdos.\n\nEnif DOOH - Visibilidade com Inteligência';
+  let att = null, file = '', digest = '';
+  const id = 'E' + Date.now().toString(36) + uid(3), msgId = '<' + uid(16) + '@' + (cfg.from.split('@')[1] || 'enif.pt').replace(/[>\s]/g, '') + '>';
+  if (!av) {
+    try { att = await finalReportPdf(c); } catch (e) { console.error('PDF falhou:', e); }
+    if (!att) { run('INSERT INTO emails(id,ts,kind,camp,camp_name,to_addr,subject,msg_id,file,bytes,sha) VALUES(?,?,?,?,?,?,?,?,?,?,?)', id, Date.now(), kind, c.id, c.name, to, subject, msgId, '', 0, ''); emailEvent(id, 'Falhou', 'Não foi possível gerar o PDF do relatório.'); return id; }
+    file = 'relatorio-final-' + slug(c.name) + '.pdf'; digest = sha(att);
+    fs.writeFileSync(path.join(REPORTS, id + '.pdf'), att);
+  }
+  run('INSERT INTO emails(id,ts,kind,camp,camp_name,to_addr,subject,msg_id,file,bytes,sha) VALUES(?,?,?,?,?,?,?,?,?,?,?)', id, Date.now(), kind, c.id, c.name, to, subject, msgId, file, att ? att.length : 0, digest);
+  emailEvent(id, 'Agendado', av ? 'Aviso enviado automaticamente a ' + Math.max(0, n) + (n === 1 ? ' dia' : ' dias') + ' do fim da campanha' : 'Envio iniciado automaticamente no fim da campanha');
+  try {
+    const r = await MAIL.send(cfg, { to, subject, text, messageId: msgId, attachments: att ? [{ name: file, type: 'application/pdf', data: att }] : [] });
+    emailEvent(id, 'Enviado', 'Aceite pelo servidor de e-mail: ' + r.response);
+    audit('sistema', av ? 'Aviso de fim de campanha enviado ao comercial' : 'Relatório final enviado ao comercial', c.name + ' → ' + to);
+  } catch (e) {
+    emailEvent(id, 'Falhou', (e.smtp || e.message || 'Erro').toString().split('\n').pop());
+    audit('sistema', av ? 'Aviso de fim de campanha falhou' : 'Relatório final falhou', c.name + ' → ' + to + ' · ' + e.message);
+  }
+  return id;
+}
+
+/* ---------- cópias de segurança (base de dados + ficheiros) ---------- */
+const stampOf = d => d.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+function backupList(limit) {
+  return fs.readdirSync(BACKUPS).filter(n => /^enif-\d{8}-\d{6}-(auto|manual)\.db$/.test(n)).map(n => { const st = fs.statSync(path.join(BACKUPS, n)); return { name: n, t: st.mtimeMs, mb: Math.max(0.1, Math.round(st.size / 104857.6) / 10), auto: /-auto\.db$/.test(n), ok: true }; })
+    .sort((a, b) => b.t - a.t).slice(0, limit || 10);
+}
+function backupNow(auto) {
+  const name = 'enif-' + stampOf(new Date()) + (auto ? '-auto' : '-manual') + '.db', file = path.join(BACKUPS, name);
+  db.exec('PRAGMA wal_checkpoint(PASSIVE)');
+  db.prepare('VACUUM INTO ?').run(file);
+  const md = path.join(BACKUPS, 'media'); fs.mkdirSync(md, { recursive: true });
+  let copied = 0; fs.readdirSync(MEDIA).forEach(f => { const to = path.join(md, f); if (!fs.existsSync(to)) { fs.copyFileSync(path.join(MEDIA, f), to + '.part'); fs.renameSync(to + '.part', to); copied++; } });
+  const old = Date.now() - 30 * 864e5;                                                    // mantém 30 dias
+  fs.readdirSync(BACKUPS).forEach(n => { if (/^enif-.*\.db$/.test(n) && fs.statSync(path.join(BACKUPS, n)).mtimeMs < old) fs.unlinkSync(path.join(BACKUPS, n)); });
+  fs.readdirSync(REPORTS).forEach(() => { });                                              // os PDF enviados ficam sempre (são comprovativo)
+  return { name, mb: Math.max(0.1, Math.round(fs.statSync(file).size / 104857.6) / 10), files: copied };
+}
+
+/* ---------- tarefas agendadas: cópia à noite, avisos e relatórios finais ---------- */
+let ticking = false;
+async function tick(force) {
+  if (ticking) return; ticking = true;
+  try {
+    const ln = S.lisbonNow(TZ), today = ln.date;
+    if ((ln.h > 3 || (ln.h === 3 && ln.m >= 30)) && !backupList(100).some(b => b.auto && S.lisbonNow(TZ, new Date(b.t)).date === today)) {
+      try { const b = backupNow(true); audit('sistema', 'Cópia de segurança automática', b.mb + ' MB'); } catch (e) { console.error('Cópia de segurança falhou:', e.message); audit('sistema', 'Cópia de segurança automática falhou', e.message); }
+    }
+    if (!smtpReady()) return;
+    for (const c0 of docs('campaigns')) {
+      if (!c0.sales) continue;
+      const upd = patch => { const cur = getDoc('campaigns', c0.id); if (cur) { Object.assign(cur, patch); putDoc('campaigns', c0.id, cur); } };
+      const n = dayDiff(c0.end, today);
+      if (c0.start <= today && n >= 0 && n <= END_WARN && c0.warnFor !== c0.end) { upd({ warnFor: c0.end }); await sendToSales(c0, 'aviso', c0.sales); continue; }
+      if (c0.end < today && c0.salesSentFor !== c0.end && dayDiff(today, c0.end) <= 30 && (ln.h >= 8 || force)) {
+        const tries = c0.salesTryFor === c0.end ? (c0.salesTries || 0) : 0;
+        if (tries >= 3 || Date.now() - (c0.salesTryAt || 0) < 3600e3) continue;
+        upd({ salesTryFor: c0.end, salesTries: tries + 1, salesTryAt: Date.now() });
+        const id = await sendToSales(c0, 'final', c0.sales);
+        const last = id && q1('SELECT st FROM email_events WHERE email=? ORDER BY id DESC LIMIT 1', id);
+        if (last && last.st === 'Enviado') upd({ salesSentFor: c0.end, salesSentAt: Date.now() });
+      }
+    }
+  } catch (e) { console.error('Tarefas agendadas:', e); } finally { ticking = false; }
+}
 
 /* ---------- rotas ---------- */
 const router = async (req, res) => {
-  const u = new URL(req.url, 'http://x'), p = u.pathname, m = req.method;
+  const u = new URL(req.url, 'http://x'), p = u.pathname, m = req.method; let r;
   if (p === '/health') return send(res, 200, { ok: true });
   if (p === '/') { res.writeHead(302, { Location: '/app/' }); return res.end(); }
   if (p === '/api/status') return send(res, 200, { setup: false });
   if (p === '/api/login' && m === 'POST') {
-    const b = await readJson(req), email = String(b.email || '').trim().toLowerCase();
+    const b = await readJson(req), email = String(b.email || '').trim().toLowerCase(), ip = ipOf(req);
     if (loginLimit.blocked(email)) throw new HttpError(429, 'Demasiadas tentativas. Tente daqui a alguns minutos.');
     const user = docs('users').find(x => x.email === email), sc = user && secret('users', user.id);
-    if (!user || !A.checkPassword(String(b.pass || ''), sc && sc.a, sc && sc.b)) { loginLimit.fail(email); throw new HttpError(401, 'E-mail ou palavra-passe incorretos.'); }
+    if (!user || !A.checkPassword(String(b.pass || ''), sc && sc.a, sc && sc.b)) { loginLimit.fail(email); audit('—', 'Tentativa de entrada falhada', email || '(sem e-mail)', ip); throw new HttpError(401, 'E-mail ou palavra-passe incorretos.'); }
     const err = accessError(user); if (err) throw new HttpError(403, err);
-    loginLimit.ok(email);
+    if (user.twoFA) {                                                            // segundo passo: código enviado por e-mail
+      const ch = newChallenge('login', user.id, 10 * 60 * 1000);
+      await mailCode(user.recovery || user.email, 'O seu código de entrada no Enif DOOH', codeText(ch.code, 'Pediram para entrar na sua conta do Enif DOOH.', 10));
+      return send(res, 200, { step: 'code', ch: ch.id });
+    }
+    loginLimit.ok(email); audit(user, 'Entrou', '', ip);
     return send(res, 200, { token: newSession(user.id) });
+  }
+  if (p === '/api/login/code' && m === 'POST') {
+    const b = await readJson(req), c = checkChallenge(b.ch, 'login', b.code), user = getDoc('users', c.user);
+    if (!user || accessError(user)) throw new HttpError(403, 'Esta conta não pode entrar.');
+    run('DELETE FROM chal WHERE id=?', c.id); loginLimit.ok(user.email); audit(user, 'Entrou (com código por e-mail)', '', ipOf(req));
+    return send(res, 200, { token: newSession(user.id) });
+  }
+  if (p === '/api/forgot' && m === 'POST') {                                      // a resposta é igual para qualquer e-mail
+    const b = await readJson(req), email = String(b.email || '').trim().toLowerCase(), ip = ipOf(req);
+    if (loginLimit.blocked('f:' + email) || loginLimit.blocked('f:ip:' + ip)) throw new HttpError(429, 'Demasiados pedidos. Tente daqui a alguns minutos.');
+    loginLimit.fail('f:' + email); loginLimit.fail('f:ip:' + ip);
+    const user = docs('users').find(x => x.admin && x.active && x.email === email);
+    if (user) {
+      const ch = newChallenge('forgot', user.id, 15 * 60 * 1000);
+      audit(user, 'Pediu recuperação da palavra-passe', '', ip);
+      try { await mailCode(user.recovery || user.email, 'Recuperar a palavra-passe do Enif DOOH', codeText(ch.code, 'Pediram para recuperar a palavra-passe da sua conta do Enif DOOH.', 15)); } catch (e) { audit('sistema', 'Falhou o envio do código de recuperação', e.message); }
+      return send(res, 200, { ch: ch.id });
+    }
+    audit('—', 'Pedido de recuperação para e-mail sem conta de administrador', email || '(sem e-mail)', ip);
+    return send(res, 200, { ch: uid(16) });
+  }
+  if (p === '/api/forgot/confirm' && m === 'POST') {
+    const b = await readJson(req), c = checkChallenge(b.ch, 'forgot', b.code), pass = minPass(b.pass), user = getDoc('users', c.user);
+    if (!user || !user.admin) throw new HttpError(400, 'Código incorreto ou expirado. Peça um novo.');
+    setPassword(user.id, pass); run('DELETE FROM chal WHERE id=?', c.id); loginLimit.ok(user.email);
+    audit(user, 'Recuperou a palavra-passe pelo e-mail', '', ipOf(req));
+    return send(res, 200, { ok: true });
+  }
+  if (p.startsWith('/api/me/') && m === 'POST') {
+    const user = needUser(req, u), b = await readJson(req); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
+    const save = patch => putDoc('users', user.id, Object.assign({}, getDoc('users', user.id), patch));
+    if (p === '/api/me/password') {
+      const sc = secret('users', user.id);
+      if (!A.checkPassword(String(b.old || ''), sc && sc.a, sc && sc.b)) throw bad('A palavra-passe atual não está certa.');
+      const pass = minPass(b.pass); if (pass === String(b.old)) throw bad('A nova palavra-passe tem de ser diferente da atual.');
+      setPassword(user.id, pass); audit(user, 'Mudou a própria palavra-passe', '', ipOf(req));
+      return send(res, 200, { token: newSession(user.id) });                       // as outras sessões terminam; esta continua
+    }
+    if (p === '/api/me/twofa') {
+      const on = !!b.on;
+      if (on && !smtpReady()) throw new HttpError(503, 'O envio de e-mail ainda não está configurado no servidor. Sem isso não é possível ligar a verificação em dois passos.');
+      save({ twoFA: on }); audit(user, on ? 'Ligou a verificação em dois passos' : 'Desligou a verificação em dois passos', '', ipOf(req));
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/me/recovery') {                                                // o novo e-mail só vale depois de confirmado com um código lá enviado
+      const to = String(b.email || '').trim().toLowerCase(); if (!validEmail(to)) throw bad('Indique um e-mail válido.');
+      const ch = newChallenge('recovery', user.id, 15 * 60 * 1000, { to });
+      await mailCode(to, 'Confirmar o e-mail de recuperação do Enif DOOH', codeText(ch.code, 'Pediram para usar este e-mail como e-mail de recuperação da conta de administrador do Enif DOOH.', 15));
+      audit(user, 'Pediu para mudar o e-mail de recuperação', to, ipOf(req));
+      return send(res, 200, { ch: ch.id });
+    }
+    if (p === '/api/me/recovery/confirm') {
+      const c = checkChallenge(b.ch, 'recovery', b.code); if (c.user !== user.id) throw new HttpError(400, 'Código incorreto ou expirado.');
+      save({ recovery: c.data.to }); run('DELETE FROM chal WHERE id=?', c.id); audit(user, 'Mudou o e-mail de recuperação', c.data.to, ipOf(req));
+      return send(res, 200, { ok: true });
+    }
+    throw new HttpError(404, 'Não encontrado');
+  }
+  if (p === '/api/backup-now' && m === 'POST') {
+    const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
+    const b = backupNow(false); audit(user, 'Fez uma cópia de segurança', b.mb + ' MB', ipOf(req)); return send(res, 200, b);
+  }
+  if (p === '/api/audit.csv' && m === 'GET') {
+    const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
+    const qq = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', fmtL = t => new Intl.DateTimeFormat('pt-PT', { timeZone: TZ, dateStyle: 'short', timeStyle: 'medium' }).format(new Date(t));
+    const rows = [['Data e hora (Lisboa)', 'Data e hora (UTC)', 'Quem', 'O quê', 'Detalhe', 'IP']].concat(q('SELECT * FROM audit ORDER BY id DESC').map(a => [fmtL(a.ts), new Date(a.ts).toISOString().replace('T', ' ').slice(0, 19) + ' UTC', a.who, a.what, a.detail, a.ip]));
+    return send(res, 200, '﻿' + rows.map(x => x.map(qq).join(';')).join('\r\n'), 'text/csv; charset=utf-8', { 'Content-Disposition': 'attachment; filename="registo-de-auditoria-' + todayStr() + '.csv"' });
+  }
+  if ((r = /^\/api\/emails\/(\w+)\/(file|retry)$/.exec(p))) {
+    const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
+    const e = q1('SELECT * FROM emails WHERE id=?', r[1]); if (!e) throw new HttpError(404, 'Envio não existe');
+    if (r[2] === 'file' && m === 'GET') {
+      const f = path.join(REPORTS, path.basename(e.id) + '.pdf'); if (!e.file || !fs.existsSync(f)) throw new HttpError(404, 'Sem ficheiro');
+      return send(res, 200, fs.readFileSync(f), 'application/pdf', { 'Content-Disposition': 'attachment; filename="' + e.file + '"' });
+    }
+    if (r[2] === 'retry' && m === 'POST') {
+      const c = getDoc('campaigns', e.camp); if (!c) throw new HttpError(404, 'A campanha já não existe.');
+      if (!smtpReady()) throw new HttpError(503, 'O envio de e-mail ainda não está configurado no servidor.');
+      const id = await sendToSales(c, e.kind, e.to_addr), last = id && q1('SELECT st FROM email_events WHERE email=? ORDER BY id DESC LIMIT 1', id);
+      if (e.kind === 'final' && last && last.st === 'Enviado') { const cur = getDoc('campaigns', c.id); putDoc('campaigns', c.id, Object.assign(cur, { salesSentFor: c.end, salesSentAt: Date.now() })); }
+      audit(user, 'Repetiu um envio ao comercial', c.name + ' → ' + e.to_addr, ipOf(req));
+      return send(res, 200, { ok: true, id });
+    }
   }
   if (p === '/api/logout' && m === 'POST') {
     const h = String(req.headers.authorization || ''); if (h.startsWith('Bearer ')) run('DELETE FROM sessions WHERE token=?', h.slice(7));
@@ -572,7 +834,6 @@ const router = async (req, res) => {
   if (p === '/api/sync' && m === 'POST') { const user = needUser(req, u), b = await readJson(req); sync(user, b.ops); return send(res, 200, { ok: true }); }
   if (p === '/api/upload' && m === 'PUT') return upload(req, res, u);
   if (p === '/api/plays' && m === 'GET') return playsApi(res, u, needUser(req, u));
-  let r;
   if ((r = /^\/api\/screens\/([\w.\-]+)\/restart$/.exec(p)) && m === 'POST') {
     const user = needUser(req, u); need(user, 'ecras.gerir');
     if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
@@ -607,9 +868,10 @@ if (require.main === module) {
     process.exit(1);
   }
   server.listen(PORT, () => {
-    console.log('Enif OOH a correr em http://localhost:' + PORT + '/');
+    console.log('Enif DOOH a correr em http://localhost:' + PORT + '/');
+    setTimeout(tick, 5000); setInterval(tick, 60000);
     if (SEED === 'criado') console.log('Conta de administrador criada. Pode apagar a palavra-passe do enif-config.json.');
     if (SEED === 'reposto') console.log('Palavra-passe do administrador reposta. Pode apagá-la do enif-config.json.');
   });
 }
-module.exports = { server, db, playlistFor, buildState };
+module.exports = { server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
