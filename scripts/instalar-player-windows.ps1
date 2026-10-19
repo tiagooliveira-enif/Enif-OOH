@@ -23,7 +23,7 @@ $url = "$Servidor/player/?code=$Codigo&key=$Chave"
 $bat = @"
 @echo off
 :loop
-"$edge" --kiosk "$url" --edge-kiosk-type=fullscreen --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required --user-data-dir="$dir\profile" --disable-pinch --overscroll-history-navigation=0
+"$edge" --kiosk "$url" --edge-kiosk-type=fullscreen --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required --unsafely-treat-insecure-origin-as-secure="$Servidor" --user-data-dir="$dir\profile" --disable-pinch --overscroll-history-navigation=0
 timeout /t 5 /nobreak >nul
 goto loop
 "@

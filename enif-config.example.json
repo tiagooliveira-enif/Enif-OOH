@@ -1,0 +1,14 @@
+{
+  "nome": "O seu nome",
+  "email": "o.seu@email.pt",
+  "palavraPasse": "uma palavra-passe forte (pelo menos 10 caracteres)",
+  "emailRecuperacao": "um.email.seu@exemplo.pt",
+  "smtp": {
+    "servidor": "smtp.exemplo.pt",
+    "porta": 587,
+    "seguro": false,
+    "utilizador": "relatorios@enif.pt",
+    "palavraPasse": "a palavra-passe da caixa de correio que envia",
+    "de": "Enif DOOH <relatorios@enif.pt>"
+  }
+}
