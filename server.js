@@ -384,6 +384,7 @@ function buildState(user) {
     st.auditLog = q('SELECT ts,who,ip,what,detail FROM audit ORDER BY id DESC LIMIT 300').map(a => ({ t: a.ts, who: a.who, what: a.what, detail: a.detail }));
     st.backups = backupList(10); st.emailLog = emailList();
   }
+  try { const d = fs.statfsSync(DATA); st.serverDisk = { free: Number(d.bavail) * Number(d.bsize), total: Number(d.blocks) * Number(d.bsize) }; } catch (e) { /* sem informação */ }
   return st;
 }
 
