@@ -45,7 +45,7 @@ async function main() {
   const base = 'http://127.0.0.1:' + server.address().port;
   const call = async (m, p, body, tok) => {
     const r = await fetch(base + p, { method: m, headers: Object.assign({ 'Content-Type': 'application/json' }, tok ? { Authorization: 'Bearer ' + tok } : {}), body: body === undefined ? undefined : (body instanceof Uint8Array ? body : JSON.stringify(body)) });
-    let j = null; try { j = await r.clone().json(); } catch (e) { }
+    let j = null; try { j = await r.clone().json(); } catch (e) { /* sem ação */ }
     return { s: r.status, j, r };
   };
   const today = S.lisbonNow('Europe/Lisbon').date, plus = n => S.addDay(today, n);

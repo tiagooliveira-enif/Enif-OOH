@@ -17,7 +17,7 @@ async function main() {
   const port = server.address().port, base = 'http://127.0.0.1:' + port;
   const call = async (m, p, body, tok) => {
     const r = await fetch(base + p, { method: m, headers: Object.assign({ 'Content-Type': 'application/json' }, tok ? { Authorization: 'Bearer ' + tok } : {}), body: body === undefined ? undefined : JSON.stringify(body) });
-    let j = null; try { j = await r.clone().json(); } catch (e) { }
+    let j = null; try { j = await r.clone().json(); } catch (e) { /* sem ação */ }
     return { s: r.status, j };
   };
   const today = S.lisbonNow('Europe/Lisbon').date, plus = n => S.addDay(today, n);
@@ -96,7 +96,7 @@ async function main() {
     ok('ficheiro de 7 GB recusado antes de ser enviado', tooBig === 413 || tooBig === 0);
   }
   console.log('\n' + passed + ' verificações OK');
-  server.close(); try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { }
+  server.close(); try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (e) { /* sem ação */ }
   process.exit(0);
 }
-main().catch(e => { console.error('FALHOU:', e); try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (x) { } process.exit(1); });
+main().catch(e => { console.error('FALHOU:', e); try { fs.rmSync(tmp, { recursive: true, force: true }); } catch (x) { /* sem ação */ } process.exit(1); });

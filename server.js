@@ -1,4 +1,5 @@
 'use strict';
+const isNil = v => v === null || v === undefined;
 /* Enif OOH – servidor. Sem dependências: só Node 22.13+. */
 const http = require('node:http'), fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
@@ -126,7 +127,7 @@ function cleanBri(b, old) {
   if (typeof b !== 'object') throw bad('Brilho inválido.');
   const pc = (v, what) => { const n = Math.round(+v); if (!(n >= 10 && n <= 100)) throw bad(what + ' inválido (10 a 100 %).'); return n; };
   const hr = (v, what) => { const n = Math.round(+v); if (!(n >= 0 && n <= 23)) throw bad(what + ' inválida.'); return n; };
-  const out = { mode: b.mode === 'manual' ? 'manual' : 'auto', day: pc(b.day == null ? 100 : b.day, 'Brilho de dia'), night: pc(b.night == null ? 40 : b.night, 'Brilho de noite'), from: hr(b.from == null ? 8 : b.from, 'Hora'), to: hr(b.to == null ? 20 : b.to, 'Hora'), manual: pc(b.manual == null ? 80 : b.manual, 'Brilho manual') };
+  const out = { mode: b.mode === 'manual' ? 'manual' : 'auto', day: pc(isNil(b.day) ? 100 : b.day, 'Brilho de dia'), night: pc(isNil(b.night) ? 40 : b.night, 'Brilho de noite'), from: hr(isNil(b.from) ? 8 : b.from, 'Hora'), to: hr(isNil(b.to) ? 20 : b.to, 'Hora'), manual: pc(isNil(b.manual) ? 80 : b.manual, 'Brilho manual') };
   if (out.mode === 'auto' && out.from === out.to) throw bad('O início e o fim do dia não podem ser à mesma hora.');
   return out;
 }
@@ -135,8 +136,8 @@ function cleanScreen(o, id, old) {
   const out = {
     id, venue: str(o.venue, 120, 'Local'), city: optStr(o.city, 80), spot: str(o.spot, 120, 'Posição'), type: optStr(o.type, 60) || 'Outro',
     res: optStr(o.res, 20) || 'auto', limit: Math.round(num(o.limit, 1, 99, 'Limite')), order: ids(o.order || [], 'Ordem'),
-    draft: null, loc: { addr: optStr(loc.addr, 200), lat: loc.lat == null ? null : num(loc.lat, -90, 90, 'Latitude'), lng: loc.lng == null ? null : num(loc.lng, -180, 180, 'Longitude'), env: optStr(loc.env, 40), pop: loc.pop == null ? null : Math.round(num(loc.pop, 0, 2e6, 'Pessoas por dia')) },
-    on: num(o.on == null ? 0 : o.on, 0, 24, 'Hora de ligar'), off: num(o.off == null ? 24 : o.off, 0, 24, 'Hora de desligar'),
+    draft: null, loc: { addr: optStr(loc.addr, 200), lat: isNil(loc.lat) ? null : num(loc.lat, -90, 90, 'Latitude'), lng: isNil(loc.lng) ? null : num(loc.lng, -180, 180, 'Longitude'), env: optStr(loc.env, 40), pop: isNil(loc.pop) ? null : Math.round(num(loc.pop, 0, 2e6, 'Pessoas por dia')) },
+    on: num(isNil(o.on) ? 0 : o.on, 0, 24, 'Hora de ligar'), off: num(isNil(o.off) ? 24 : o.off, 0, 24, 'Hora de desligar'),
     onT: optStr(o.onT, 5) || '00:00', offT: optStr(o.offT, 5) || '23:59',
     fit: FITS.indexOf(o.fit) > -1 ? o.fit : ((old && old.fit) || 'caber'),
     bri: cleanBri(o.bri, old && old.bri)
@@ -150,30 +151,30 @@ function cleanCampaign(o, id, old) {
     id, name: str(o.name, 160, 'Nome'), client: optStr(o.client, 160) || 'Sem cliente', venues: ids(o.venues || [], 'Locais'),
     sector: optStr(o.sector, 40), sales: optStr(o.sales, 160).toLowerCase(),
     start: o.start, end: o.end, h0: num(o.h0, 0, 23, 'Hora de início'), h1: num(o.h1, 1, 24, 'Hora de fim'),
-    ppm: num(o.ppm, 0.2, 12, 'Passagens por minuto'), dur: Math.round(num(o.dur == null ? 10 : o.dur, 3, 60, 'Duração')),
-    priority: ['Alta', 'Normal', 'Baixa'].includes(o.priority) ? o.priority : 'Normal', manual: !!o.manual, color: Math.round(num(o.color == null ? 1 : o.color, 1, 6, 'Cor')), items: [],
+    ppm: num(o.ppm, 0.2, 12, 'Passagens por minuto'), dur: Math.round(num(isNil(o.dur) ? 10 : o.dur, 3, 60, 'Duração')),
+    priority: ['Alta', 'Normal', 'Baixa'].includes(o.priority) ? o.priority : 'Normal', manual: !!o.manual, color: Math.round(num(isNil(o.color) ? 1 : o.color, 1, 6, 'Cor')), items: [],
     pauses: []
   };
   if (!out.name) throw bad('Dê um nome à campanha.');
   if (out.sales && !validEmail(out.sales)) throw bad('O e-mail do comercial não parece válido.');
   if (!isDate(out.start) || !isDate(out.end) || out.end < out.start) throw bad('Datas inválidas.');
   if (out.h1 <= out.h0) throw bad('A hora de fim tem de ser depois da hora de início.');
-  if (o.pauses != null) {
+  if (!isNil(o.pauses)) {
     if (!Array.isArray(o.pauses) || o.pauses.length > 200) throw bad('Pausas inválidas.');
     out.pauses = o.pauses.map(x => {
-      if (!x || !isDate(x.from) || (x.to != null && !isDate(x.to)) || (x.to != null && x.to < x.from)) throw bad('Pausas inválidas.');
-      return { from: x.from, to: x.to == null ? null : x.to };
+      if (!x || !isDate(x.from) || (!isNil(x.to) && !isDate(x.to)) || (!isNil(x.to) && x.to < x.from)) throw bad('Pausas inválidas.');
+      return { from: x.from, to: isNil(x.to) ? null : x.to };
     });
   }
   if (!Array.isArray(o.items) || o.items.length > 200) throw bad('Conteúdos inválidos.');
   out.items = o.items.map(i => {
-    const it = { f: str(i.f, 40, 'Conteúdo'), h0: i.h0 == null ? null : num(i.h0, 0, 24, 'Hora do vídeo'), h1: i.h1 == null ? null : num(i.h1, 0, 24, 'Hora do vídeo'), d0: i.d0 || null, d1: i.d1 || null, ppm: Math.round(num(i.ppm == null ? 1 : i.ppm, 1, 12, 'Vezes por minuto')) };
+    const it = { f: str(i.f, 40, 'Conteúdo'), h0: isNil(i.h0) ? null : num(i.h0, 0, 24, 'Hora do vídeo'), h1: isNil(i.h1) ? null : num(i.h1, 0, 24, 'Hora do vídeo'), d0: i.d0 || null, d1: i.d1 || null, ppm: Math.round(num(isNil(i.ppm) ? 1 : i.ppm, 1, 12, 'Vezes por minuto')) };
     if ((it.d0 && !isDate(it.d0)) || (it.d1 && !isDate(it.d1))) throw bad('Dias do vídeo inválidos.');
     if (!getDoc('contents', it.f)) throw bad('Conteúdo inexistente.');
     return it;
   });
   // campos que só o servidor escreve (avisos e relatório final já enviados ao comercial)
-  ['warnFor', 'salesSentAt', 'salesSentFor', 'salesTries', 'salesTryAt', 'salesTryFor'].forEach(k => { if (old && old[k] != null) out[k] = old[k]; });
+  ['warnFor', 'salesSentAt', 'salesSentFor', 'salesTries', 'salesTryAt', 'salesTryFor'].forEach(k => { if (old && !isNil(old[k])) out[k] = old[k]; });
   return out;
 }
 function cleanUserDoc(o, id, old) {
@@ -192,7 +193,7 @@ function cleanUserDoc(o, id, old) {
   const ui = o.ui === undefined ? (old && old.ui) : o.ui;
   if (ui) { if (typeof ui !== 'object' || JSON.stringify(ui).length > 50000) throw bad('Preferências inválidas.'); out.ui = ui; }
   // dados de segurança: só o servidor os escreve
-  ['recovery', 'twoFA'].forEach(k => { if (old && old[k] != null) out[k] = old[k]; });
+  ['recovery', 'twoFA'].forEach(k => { if (old && !isNil(old[k])) out[k] = old[k]; });
   return out;
 }
 
@@ -503,8 +504,8 @@ async function upload(req, res, u) {
     const w = fs.createWriteStream(file);
     req.on('data', c => { n += c.length; if (n > MAX_UPLOAD) { ko(new HttpError(413, 'O ficheiro é demasiado grande.')); req.destroy(); w.destroy(); } });
     req.pipe(w); w.on('finish', ok); w.on('error', ko); req.on('error', ko); req.on('aborted', () => ko(bad('Envio interrompido.')));
-  }).catch(e => { try { fs.unlinkSync(file); } catch (x) { } throw e; });
-  const drop = () => { try { fs.unlinkSync(file); } catch (x) { } };
+  }).catch(e => { try { fs.unlinkSync(file); } catch (x) { /* sem ação */ } throw e; });
+  const drop = () => { try { fs.unlinkSync(file); } catch (x) { /* sem ação */ } };
   if (!n) { drop(); throw bad('Ficheiro vazio.'); }
   // o servidor lê a resolução e a duração do próprio ficheiro; só se não conseguir usa o que o browser disse
   const got = await M.probe(file, type);
@@ -584,7 +585,7 @@ function readConfig() {
 function smtpCfg() {
   const c = readConfig().smtp || {}, e = process.env;
   const host = String(e.SMTP_HOST || c.servidor || '').trim(); if (!host) return null;
-  const port = +(e.SMTP_PORT || c.porta) || 587, secure = e.SMTP_SECURE != null ? e.SMTP_SECURE === '1' : (c.seguro != null ? !!c.seguro : port === 465);
+  const port = +(e.SMTP_PORT || c.porta) || 587, secure = !isNil(e.SMTP_SECURE) ? e.SMTP_SECURE === '1' : (!isNil(c.seguro) ? !!c.seguro : port === 465);
   const user = String(e.SMTP_USER || c.utilizador || ''), pass = String(e.SMTP_PASS || c.palavraPasse || ''), from = String(e.SMTP_FROM || c.de || user || '').trim();
   if (!from || !/@/.test(from)) return null;
   return { host, port, secure, user, pass, from, allowPlain: e.SMTP_PLAIN === '1' || c.semCifra === true, rejectUnauthorized: e.SMTP_INSECURE !== '1' };
@@ -644,7 +645,7 @@ async function finalReportPdf(c) {
     for (const id of ids) {
       const f = getDoc('contents', id); if (!f) continue;
       const out = path.join(tmp, id + '.jpg'); let jpg = null;
-      try { if (await M.jpegStill(path.join(MEDIA, path.basename(id)), f.type, out, 2)) jpg = fs.readFileSync(out); } catch (e) { }
+      try { if (await M.jpegStill(path.join(MEDIA, path.basename(id)), f.type, out, 2)) jpg = fs.readFileSync(out); } catch (e) { /* sem ação */ }
       files[id] = { name: f.name, jpg };
     }
     return REPORT.buildReport(c, rows, scrs, files, Date.now());
@@ -807,7 +808,7 @@ const router = async (req, res) => {
   }
   if (p === '/api/audit.csv' && m === 'GET') {
     const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
-    const qq = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"', fmtL = t => new Intl.DateTimeFormat('pt-PT', { timeZone: TZ, dateStyle: 'short', timeStyle: 'medium' }).format(new Date(t));
+    const qq = v => '"' + String(isNil(v) ? '' : v).replace(/"/g, '""') + '"', fmtL = t => new Intl.DateTimeFormat('pt-PT', { timeZone: TZ, dateStyle: 'short', timeStyle: 'medium' }).format(new Date(t));
     const rows = [['Data e hora (Lisboa)', 'Data e hora (UTC)', 'Quem', 'O quê', 'Detalhe', 'IP']].concat(q('SELECT * FROM audit ORDER BY id DESC').map(a => [fmtL(a.ts), new Date(a.ts).toISOString().replace('T', ' ').slice(0, 19) + ' UTC', a.who, a.what, a.detail, a.ip]));
     return send(res, 200, '﻿' + rows.map(x => x.map(qq).join(';')).join('\r\n'), 'text/csv; charset=utf-8', { 'Content-Disposition': 'attachment; filename="registo-de-auditoria-' + todayStr() + '.csv"' });
   }
