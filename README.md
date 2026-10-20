@@ -24,7 +24,7 @@ Não há registo público: **só um administrador cria contas**, em **Utilizador
 4. Abra a ligação do player num separador (ou instale no mini PC). O ecrã passa a **Online** e as passagens aparecem em **Relatórios**.
 5. **Utilizadores**: crie contas com perfis (Administrador, Operador, Só consulta ou personalizado) e data limite de acesso.
 
-Variáveis opcionais: `PORT` (8080), `DATA_DIR`, `TZ_NAME` (Europe/Lisbon), `MAX_UPLOAD_MB` (1024), `CONFIG_FILE` (outro caminho para o ficheiro de configuração).
+Variáveis opcionais: `PORT` (8080), `DATA_DIR`, `TZ_NAME` (Europe/Lisbon), `MAX_UPLOAD_MB` (6144, ou seja, 6 GB por ficheiro), `CONFIG_FILE` (outro caminho para o ficheiro de configuração).
 
 ## Segurança
 
