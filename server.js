@@ -146,11 +146,23 @@ function cleanScreen(o, id, old) {
   if (o.draft) out.draft = { order: ids(o.draft.order || [], 'Rascunho'), limit: Math.round(num(o.draft.limit, 1, 99, 'Limite')) };
   return out;
 }
+/* intervalos de horas: até 3, em ordem, sem sobreposição (os que se tocam ou sobrepõem juntam-se) */
+function cleanIvs(a, what) {
+  if (!Array.isArray(a) || a.length < 1 || a.length > 3) throw bad(what + ': indique entre 1 e 3 intervalos.');
+  const v = a.map(x => {
+    if (!Array.isArray(x) || x.length !== 2) throw bad(what + ' inválidas.');
+    const p = [num(x[0], 0, 23, what), num(x[1], 1, 24, what)];
+    if (p[1] <= p[0]) throw bad(what + ': a hora de fim tem de ser depois da de início.');
+    return p;
+  }).sort((x, y) => x[0] - y[0]), out = [];
+  v.forEach(p => { const l = out[out.length - 1]; if (l && p[0] <= l[1]) l[1] = Math.max(l[1], p[1]); else out.push(p); });
+  return out;
+}
 function cleanCampaign(o, id, old) {
   const out = {
     id, name: str(o.name, 160, 'Nome'), client: optStr(o.client, 160) || 'Sem cliente', venues: ids(o.venues || [], 'Locais'),
     sector: optStr(o.sector, 40), sales: optStr(o.sales, 160).toLowerCase(),
-    start: o.start, end: o.end, h0: num(o.h0, 0, 23, 'Hora de início'), h1: num(o.h1, 1, 24, 'Hora de fim'),
+    start: o.start, end: o.end, h0: num(o.h0, 0, 23, 'Hora de início'), h1: num(o.h1, 1, 24, 'Hora de fim'), ivs: null,
     ppm: num(o.ppm, 0.2, 12, 'Passagens por minuto'), dur: Math.round(num(isNil(o.dur) ? 10 : o.dur, 3, 60, 'Duração')),
     priority: ['Alta', 'Normal', 'Baixa'].includes(o.priority) ? o.priority : 'Normal', manual: !!o.manual, color: Math.round(num(isNil(o.color) ? 1 : o.color, 1, 6, 'Cor')), items: [],
     pauses: []
@@ -158,6 +170,11 @@ function cleanCampaign(o, id, old) {
   if (!out.name) throw bad('Dê um nome à campanha.');
   if (out.sales && !validEmail(out.sales)) throw bad('O e-mail do comercial não parece válido.');
   if (!isDate(out.start) || !isDate(out.end) || out.end < out.start) throw bad('Datas inválidas.');
+  if (!isNil(o.ivs)) {
+    out.ivs = cleanIvs(o.ivs, 'Horas da campanha');
+    out.h0 = out.ivs[0][0]; out.h1 = out.ivs[out.ivs.length - 1][1];
+    if (out.ivs.length < 2) out.ivs = null;
+  }
   if (out.h1 <= out.h0) throw bad('A hora de fim tem de ser depois da hora de início.');
   if (!isNil(o.pauses)) {
     if (!Array.isArray(o.pauses) || o.pauses.length > 200) throw bad('Pausas inválidas.');
@@ -169,6 +186,11 @@ function cleanCampaign(o, id, old) {
   if (!Array.isArray(o.items) || o.items.length > 200) throw bad('Conteúdos inválidos.');
   out.items = o.items.map(i => {
     const it = { f: str(i.f, 40, 'Conteúdo'), h0: isNil(i.h0) ? null : num(i.h0, 0, 24, 'Hora do vídeo'), h1: isNil(i.h1) ? null : num(i.h1, 0, 24, 'Hora do vídeo'), d0: i.d0 || null, d1: i.d1 || null, ppm: Math.round(num(isNil(i.ppm) ? 1 : i.ppm, 1, 12, 'Vezes por minuto')) };
+    if (!isNil(i.ivs)) {
+      const v = cleanIvs(i.ivs, 'Horas do vídeo');
+      it.h0 = v[0][0]; it.h1 = v[v.length - 1][1];
+      if (v.length > 1) it.ivs = v;
+    }
     if ((it.d0 && !isDate(it.d0)) || (it.d1 && !isDate(it.d1))) throw bad('Dias do vídeo inválidos.');
     if (!getDoc('contents', it.f)) throw bad('Conteúdo inexistente.');
     return it;

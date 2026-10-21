@@ -110,6 +110,17 @@ async function main() {
   ok('datas ao contrário recusadas', (await sync(top, [camp('C1', { start: plus(3), end: plus(1) })])).s === 400);
   ok('conteúdo inexistente recusado', (await sync(top, [camp('C1', { items: [{ f: 'Fzzz' }] })])).s === 400);
   ok('operador cria campanha', (await sync(top, [camp('C1')])).s === 200);
+  // vários intervalos de horas
+  ok('mais de 3 intervalos recusados', (await sync(top, [camp('CI', { ivs: [[1, 2], [3, 4], [5, 6], [7, 8]] })])).s === 400);
+  ok('intervalo com fim antes do início recusado', (await sync(top, [camp('CI', { ivs: [[10, 8], [19, 22]] })])).s === 400);
+  ok('campanha com dois intervalos aceite', (await sync(top, [camp('CI', { ivs: [[19, 22], [7, 10]], items: [{ f: f1.j.id, h0: null, h1: null, ivs: [[8, 9], [20, 21]], ppm: 1 }] })])).s === 200);
+  const ci = (await call('GET', '/api/state', undefined, top)).j.campaigns.find(x => x.id === 'CI');
+  ok('intervalos guardados por ordem, com h0/h1 a cobrir o dia todo', JSON.stringify(ci.ivs) === '[[7,10],[19,22]]' && ci.h0 === 7 && ci.h1 === 22);
+  ok('intervalos do vídeo guardados', JSON.stringify(ci.items[0].ivs) === '[[8,9],[20,21]]');
+  await sync(top, [camp('CJ', { ivs: [[7, 10], [9, 12]] })]);
+  const cj = (await call('GET', '/api/state', undefined, top)).j.campaigns.find(x => x.id === 'CJ');
+  ok('intervalos sobrepostos ficam juntos (7–10 + 9–12 = 7–12)', cj && !cj.ivs && cj.h0 === 7 && cj.h1 === 12);
+  await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CI' }, { op: 'del', coll: 'campaigns', id: 'CJ' }]);
   ok('gestor de conteúdos só mexe nos vídeos da campanha', (await sync(tcn, [op('campaigns', 'C1', { items: [{ f: f1.j.id, h0: null, h1: null, d0: null, d1: null, ppm: 1 }] }, ['items'])])).s === 200 && (await sync(tcn, [op('campaigns', 'C1', { name: 'Outro' }, ['name'])])).s === 403);
   await sync(top, [camp('C1')]);
   ok('chaves desconhecidas não passam', (await sync(top, [op('campaigns', 'C1', { evil: 1 }, ['evil'])])).s === 200 && !('evil' in (await call('GET', '/api/state', undefined, top)).j.campaigns[0]));

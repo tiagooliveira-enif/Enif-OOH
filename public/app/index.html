@@ -13,7 +13,7 @@
    Layout: floating sidebar + one working column; a floating glass tab bar on phones. */
 :root{
   --bg:#E8EEF8; --solid:#F6F8FC;
-  --orb1:rgba(255,205,40,.50); --orb2:rgba(40,200,200,.38); --orb3:rgba(255,120,110,.34); --orb4:rgba(80,170,255,.34);
+  --orb1:rgba(255,205,40,.50); --orb2:rgba(80,170,255,.34); --orb3:rgba(255,120,110,.34); --orb4:rgba(80,170,255,.34);
   --surface:rgba(255,255,255,.55); --surface-strong:rgba(255,255,255,.76); --surface-2:rgba(255,255,255,.42);
   --field:rgba(255,255,255,.64); --field-hover:rgba(255,255,255,.88);
   --sheen:rgba(255,255,255,.45); --hi:rgba(255,255,255,.92); --edge:rgba(255,255,255,.78);
@@ -31,7 +31,7 @@
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --bg:#080C14; --solid:#141A25;
-    --orb1:rgba(255,200,40,.26); --orb2:rgba(20,170,170,.30); --orb3:rgba(255,100,90,.18); --orb4:rgba(60,140,255,.26);
+    --orb1:rgba(255,200,40,.26); --orb2:rgba(60,140,255,.26); --orb3:rgba(255,100,90,.18); --orb4:rgba(60,140,255,.26);
     --surface:rgba(30,37,52,.55); --surface-strong:rgba(26,32,46,.80); --surface-2:rgba(255,255,255,.07);
     --field:rgba(255,255,255,.08); --field-hover:rgba(255,255,255,.15);
     --sheen:rgba(255,255,255,.08); --hi:rgba(255,255,255,.20); --edge:rgba(255,255,255,.14);
@@ -48,7 +48,7 @@
 }
 :root[data-theme="dark"]{
   --bg:#080C14; --solid:#141A25;
-  --orb1:rgba(255,200,40,.26); --orb2:rgba(20,170,170,.30); --orb3:rgba(255,100,90,.18); --orb4:rgba(60,140,255,.26);
+  --orb1:rgba(255,200,40,.26); --orb2:rgba(60,140,255,.26); --orb3:rgba(255,100,90,.18); --orb4:rgba(60,140,255,.26);
   --surface:rgba(30,37,52,.55); --surface-strong:rgba(26,32,46,.80); --surface-2:rgba(255,255,255,.07);
   --field:rgba(255,255,255,.08); --field-hover:rgba(255,255,255,.15);
   --sheen:rgba(255,255,255,.08); --hi:rgba(255,255,255,.20); --edge:rgba(255,255,255,.14);
@@ -78,10 +78,10 @@ svg.i{width:20px;height:20px;flex:none;fill:none;stroke:currentColor;stroke-widt
 /* colour field behind the glass */
 .bg{position:fixed;inset:0;z-index:0;pointer-events:none;
   background:
-    radial-gradient(52% 46% at 10% 6%,var(--orb1),transparent 62%),
-    radial-gradient(46% 42% at 92% 10%,var(--orb2),transparent 62%),
-    radial-gradient(50% 46% at 86% 94%,var(--orb3),transparent 62%),
-    radial-gradient(44% 40% at 6% 92%,var(--orb4),transparent 62%);}
+    radial-gradient(49% 44% at 9% 5%,var(--orb1),transparent 80%),
+    radial-gradient(46% 41% at 93% 9%,var(--orb2),transparent 80%),
+    radial-gradient(49% 44% at 87% 95%,var(--orb3),transparent 80%),
+    radial-gradient(46% 41% at 5% 93%,var(--orb4),transparent 80%);}
 
 /* glass surfaces */
 .card,.side,.login-card{
@@ -451,6 +451,16 @@ button.avatar{border:0;padding:0;cursor:pointer;}
 .ci-line input[type=number]{width:72px;padding:6px 10px;font-size:13px;border-radius:999px;}
 @media(max-width:700px){.ci-win{align-items:stretch;}.ci-line{flex-wrap:wrap;}.ci-line input[type=date]{flex:1 1 120px;min-width:0;}.ci-line select{flex:1 1 90px;}.checks.ci-list{max-height:380px;}}
 .ci-line small{color:var(--muted);min-width:38px;}
+.iv-box{display:flex;flex-direction:column;align-items:flex-start;gap:6px;}
+.ci-hours{align-items:flex-start;}.ci-hours .iv-box{align-items:flex-end;}
+.iv-list{display:flex;flex-direction:column;gap:6px;}
+.iv-row{display:flex;align-items:center;gap:6px;}
+.iv-row select{width:auto;}
+.iv-list:not(.multi) .iv-del{display:none;}
+.iv-del{padding:4px 6px;}.iv-del svg{width:14px;height:14px;}
+.iv-camp .iv-row select{padding:8px 12px;}
+.warn-t{color:var(--warn);font-weight:600;}
+@media(max-width:700px){.ci-win,.ci-hours,.ci-hours .iv-box,.ci-hours .iv-list,.ci-hours .iv-row{min-width:0;max-width:100%;}.ci-hours{flex-wrap:wrap;}.ci-hours .iv-box{flex:1 1 100%;align-items:stretch;}.ci-hours .iv-list{width:100%;}.ci-hours .iv-row select{flex:1 1 0;min-width:0;}.ci-hours .iv-add{align-self:flex-end;}.iv-camp .iv-row select{flex:1 1 0;min-width:0;}}
 .ci-line input[type=date]{width:auto;padding:6px 10px;font-size:13px;border-radius:999px;}
 .ci-win select{width:auto;padding:6px 10px;font-size:13px;border-radius:999px;}
 .field-inline input{width:auto;border-radius:999px;}
@@ -679,8 +689,13 @@ const screensOf=c=>screens.filter(s=>c.venues.indexOf(s.venue)>-1);
 /* ecrãs onde a campanha passa de facto: os do local em que algum conteúdo serve */
 const playScreens=c=>screensOf(c).filter(s=>!c.items.length||c.items.some(i=>okFor(fileById(i.f),s)));
 const campById=id=>campaigns.find(c=>c.id===id);
-const activeNow=()=>campaigns.filter(c=>statusOf(c)==='Ativa'&&hourNow>=c.h0&&hourNow<c.h1);
+/* intervalos de horas da campanha: um só (h0–h1) ou até 3 (ivs); h0/h1 guardam sempre o início do primeiro e o fim do último */
+const civs=c=>(c.ivs&&c.ivs.length)?c.ivs:[[c.h0,c.h1]];
+const inIvs=(v,h)=>v.some(x=>h>=x[0]&&h<x[1]);
+const hrsC=c=>civs(c).map(x=>hrs(x[0],x[1])).join(' e ');
+const activeNow=()=>campaigns.filter(c=>statusOf(c)==='Ativa'&&inIvs(civs(c),hourNow));
 function bestShift(c,maxShift){
+  if(civs(c).length>1)return {h0:c.h0,h1:c.h1,sum:0,gain:0};
   const len=c.h1-c.h0,cur=sumH(c.h0,c.h1);
   let best={h0:c.h0,sum:cur,gain:0};
   for(let sft=-maxShift;sft<=maxShift;sft++){
@@ -774,13 +789,20 @@ const fileById=id=>contents.find(f=>f.id===id);
 const folderById=id=>folders.find(p=>p.id===id);
 const campsOfFile=f=>campaigns.filter(c=>c.items.some(i=>i.f===f.id));
 /* janela efetiva de um vídeo dentro da campanha (vazio = acompanha a campanha) */
-const itemWin=(c,i)=>[Math.max(c.h0,isNil(i.h0)?c.h0:i.h0),Math.min(c.h1,isNil(i.h1)?c.h1:i.h1)];
+/* intervalos efetivos de um vídeo: os dele (ou o seu h0–h1) cortados pelos da campanha */
+function itemIvs(c,i){
+  const own=(i.ivs&&i.ivs.length)?i.ivs:[[isNil(i.h0)?0:i.h0,isNil(i.h1)?24:i.h1]],out=[];
+  civs(c).forEach(function(cv){own.forEach(function(o){const a=Math.max(cv[0],o[0]),b=Math.min(cv[1],o[1]);if(b>a)out.push([a,b]);});});
+  return out.sort((x,y)=>x[0]-y[0]);
+}
+/* janela de um vídeo (do primeiro início ao último fim); serve para ordenar */
+const itemWin=(c,i)=>{const v=itemIvs(c,i);return v.length?[v[0][0],v[v.length-1][1]]:[c.h0,c.h0];};
 /* dias efetivos de um vídeo (vazio = acompanha a campanha) */
 const itemDays=(c,i)=>[(i.d0&&i.d0>c.start)?i.d0:c.start,(i.d1&&i.d1<c.end)?i.d1:c.end];
 /* vídeos ativos numa hora e dia, por ordem de entrada (dia, hora) e depois pela ordem da lista */
 function itemsOn(c,h,d,sc){
-  return c.items.map(function(i,k){return {i:i,k:k,w:itemWin(c,i),y:itemDays(c,i)};})
-    .filter(function(x){return h>=x.w[0]&&h<x.w[1]&&(!d||(d>=x.y[0]&&d<=x.y[1]))&&(!sc||okFor(fileById(x.i.f),sc));})
+  return c.items.map(function(i,k){return {i:i,k:k,v:itemIvs(c,i),w:itemWin(c,i),y:itemDays(c,i)};})
+    .filter(function(x){return inIvs(x.v,h)&&(!d||(d>=x.y[0]&&d<=x.y[1]))&&(!sc||okFor(fileById(x.i.f),sc));})
     .sort(function(p,q){return c.manual?(p.k-q.k):((p.y[0]-q.y[0])||(p.w[0]-q.w[0])||(p.k-q.k));}).map(x=>x.i);
 }
 /* os vídeos de uma campanha alternam a cada passagem: A, B, C… e volta ao A; m = n.º da passagem */
@@ -790,22 +812,24 @@ function itemOn(c,h,d,m,sc){
 }
 function winsOf(c,fid){
   const its=c.items.filter(i=>!fid||i.f===fid);
-  if(!c.items.length)return fid?[]:[{a:c.h0,b:c.h1,f:null,d0:c.start,d1:c.end}];
-  return its.map(function(i){const w=itemWin(c,i),k=itemDays(c,i);return {a:w[0],b:w[1],f:i.f,d0:k[0],d1:k[1]};}).filter(w=>w.b>w.a&&w.d1>=w.d0).sort((x,y)=>x.a-y.a);
+  if(!c.items.length)return fid?[]:civs(c).map(function(v){return {a:v[0],b:v[1],f:null,d0:c.start,d1:c.end};});
+  const out=[];
+  its.forEach(function(i){const k=itemDays(c,i);itemIvs(c,i).forEach(function(w){out.push({a:w[0],b:w[1],f:i.f,d0:k[0],d1:k[1]});});});
+  return out.filter(w=>w.b>w.a&&w.d1>=w.d0).sort((x,y)=>x.a-y.a);
 }
 /* troços do dia: em cada troço os mesmos vídeos estão ativos e dividem as passagens da campanha por igual */
 function segsOf(c,fid,d,sc){
-  if(!c.items.length)return [{a:c.h0,b:c.h1,f:null,share:1}];
-  const act=c.items.map(function(i){return {i:i,w:itemWin(c,i),y:itemDays(c,i)};}).filter(x=>x.w[1]>x.w[0]&&d>=x.y[0]&&d<=x.y[1]&&(!sc||okFor(fileById(x.i.f),sc)));
-  const pts=[];act.forEach(function(x){x.w.forEach(function(v){if(pts.indexOf(v)<0)pts.push(v);});});pts.sort((a,b)=>a-b);
+  if(!c.items.length)return civs(c).map(function(v){return {a:v[0],b:v[1],f:null,share:1};});
+  const act=c.items.map(function(i){return {i:i,v:itemIvs(c,i),y:itemDays(c,i)};}).filter(x=>x.v.length&&d>=x.y[0]&&d<=x.y[1]&&(!sc||okFor(fileById(x.i.f),sc)));
+  const pts=[];act.forEach(function(x){x.v.forEach(function(w){w.forEach(function(v){if(pts.indexOf(v)<0)pts.push(v);});});});pts.sort((a,b)=>a-b);
   const out=[];
   for(let k=0;k+1<pts.length;k++){
-    const a=pts[k],b=pts[k+1],on=act.filter(x=>x.w[0]<=a&&x.w[1]>=b);
+    const a=pts[k],b=pts[k+1],on=act.filter(x=>x.v.some(w=>w[0]<=a&&w[1]>=b));
     on.forEach(function(x){const n=x.i.ppm||1;if(!fid||x.i.f===fid)out.push({a:a,b:b,f:x.i.f,share:1/on.length,mult:n>1?Math.max(c.ppm,n)/c.ppm:1});});
   }
   return out;
 }
-const onAt=(c,d,h,sc)=>c.start<=d&&c.end>=d&&!pausedOn(c,d)&&h>=c.h0&&h<c.h1&&(!c.items.length||itemsOn(c,h,d,sc).length>0);
+const onAt=(c,d,h,sc)=>c.start<=d&&c.end>=d&&!pausedOn(c,d)&&inIvs(civs(c),h)&&(!c.items.length||itemsOn(c,h,d,sc).length>0);
 const names=ids=>ids.map(id=>'«'+campById(id).name+'»').join(', ');
 /* horário do ecrã (liga/desliga, no mesmo dia) */
 const sOn=s=>isNil(s.on)?0:s.on,sOff=s=>isNil(s.off)?24:s.off;
@@ -1367,7 +1391,7 @@ function viewDash(){
   const an=activeNow();
   const playing=an.length?an.map(function(c){
     const n=screens.filter(s=>playingOn(s).indexOf(c)>-1).length;
-    return '<div class="item"><span class="ico ok">'+ic('play')+'</span><div class="grow"><div class="title">'+esc(c.name)+'</div><div class="muted">'+esc(c.client)+' · '+hrs(c.h0,c.h1)+' · '+c.dur+' s · '+modTxt(c.ppm)+'</div></div><div style="text-align:right"><b>'+n+'</b> <span class="muted">'+(n===1?'ecrã':'ecrãs')+'</span><div>'+prioPill(c.priority)+'</div></div></div>';
+    return '<div class="item"><span class="ico ok">'+ic('play')+'</span><div class="grow"><div class="title">'+esc(c.name)+'</div><div class="muted">'+esc(c.client)+' · '+hrsC(c)+' · '+c.dur+' s · '+modTxt(c.ppm)+'</div></div><div style="text-align:right"><b>'+n+'</b> <span class="muted">'+(n===1?'ecrã':'ecrãs')+'</span><div>'+prioPill(c.priority)+'</div></div></div>';
   }).join(''):'<div class="empty">Nenhuma campanha em reprodução neste momento.</div>';
   const sg=suggestions(),cRep=can('relatorios.ver');
   const fewCtl=can('ecras.gerir')?'<div class="few-ctl"><label for="few-min">Avisar ecrãs com menos de</label><input id="few-min" type="number" min="0" max="99" step="1" value="'+state.fewMin+'" data-a-change="few-min"><span>campanhas ativas</span></div>':'';
@@ -1389,7 +1413,7 @@ function plState(c,s,L,h){
   if(statusOf(c)==='Pausada')return ['off','Em pausa',''];
   if(statusOf(c)==='Agendada')return ['sched','Agendada · '+dShort.format(c.start),'accent'];
   if(!screenOn(s,h))return ['off','Ecrã desligado',''];
-  if(!onAt(c,today,h,s))return ['off',h<c.h0?'Entra às '+c.h0+'h':(h>=c.h1?'Saiu às '+c.h1+'h':'Sem vídeo a esta hora'),''];
+  if(!onAt(c,today,h,s))return ['off',(function(){const v=civs(c),nx=v.find(x=>x[0]>h),pv=v.filter(x=>x[1]<=h).pop();return inIvs(v,h)?'Sem vídeo a esta hora':(nx?'Entra às '+nx[0]+'h':(pv?'Saiu às '+pv[1]+'h':'Sem vídeo a esta hora'));})(),''];
   if(L.out.indexOf(c)>-1)return ['limit','Fora do limite agora','warn'];
   if(s.status==='offline')return ['on','Passa a última lista guardada','warn dot'];
   return ['on','A passar agora','ok dot'];
@@ -1425,7 +1449,7 @@ function playlistHtml(s){
   list.forEach(function(c,i){
     const st=plState(c,s,L,h);
     const nv=c.items.length;
-    items+='<div class="pl-item '+st[0]+'"><span class="pl-n">'+(i+1)+'</span><span class="grow"><b class="ell" style="display:block">'+esc(c.name)+'</b><small class="muted">'+esc(c.client)+' · '+hrs(c.h0,c.h1)+' · '+c.dur+' s'+(nv>1?' · '+nv+' vídeos':'')+(slot[c.id]?' · <span class="pl-slot">no loop '+slot[c.id]+'</span>':'')+'</small></span><span class="pill '+st[2]+'">'+st[1]+'</span>'
+    items+='<div class="pl-item '+st[0]+'"><span class="pl-n">'+(i+1)+'</span><span class="grow"><b class="ell" style="display:block">'+esc(c.name)+'</b><small class="muted">'+esc(c.client)+' · '+hrsC(c)+' · '+c.dur+' s'+(nv>1?' · '+nv+' vídeos':'')+(slot[c.id]?' · <span class="pl-slot">no loop '+slot[c.id]+'</span>':'')+'</small></span><span class="pill '+st[2]+'">'+st[1]+'</span>'
       +(edit?'<span class="pl-btns"><button class="btn sm ghost" data-a="pl-move" data-id="'+s.id+'" data-i="'+i+'" data-d="-1" aria-label="Subir na playlist"'+(i===0?' disabled':'')+'>'+ic('up')+'</button><button class="btn sm ghost" data-a="pl-move" data-id="'+s.id+'" data-i="'+i+'" data-d="1" aria-label="Descer na playlist"'+(i===list.length-1?' disabled':'')+'>'+ic('down')+'</button></span>':'')+'</div>';
   });
   const sameVenue=screens.filter(x=>x.venue===s.venue).length>1;
@@ -1640,7 +1664,7 @@ function campRows(){
       const first=on&&(dayDiff(d,c.start)===0||i===0),last=on&&(dayDiff(d,c.end)===0||i===6);
       return '<span class="cell'+(dayDiff(d,today)===0?' todaycol':'')+(st==='Terminada'?' ended':'')+'">'+(on?'<i class="'+(first?'first ':'')+(last?'last':'')+'" style="--bc:var(--c'+c.color+')"></i>':'')+'</span>';
     }).join('');
-    return '<button class="crow" data-a="edit-camp" data-id="'+c.id+'"><span class="clabel"><strong><span class="ell">'+esc(c.name)+'</span>'+(inConf?'<span class="pill warn">Conflito</span>':'')+(c.items.length>1?'<span class="pill">Alternam</span>':'')+(st!=='Ativa'?'<span class="pill">'+st+'</span>':'')+'</strong><small>'+(c.sector?esc(c.sector)+' · ':'')+hrs(c.h0,c.h1)+' · '+modTxt(c.ppm)+' · '+playScreens(c).length+(playScreens(c).length===1?' ecrã':' ecrãs')+' · '+(c.items.length?c.items.length+(c.items.length===1?' vídeo':' vídeos'):'sem conteúdo')+' · '+c.priority+'</small></span>'+cells+'</button>';
+    return '<button class="crow" data-a="edit-camp" data-id="'+c.id+'"><span class="clabel"><strong><span class="ell">'+esc(c.name)+'</span>'+(inConf?'<span class="pill warn">Conflito</span>':'')+(c.items.length>1?'<span class="pill">Alternam</span>':'')+(st!=='Ativa'?'<span class="pill">'+st+'</span>':'')+'</strong><small>'+(c.sector?esc(c.sector)+' · ':'')+hrsC(c)+' · '+modTxt(c.ppm)+' · '+playScreens(c).length+(playScreens(c).length===1?' ecrã':' ecrãs')+' · '+(c.items.length?c.items.length+(c.items.length===1?' vídeo':' vídeos'):'sem conteúdo')+' · '+c.priority+'</small></span>'+cells+'</button>';
   }).join('');
   return rows||'<div class="empty" style="grid-column:1/-1">Nenhuma campanha corresponde à pesquisa.</div>';
 }
@@ -1735,6 +1759,37 @@ function winOpts(sel,from,to,blank){
   for(let h=from;h<=to;h++)o+='<option value="'+h+'"'+(sel===h?' selected':'')+'>'+pad(h)+':00</option>';
   return o;
 }
+/* vários intervalos de horas: linhas Das–Até às (máx. 3) */
+const IV_MAX=3;
+/* atualiza o botão «adicionar», os botões de remover e o aviso de sobreposição */
+function ivSync(bx){
+  const ls=bx.querySelector('.iv-list'),n=ls.children.length,ad=bx.querySelector('.iv-add');
+  ls.classList.toggle('multi',n>1);if(ad)ad.hidden=n>=IV_MAX;
+  const h=bx.parentNode&&bx.parentNode.id==='c-ivs'?$('#c-iv-hint'):null;
+  if(h){
+    const raw=[];ls.querySelectorAll('.iv-row').forEach(function(r){const e=r.querySelectorAll('select');if(e[1].value>e[0].value*1)raw.push([+e[0].value,+e[1].value]);});
+    const m=mergeIvs(raw);
+    h.textContent=m.over?'Atenção: estes intervalos sobrepõem-se e vão ficar juntos em '+ivTxt(m.list)+'.':'Pode ter até 3 intervalos no mesmo dia, por exemplo 7h–10h e 19h–22h. Se dois se sobrepuserem, junto-os num só.';
+    h.classList.toggle('warn-t',m.over);
+  }
+}
+function ivRow(n0,n1,a,b,b0,b1,lab){
+  return '<span class="iv-row"><select name="'+n0+'" aria-label="Início'+lab+'" data-a-change="iv-chg">'+(b0?winOpts(a,0,23,b0):hourOpts(0,23,a))+'</select><span>–</span><select name="'+n1+'" aria-label="Fim'+lab+'" data-a-change="iv-chg">'+(b1?winOpts(b,1,24,b1):hourOpts(1,24,b))+'</select><button type="button" class="btn ghost sm iv-del" data-a="iv-del" aria-label="Remover intervalo">'+ic('x')+'</button></span>';
+}
+function ivBox(n0,n1,list,b0,b1,lab){
+  const rows=list.map(v=>ivRow(n0,n1,v[0],v[1],b0,b1,lab)).join('');
+  return '<span class="iv-box" data-n0="'+n0+'" data-n1="'+n1+'" data-b0="'+esc(b0)+'" data-b1="'+esc(b1)+'" data-lab="'+esc(lab)+'"><span class="iv-list'+(list.length>1?' multi':'')+'">'+rows+'</span><button type="button" class="btn ghost sm iv-add" data-a="iv-add"'+(list.length>=IV_MAX?' hidden':'')+'>'+(b0?'+ Outro intervalo':'+ Adicionar outro intervalo')+'</button></span>';
+}
+/* ordena e junta intervalos que se sobrepõem ou se tocam; devolve também se houve sobreposição verdadeira */
+function mergeIvs(list){
+  const a=list.map(v=>[v[0],v[1]]).sort((x,y)=>x[0]-y[0]),out=[];let over=false;
+  a.forEach(function(v){
+    const l=out[out.length-1];
+    if(l&&v[0]<=l[1]){if(v[0]<l[1])over=true;l[1]=Math.max(l[1],v[1]);}else out.push(v);
+  });
+  return {list:out,over:over};
+}
+const ivTxt=list=>list.map(v=>v[0]+'h–'+v[1]+'h').join(' e ');
 function itemsField(c){
   if(!contents.length)return '<div class="field"><span class="lab">Conteúdos</span><p class="muted">Ainda não há conteúdos. Carregue-os primeiro em «Conteúdos».</p></div>';
   const rank={};
@@ -1746,21 +1801,37 @@ function itemsField(c){
       +'<span class="ci-line"><small>Dias</small><input type="date" name="cid0_'+f.id+'" value="'+(it&&it.d0?iso(it.d0):'')+'" aria-label="Dia de entrada de '+esc(f.name)+'"><span>–</span><input type="date" name="cid1_'+f.id+'" value="'+(it&&it.d1?iso(it.d1):'')+'" aria-label="Dia de saída de '+esc(f.name)+'"></span>'
       +'<span class="ci-line"><small>Vezes/min</small><input type="number" name="cip_'+f.id+'" min="1" max="12" step="1" value="'+((it&&it.ppm)||1)+'" aria-label="Passagens por minuto de '+esc(f.name)+'"></span>'
       +'<span class="ci-line ci-pos"><small>Posição</small><input type="number" name="cio_'+f.id+'" min="1" max="99" step="1" value="'+(rank[f.id]||'')+'" aria-label="Posição de '+esc(f.name)+' na ordem"></span>'
-      +'<span class="ci-line"><small>Horas</small><select name="ci0_'+f.id+'" aria-label="Início do vídeo '+esc(f.name)+'">'+winOpts(it?it.h0:null,0,23,'Início da campanha')+'</select><span>–</span><select name="ci1_'+f.id+'" aria-label="Fim do vídeo '+esc(f.name)+'">'+winOpts(it?it.h1:null,1,24,'Fim da campanha')+'</select></span></div></div>';
+      +'<span class="ci-line ci-hours"><small>Horas</small>'+ivBox('ci0_'+f.id,'ci1_'+f.id,(it&&it.ivs&&it.ivs.length)?it.ivs:[[it?it.h0:null,it?it.h1:null]],'Início da campanha','Fim da campanha',' do vídeo '+esc(f.name))+'</span></div></div>';
   }).join('');
   return '<div class="field"><span class="lab">Conteúdos desta campanha</span><div class="field-inline ci-order"><label for="c-order">Ordem em que alternam</label><select id="c-order" name="order" data-a-change="ci-order"><option value="auto"'+(c.manual?'':' selected')+'>Automática (dia e hora de entrada)</option><option value="manual"'+(c.manual?' selected':'')+'>Manual (defino eu)</option></select></div><div class="checks ci-list"'+(c.manual?' data-manual="1"':'')+'>'+rows+'</div><span class="hint">Escolha os conteúdos e, para cada um, os dias e as horas em que entra e sai. Se deixar em branco, acompanha a campanha. Os vídeos ativos passam alternados, um em cada passagem da campanha: com 5 vídeos e 2 passagens por minuto, o 1.º minuto leva A e B, o 2.º leva C e D, o 3.º leva E e A, e assim por diante. Na ordem automática, entra primeiro quem tem o dia e a hora de entrada mais cedo; na manual, a ordem é a das posições que definir. Quando um sai, os outros continuam. «Vezes/min» é opcional: serve para um vídeo exclusivo ter um ritmo próprio, e esse vídeo não pode partilhar dias e horas com outros.</span></div>';
 }
-function readItems(fd,ch0,ch1,cs,ce){
-  const items=[];
+function readItems(fd,ch0,ch1,cs,ce,cv){
+  const items=[],warns=[];
   fd.getAll('ci').forEach(function(id){
-    const a=fd.get('ci0_'+id),b=fd.get('ci1_'+id),x=String(fd.get('cid0_'+id)||''),y=String(fd.get('cid1_'+id)||'');
+    const as=fd.getAll('ci0_'+id),bs=fd.getAll('ci1_'+id),x=String(fd.get('cid0_'+id)||''),y=String(fd.get('cid1_'+id)||'');
     const pr=String(isNil(fd.get('cip_'+id))?'1':fd.get('cip_'+id)).trim(),pn=Math.round(+pr);
-    items.push({f:id,ppm:pn,h0:(a===''||isNil(a))?null:+a,h1:(b===''||isNil(b))?null:+b,d0:x?parseISO(x):null,d1:y?parseISO(y):null,_pr:pr});
+    const it={f:id,ppm:pn,h0:null,h1:null,d0:x?parseISO(x):null,d1:y?parseISO(y):null,_pr:pr,_a:as,_b:bs};
+    items.push(it);
   });
   for(let k=0;k<items.length;k++){
     const it=items[k];
     if(!it._pr||!(it.ppm>=1&&it.ppm<=12))return {err:'Passagens por minuto de «'+fileById(it.f).name+'»: indique um número inteiro entre 1 e 12.'};
-    delete it._pr;
+    const nm=fileById(it.f).name,n=it._a.length;
+    if(n===1){
+      it.h0=(it._a[0]===''||isNil(it._a[0]))?null:+it._a[0];it.h1=(it._b[0]===''||isNil(it._b[0]))?null:+it._b[0];
+    }else{
+      const raw=[];
+      for(let q=0;q<n;q++){
+        if(it._a[q]===''||it._b[q]===''||isNil(it._a[q])||isNil(it._b[q]))return {err:'«'+nm+'»: com mais do que um intervalo, escolha a hora de início e de fim de cada um.'};
+        if(+it._b[q]<=+it._a[q])return {err:'«'+nm+'»: em cada intervalo, a hora de fim tem de ser depois da de início.'};
+        raw.push([+it._a[q],+it._b[q]]);
+      }
+      const m=mergeIvs(raw);
+      if(m.over)warns.push('«'+nm+'»: intervalos sobrepostos juntados em '+ivTxt(m.list)+'.');
+      it.h0=m.list[0][0];it.h1=m.list[m.list.length-1][1];
+      if(m.list.length>1)it.ivs=m.list;
+    }
+    delete it._pr;delete it._a;delete it._b;
   }
   const manual=fd.get('order')==='manual';
   if(manual&&items.length>1){
@@ -1775,12 +1846,14 @@ function readItems(fd,ch0,ch1,cs,ce){
   }
   for(let k=0;k<items.length;k++){
     const it=items[k],f=fileById(it.f),w0=isNil(it.h0)?ch0:it.h0,w1=isNil(it.h1)?ch1:it.h1;
-    if(w0<ch0||w1>ch1)return {err:'O horário de «'+f.name+'» tem de ficar dentro do horário da campanha ('+ch0+'h–'+ch1+'h).'};
+    const mine=(it.ivs&&it.ivs.length)?it.ivs:[[w0,w1]],full=cv.length===1||(it.ivs&&it.ivs.length)||(!isNil(it.h0)&&!isNil(it.h1));
     if(w1<=w0)return {err:'O vídeo «'+f.name+'» tem de acabar depois de começar.'};
+    if(full&&!mine.every(v=>cv.some(x=>v[0]>=x[0]&&v[1]<=x[1])))return {err:'O horário de «'+f.name+'» tem de ficar dentro do horário da campanha ('+ivTxt(cv)+').'};
+    if(!itemIvs({ivs:cv.length>1?cv:null,h0:ch0,h1:ch1},it).length)return {err:'O horário de «'+f.name+'» não coincide com nenhum intervalo da campanha ('+ivTxt(cv)+').'};
     if((it.d0&&it.d0<cs)||(it.d1&&it.d1>ce)||(it.d0&&it.d0>ce)||(it.d1&&it.d1<cs))return {err:'Os dias de «'+f.name+'» têm de ficar dentro das datas da campanha ('+dShort.format(cs)+' a '+dShort.format(ce)+').'};
     if(it.d0&&it.d1&&it.d1<it.d0)return {err:'O vídeo «'+f.name+'» tem de sair no mesmo dia ou depois de entrar.'};
   }
-  const tmp={h0:ch0,h1:ch1,start:cs,end:ce,items:items},w=winsOf(tmp,null).filter(x=>x.f),pp={};
+  const tmp={h0:ch0,h1:ch1,ivs:cv.length>1?cv:null,start:cs,end:ce,items:items},w=winsOf(tmp,null).filter(x=>x.f),pp={};
   items.forEach(function(i){pp[i.f]=i.ppm;});
   for(let i=0;i<w.length;i++)for(let j=i+1;j<w.length;j++){
     if(w[i].a<w[j].b&&w[j].a<w[i].b&&w[i].d0<=w[j].d1&&w[j].d0<=w[i].d1&&(pp[w[i].f]>1||pp[w[j].f]>1)){
@@ -1788,7 +1861,7 @@ function readItems(fd,ch0,ch1,cs,ce){
       return {err:'«'+fileById(big).name+'» passa '+pp[big]+'× por minuto e, por isso, não pode partilhar dias e horas com outros vídeos da campanha. Escolha dias ou horas diferentes para cada vídeo.'};
     }
   }
-  return {items:items,manual:manual};
+  return {items:items,manual:manual,warns:warns};
 }
 
 function hourOpts(from,to,sel){let o='';for(let h=from;h<=to;h++)o+='<option value="'+h+'"'+(h===sel?' selected':'')+'>'+pad(h)+':00</option>';return o;}
@@ -1813,7 +1886,7 @@ function campModal(id){
     +'<div class="field"><label for="c-sales">E-mail do comercial (opcional)</label><input id="c-sales" name="sales" type="email" inputmode="email" autocomplete="off" list="c-sales-l" value="'+esc(c.sales||'')+'" placeholder="Ex.: comercial@enif.pt"><datalist id="c-sales-l">'+users.filter(function(u){return u.active;}).map(function(u){return '<option value="'+esc(u.email)+'">'+esc(u.name)+'</option>';}).join('')+'</datalist><span class="hint">No fim da campanha envio-lhe automaticamente o relatório final, com as imagens dos conteúdos, para poder mostrá-lo ao cliente.</span></div>'+mailStatusLine(ex)
     +'<div class="field"><span class="lab">Onde passa</span><div class="checks">'+venues.map(v=>'<label><input type="checkbox" name="venue" value="'+esc(v)+'"'+(c.venues.indexOf(v)>-1?' checked':'')+'>'+esc(v)+'</label>').join('')+'</div></div>'
     +'<div class="grid2"><div class="field"><label for="c-start">Início</label><input id="c-start" type="date" name="start" value="'+iso(c.start)+'"></div><div class="field"><label for="c-end">Fim</label><input id="c-end" type="date" name="end" value="'+iso(c.end)+'"></div></div>'
-    +'<div class="grid2"><div class="field"><label for="c-h0">Das</label><select id="c-h0" name="h0">'+hourOpts(0,23,c.h0)+'</select></div><div class="field"><label for="c-h1">Até às</label><select id="c-h1" name="h1">'+hourOpts(1,24,c.h1)+'</select></div></div>'
+    +'<div class="field"><span class="lab">Horas em que passa</span><div class="iv-camp" id="c-ivs">'+ivBox('h0','h1',civs(c),'','','')+'</div><span class="hint" id="c-iv-hint">Pode ter até 3 intervalos no mesmo dia, por exemplo 7h–10h e 19h–22h. Se dois se sobrepuserem, junto-os num só.</span></div>'
     +'<div class="grid2"><div class="field"><label for="c-dur">Duração do vídeo (segundos)</label><input id="c-dur" type="number" name="dur" min="3" max="60" step="1" value="'+c.dur+'"></div><div class="field"><label for="c-mod">Modalidade de passagem (mínimo)</label><select id="c-mod" name="mod" data-a-change="mod-change">'+modOpts(c.ppm)+'</select><input id="c-ppm" type="number" name="ppm" min="0.2" max="12" step="any" value="'+c.ppm+'" aria-label="Passagens por minuto (mínimo)" style="margin-top:6px;'+(modIdx(c.ppm)<0?'':'display:none')+'"></div></div><p class="hint" id="ppm-hint" style="margin:-6px 0 14px">'+ppmHint(c.ppm,c.dur)+'</p><div class="grid2"><div class="field"><label for="c-pri">Prioridade</label><select id="c-pri" name="priority">'+['Alta','Normal','Baixa'].map(p=>'<option'+(p===c.priority?' selected':'')+'>'+p+'</option>').join('')+'</select></div></div>'
     +itemsField(c)+'<div id="asp-hint"></div>'
     +(ro?'':'<div class="ai-box"><button type="button" class="btn sm" data-a="ai-window">'+ic('spark')+'Sugerir horário com IA</button><span class="hint" id="ai-msg">A IA escolhe a janela com mais passagem de pessoas, mantendo a mesma duração.</span></div>')
@@ -3122,10 +3195,22 @@ const actions={
   'apply-opt':function(t){
     if(!guard('campanhas.gerir'))return;
     const g=suggestions().find(s=>s.id===t.dataset.id);
-    if(g){const dl=g.b.h0-g.c.h0;g.c.items.forEach(function(i){if(!isNil(i.h0))i.h0+=dl;if(!isNil(i.h1))i.h1+=dl;});g.c.h0=g.b.h0;g.c.h1=g.b.h1;toast('«'+g.c.name+'» passa para '+hrs(g.c.h0,g.c.h1)+'.');render();}
+    if(g){const dl=g.b.h0-g.c.h0;g.c.items.forEach(function(i){if(!isNil(i.h0))i.h0+=dl;if(!isNil(i.h1))i.h1+=dl;if(i.ivs)i.ivs=i.ivs.map(v=>[v[0]+dl,v[1]+dl]);});g.c.h0=g.b.h0;g.c.h1=g.b.h1;toast('«'+g.c.name+'» passa para '+hrs(g.c.h0,g.c.h1)+'.');render();}
+  },
+  'iv-add':function(t){
+    const bx=t.closest('.iv-box'),ls=bx&&bx.querySelector('.iv-list');if(!ls||ls.children.length>=IV_MAX)return;
+    const d=bx.dataset,camp=bx.parentNode&&bx.parentNode.id==='c-ivs',last=ls.lastElementChild,e=last?last.querySelectorAll('select'):[],lo=e.length?+e[1].value:NaN;
+    const a=camp&&!isNaN(lo)&&lo<22?lo+1:(camp?19:null),b=a===null?null:Math.min(24,a+2);
+    ls.insertAdjacentHTML('beforeend',ivRow(d.n0,d.n1,a,b,d.b0,d.b1,d.lab));
+    ivSync(bx);
+  },
+  'iv-del':function(t){
+    const bx=t.closest('.iv-box'),ls=bx&&bx.querySelector('.iv-list'),r=t.closest('.iv-row');if(!ls||!r||ls.children.length<2)return;
+    r.remove();ivSync(bx);
   },
   'ai-window':function(){
-    const a=$('#c-h0'),b=$('#c-h1');if(!a||!b)return;
+    const a=$('#c-ivs select[name=h0]'),b=$('#c-ivs select[name=h1]');if(!a||!b)return;
+    if(document.querySelectorAll('#c-ivs .iv-row').length>1){$('#ai-msg').textContent='A sugestão da IA só funciona com um intervalo de horas. Remova os outros para a usar.';return;}
     const len=Math.max(1,(+b.value)-(+a.value));
     let bh=0,bv=-1;
     for(let h=0;h+len<=24;h++){const v=sumH(h,h+len);if(v>bv){bv=v;bh=h;}}
@@ -3321,6 +3406,7 @@ document.addEventListener('change',function(e){
   else if(ac==='ci-order'){const l=t.closest&&t.closest('.field'),b=l&&l.querySelector('.ci-list');if(b){if(t.value==='manual')b.setAttribute('data-manual','1');else b.removeAttribute('data-manual');}}
   else if(ac==='sec-change'){const o=$('#c-sector-o');if(o){if(t.value==='__other'){o.style.display='';o.focus();}else{o.style.display='none';o.value='';}}}
   else if(ac==='mod-change'){const p=$('#c-ppm'),h=$('#ppm-hint'),d=$('#c-dur');if(p){if(t.value==='custom'){p.style.display='';p.focus();}else{p.value=t.value;p.style.display='none';}if(h&&d)h.textContent=ppmHint(parseFloat(p.value),parseFloat(d.value));}}
+  else if(ac==='iv-chg'){const bx=t.closest('.iv-box');if(bx)ivSync(bx);}
   else if(ac==='ci-toggle'){const row=t.closest&&t.closest('.ci-row'),w=row&&row.querySelector('.ci-win');if(w)w.hidden=!t.checked;}
   else if(ac==='pv-hour'){if(pv){pv.h=t.value===''?null:+t.value;pv.t=0;pvDraw();}}
   else if(ac==='csort'){state.csort=t.value;render();}
@@ -3531,7 +3617,7 @@ document.addEventListener('submit',function(e){
   if(!guard('campanhas.gerir'))return;
   const name=String(fd.get('name')||'').trim(),client=String(fd.get('client')||'').trim();
   const vs=fd.getAll('venue'),sv=fd.get('start'),ev=fd.get('end');
-  const h0=+fd.get('h0'),h1=+fd.get('h1');
+  const raw0=fd.getAll('h0'),raw1=fd.getAll('h1'),rawIv=raw0.map((v,q)=>[+v,+raw1[q]]);
   const ppm=parseFloat(String(fd.get('ppm')).replace(',','.'));
   const dur=Math.round(parseFloat(String(fd.get('dur')).replace(',','.')));
   const sales=String(fd.get('sales')||'').trim();
@@ -3541,12 +3627,13 @@ document.addEventListener('submit',function(e){
   if(sales&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(sales)){err.textContent='O e-mail do comercial não parece válido. Exemplo: nome@empresa.pt';return;}
   if(!vs.length){err.textContent='Escolha pelo menos um local.';return;}
   if(!sv||!ev||parseISO(ev)<parseISO(sv)){err.textContent='A data de fim tem de ser igual ou posterior à de início.';return;}
-  if(h1<=h0){err.textContent='A hora de fim tem de ser depois da hora de início.';return;}
+  if(!rawIv.length||rawIv.some(v=>!(v[1]>v[0]))){err.textContent='Em cada intervalo, a hora de fim tem de ser depois da hora de início.';return;}
+  const mg=mergeIvs(rawIv),h0=mg.list[0][0],h1=mg.list[mg.list.length-1][1],cvl=mg.list;
   if(!(dur>=3&&dur<=60)){err.textContent='Duração do vídeo: indique entre 3 e 60 segundos.';return;}
   if(!(ppm>=0.2&&ppm<=12)){err.textContent='Passagens por minuto: indique um valor entre 0,2 (1 a cada 5 minutos) e 12.';return;}
-  const ri=readItems(fd,h0,h1,parseISO(sv),parseISO(ev));
+  const ri=readItems(fd,h0,h1,parseISO(sv),parseISO(ev),cvl);
   if(ri.err){err.textContent=ri.err;return;}
-  const data={name:name,client:client||'Sem cliente',venues:vs,start:parseISO(sv),end:parseISO(ev),h0:h0,h1:h1,ppm:ppm,dur:dur,priority:fd.get('priority'),items:ri.items,manual:ri.manual,sales:sales,sector:sector};
+  const data={name:name,client:client||'Sem cliente',venues:vs,start:parseISO(sv),end:parseISO(ev),h0:h0,h1:h1,ivs:cvl.length>1?cvl:null,ppm:ppm,dur:dur,priority:fd.get('priority'),items:ri.items,manual:ri.manual,sales:sales,sector:sector};
   let c;
   if(f.dataset.id){c=campById(f.dataset.id);Object.assign(c,data);}
   else{c=Object.assign({id:'C'+Date.now().toString(36),color:campaigns.length%6+1},data);campaigns.push(c);}
@@ -3554,7 +3641,8 @@ document.addEventListener('submit',function(e){
   const n=allIssues().reduce((a,g)=>a+(g.i.ids.indexOf(c.id)>-1?g.screens.length:0),0);
   
   audit(f.dataset.id?'Atualizou a campanha':'Criou a campanha',c.name);
-  toast((f.dataset.id?'Campanha atualizada.':'Campanha criada.')+(n?' Atenção: conflito de playlist em '+n+(n===1?' ecrã.':' ecrãs.'):''));
+  const warnIv=(mg.over?['Intervalos da campanha sobrepostos juntados em '+ivTxt(cvl)+'.']:[]).concat(ri.warns);
+  toast((f.dataset.id?'Campanha atualizada.':'Campanha criada.')+(warnIv.length?' Aviso: '+warnIv.join(' '):'')+(n?' Atenção: conflito de playlist em '+n+(n===1?' ecrã.':' ecrãs.'):''));
   if(state.view!=='campanhas'&&!f.dataset.id){state.view='campanhas';}
   render();
 });

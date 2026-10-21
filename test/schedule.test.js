@@ -49,4 +49,19 @@ const cs = ['A', 'B', 'C', 'D'].map((n, i) => mk(n, { sector: i < 2 ? 'Cafés' :
 l = loop(cs, D, 10);
 const ids = l.seq.map(e => e.c);
 for (let i = 0; i < 4; i++) assert.notEqual(cs.find(c => c.id === ids[i]).sector, cs.find(c => c.id === ids[(i + 1) % 4]).sector);
+// vários intervalos de horas no mesmo dia (campanha e vídeo)
+const M = mk('M', { h0: 7, h1: 22, ivs: [[7, 10], [19, 22]], items: [{ f: 'a1' }, { f: 'a2', h0: 8, h1: 21, ivs: [[8, 10], [20, 21]] }, { f: 'a3', h0: 19, h1: 21 }] });
+const seqAt = h => { const r = loop([M], D, h); return r ? r.seq.map(e => e.items.join('+')).join(',') : ''; };
+assert.equal(seqAt(6), '', 'antes do 1.º intervalo');
+assert.equal(seqAt(7), 'a1', 'só a1 às 7h');
+assert.equal(seqAt(8), 'a1+a2', 'a1 e a2 às 8h');
+assert.equal(seqAt(12), '', 'fora dos dois intervalos');
+assert.equal(seqAt(19), 'a1+a3', 'a1 e a3 às 19h');
+assert.equal(seqAt(20), 'a1+a2+a3', 'os três às 20h');
+assert.equal(seqAt(21), 'a1', 'às 21h só a1: a2 e a3 já saíram');
+assert.equal(seqAt(22), '', 'depois do 2.º intervalo');
+assert.deepEqual(S.civs(M), [[7, 10], [19, 22]]);
+assert.deepEqual(S.civs(mk('S', { h0: 9, h1: 12 })), [[9, 12]], 'campanha de um só intervalo continua igual');
+assert.equal(S.onAt(M, D, 12, scr, ctx), false);
+assert.equal(S.onAt(M, D, 20, scr, ctx), true);
 console.log('schedule: ok');
