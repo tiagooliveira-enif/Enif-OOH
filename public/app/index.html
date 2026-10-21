@@ -460,6 +460,7 @@ button.avatar{border:0;padding:0;cursor:pointer;}
 .iv-del{padding:4px 6px;}.iv-del svg{width:14px;height:14px;}
 .iv-camp .iv-row select{padding:8px 12px;}
 .warn-t{color:var(--warn);font-weight:600;}
+.more-hint{margin-top:6px;}.more-hint summary{cursor:pointer;color:var(--accent);font-weight:600;}.more-hint[open] summary{margin-bottom:4px;}
 @media(max-width:700px){.ci-win,.ci-hours,.ci-hours .iv-box,.ci-hours .iv-list,.ci-hours .iv-row{min-width:0;max-width:100%;}.ci-hours{flex-wrap:wrap;}.ci-hours .iv-box{flex:1 1 100%;align-items:stretch;}.ci-hours .iv-list{width:100%;}.ci-hours .iv-row select{flex:1 1 0;min-width:0;}.ci-hours .iv-add{align-self:flex-end;}.iv-camp .iv-row select{flex:1 1 0;min-width:0;}}
 .ci-line input[type=date]{width:auto;padding:6px 10px;font-size:13px;border-radius:999px;}
 .ci-win select{width:auto;padding:6px 10px;font-size:13px;border-radius:999px;}
@@ -573,7 +574,7 @@ const $=(s,r)=>(r||document).querySelector(s);
 const isNil=v=>v===null||v===undefined;
 const pad=n=>String(n).padStart(2,'0');
 const pad3=n=>String(n).padStart(3,'0');
-const fmt=new Intl.NumberFormat('pt-PT');
+const fmt=new Intl.NumberFormat('pt-PT',{useGrouping:'always'});
 const compact=new Intl.NumberFormat('pt-PT',{notation:'compact',maximumFractionDigits:1});
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let now=new Date(),hourNow=0,today=now;
@@ -923,6 +924,16 @@ function rateTxt(L){
   if(!r.length)return '0×';
   const a=Math.min.apply(null,r),b=Math.max.apply(null,r);
   return a===b?fmtPpm(a)+'×':fmtPpm(a)+'× a '+fmtPpm(b)+'×';
+}
+/* porque é que uma campanha dentro do horário não está a passar em nenhum ecrã */
+function noPlayWhy(c){
+  const sc=screensOf(c);
+  if(!sc.length)return 'não há ecrãs nos locais escolhidos.';
+  const ok=playScreens(c);
+  if(!ok.length)return 'nenhum conteúdo é compatível com os ecrãs dos locais escolhidos.';
+  if(ok.every(x=>x.status==='offline'||x.status==='novo'))return ok.length===1?'o ecrã '+ok[0].id+' está offline.':'os ecrãs estão offline.';
+  if(ok.every(x=>!isOnNow(x)))return 'os ecrãs estão desligados a esta hora.';
+  return 'ficou fora do limite de campanhas em simultâneo dos ecrãs.';
 }
 function playingOn(s){
   if(s.status==='offline'||s.status==='novo'||!isOnNow(s))return [];
@@ -1391,7 +1402,8 @@ function viewDash(){
   const an=activeNow();
   const playing=an.length?an.map(function(c){
     const n=screens.filter(s=>playingOn(s).indexOf(c)>-1).length;
-    return '<div class="item"><span class="ico ok">'+ic('play')+'</span><div class="grow"><div class="title">'+esc(c.name)+'</div><div class="muted">'+esc(c.client)+' · '+hrsC(c)+' · '+c.dur+' s · '+modTxt(c.ppm)+'</div></div><div style="text-align:right"><b>'+n+'</b> <span class="muted">'+(n===1?'ecrã':'ecrãs')+'</span><div>'+prioPill(c.priority)+'</div></div></div>';
+    const why=n?'':noPlayWhy(c);
+    return '<div class="item"><span class="ico '+(n?'ok':'warn')+'">'+ic(n?'play':'alert')+'</span><div class="grow"><div class="title">'+esc(c.name)+'</div><div class="muted">'+esc(c.client)+' · '+hrsC(c)+' · '+c.dur+' s · '+modTxt(c.ppm)+'</div>'+(why?'<div class="muted"><b>Não está a passar:</b> '+why+'</div>':'')+'</div><div style="text-align:right">'+(n?'<b>'+n+'</b> <span class="muted">'+(n===1?'ecrã':'ecrãs')+'</span>':'<span class="pill warn">Parada</span>')+'<div>'+prioPill(c.priority)+'</div></div></div>';
   }).join(''):'<div class="empty">Nenhuma campanha em reprodução neste momento.</div>';
   const sg=suggestions(),cRep=can('relatorios.ver');
   const fewCtl=can('ecras.gerir')?'<div class="few-ctl"><label for="few-min">Avisar ecrãs com menos de</label><input id="few-min" type="number" min="0" max="99" step="1" value="'+state.fewMin+'" data-a-change="few-min"><span>campanhas ativas</span></div>':'';
@@ -1461,11 +1473,11 @@ function playlistHtml(s){
 }
 
 const matchF=(s,f)=>f==='todos'||(f==='conflito'?hasConf(s):(f==='porenviar'?!!s.draft:s.status===f));
-const rowPills=s=>{const a=(hasConf(s)?'<span class="pill warn">Conflito</span> ':'')+(diskLow(s)?'<span class="pill bad">Disco quase cheio</span> ':'')+(s.draft?'<span class="pill accent">Por enviar</span>':'');return a?'<span style="display:block;margin-top:3px">'+a+'</span>':'';};
+const rowPills=s=>{const al=s.status==='atencao'&&!diskLow(s)&&!hasConf(s)?alerts.find(x=>x.screen===s.id):null;const a=(al?'<span class="pill warn">'+esc(al.title)+'</span> ':'')+(hasConf(s)?'<span class="pill warn">Conflito</span> ':'')+(diskLow(s)?'<span class="pill bad">Disco quase cheio</span> ':'')+(s.draft?'<span class="pill accent">Por enviar</span>':'');return a?'<span style="display:block;margin-top:3px">'+a+'</span>':'';};
 function viewScreens(){
   head('Ecrãs',screens.length+' ecrãs registados em '+new Set(screens.map(s=>s.venue)).size+' locais',can('ecras.gerir')?'<button class="btn primary" data-a="new-screen">'+ic('plus')+'Novo ecrã</button>':'');
   const cnt=f=>screens.filter(s=>matchF(s,f)).length;
-  const chips=[['todos','Todos'],['online','Online'],['atencao','Atenção'],['offline','Offline'],['conflito','Conflitos'],['porenviar','Por enviar']].map(f=>'<button class="chip" data-a="filter" data-f="'+f[0]+'" aria-pressed="'+(state.filter===f[0])+'">'+f[1]+' <b>'+cnt(f[0])+'</b></button>').join('');
+  const chips=[['todos','Todos'],['online','Online'],['atencao','Atenção'],['offline','Offline'],['conflito','Conflitos','Ecrãs onde duas campanhas disputam o mesmo espaço na playlist'],['porenviar','Por enviar','Ecrãs com a playlist alterada e ainda não enviada']].map(f=>'<button class="chip" data-a="filter" data-f="'+f[0]+'"'+(f[2]?' title="'+f[2]+'"':'')+' aria-pressed="'+(state.filter===f[0])+'">'+f[1]+' <b>'+cnt(f[0])+'</b></button>').join('');
   return '<div class="tools"><div class="search">'+ic('search')+'<input id="q" type="search" placeholder="Procurar por local, cidade ou código" value="'+esc(state.q)+'" aria-label="Procurar ecrãs"></div><div class="chips">'+chips+'</div></div><div class="card" id="screen-list"></div>';
 }
 function drawScreenList(){
@@ -1799,11 +1811,11 @@ function itemsField(c){
     return '<div class="ci-row"><label class="ci-main"><input type="checkbox" name="ci" value="'+f.id+'" data-a-change="ci-toggle"'+(it?' checked':'')+'><span class="ell">'+esc(f.name)+'</span>'+(fo?'<small class="muted">'+esc(fo.name)+'</small>':'')+'</label>'
       +'<div class="ci-win"'+(it?'':' hidden')+'>'
       +'<span class="ci-line"><small>Dias</small><input type="date" name="cid0_'+f.id+'" value="'+(it&&it.d0?iso(it.d0):'')+'" aria-label="Dia de entrada de '+esc(f.name)+'"><span>–</span><input type="date" name="cid1_'+f.id+'" value="'+(it&&it.d1?iso(it.d1):'')+'" aria-label="Dia de saída de '+esc(f.name)+'"></span>'
-      +'<span class="ci-line"><small>Vezes/min</small><input type="number" name="cip_'+f.id+'" min="1" max="12" step="1" value="'+((it&&it.ppm)||1)+'" aria-label="Passagens por minuto de '+esc(f.name)+'"></span>'
+      +'<span class="ci-line"><small title="Quantas vezes por minuto este vídeo passa. Deixe 1 se não precisar de um ritmo próprio.">Vezes/min</small><input type="number" name="cip_'+f.id+'" min="1" max="12" step="1" value="'+((it&&it.ppm)||1)+'" aria-label="Passagens por minuto de '+esc(f.name)+'"></span>'
       +'<span class="ci-line ci-pos"><small>Posição</small><input type="number" name="cio_'+f.id+'" min="1" max="99" step="1" value="'+(rank[f.id]||'')+'" aria-label="Posição de '+esc(f.name)+' na ordem"></span>'
       +'<span class="ci-line ci-hours"><small>Horas</small>'+ivBox('ci0_'+f.id,'ci1_'+f.id,(it&&it.ivs&&it.ivs.length)?it.ivs:[[it?it.h0:null,it?it.h1:null]],'Início da campanha','Fim da campanha',' do vídeo '+esc(f.name))+'</span></div></div>';
   }).join('');
-  return '<div class="field"><span class="lab">Conteúdos desta campanha</span><div class="field-inline ci-order"><label for="c-order">Ordem em que alternam</label><select id="c-order" name="order" data-a-change="ci-order"><option value="auto"'+(c.manual?'':' selected')+'>Automática (dia e hora de entrada)</option><option value="manual"'+(c.manual?' selected':'')+'>Manual (defino eu)</option></select></div><div class="checks ci-list"'+(c.manual?' data-manual="1"':'')+'>'+rows+'</div><span class="hint">Escolha os conteúdos e, para cada um, os dias e as horas em que entra e sai. Se deixar em branco, acompanha a campanha. Os vídeos ativos passam alternados, um em cada passagem da campanha: com 5 vídeos e 2 passagens por minuto, o 1.º minuto leva A e B, o 2.º leva C e D, o 3.º leva E e A, e assim por diante. Na ordem automática, entra primeiro quem tem o dia e a hora de entrada mais cedo; na manual, a ordem é a das posições que definir. Quando um sai, os outros continuam. «Vezes/min» é opcional: serve para um vídeo exclusivo ter um ritmo próprio, e esse vídeo não pode partilhar dias e horas com outros.</span></div>';
+  return '<div class="field"><span class="lab">Conteúdos desta campanha</span><div class="field-inline ci-order"><label for="c-order">Ordem em que alternam</label><select id="c-order" name="order" data-a-change="ci-order"><option value="auto"'+(c.manual?'':' selected')+'>Automática (dia e hora de entrada)</option><option value="manual"'+(c.manual?' selected':'')+'>Manual (defino eu)</option></select></div><div class="checks ci-list"'+(c.manual?' data-manual="1"':'')+'>'+rows+'</div><span class="hint">Escolha os conteúdos e, para cada um, os dias e as horas em que entra e sai. Se deixar em branco, acompanha a campanha. Os vídeos ativos passam alternados, um em cada passagem da campanha.<details class="more-hint"><summary>Ver exemplo e outras regras</summary>Com 5 vídeos e 2 passagens por minuto, o 1.º minuto leva A e B, o 2.º leva C e D, o 3.º leva E e A, e assim por diante. Na ordem automática, entra primeiro quem tem o dia e a hora de entrada mais cedo; na manual, a ordem é a das posições que definir. Quando um sai, os outros continuam. «Vezes/min» é opcional: serve para um vídeo exclusivo ter um ritmo próprio, e esse vídeo não pode partilhar dias e horas com outros.</details></span></div>';
 }
 function readItems(fd,ch0,ch1,cs,ce,cv){
   const items=[],warns=[];
@@ -2540,7 +2552,7 @@ function viewReports(){
     +'</div></div>';
   const cfc={alta:0,'média':0,baixa:0},seen={};
   recs.forEach(function(r){if(!seen[r.s.id]){seen[r.s.id]=1;cfc[locInfo(r.s).conf]++;}});
-  const confLine='<p class="hint" style="margin:-4px 0 16px">Confiança da estimativa de audiência nos ecrãs deste relatório: '+cfc.alta+' alta · '+cfc['média']+' média · '+cfc.baixa+' baixa. Indique o tipo de local, as coordenadas e a contagem de pessoas em cada ecrã para a melhorar.</p>';
+  const confLine='<p class="hint" style="margin:-4px 0 16px">Confiança da estimativa de audiência nos ecrãs deste relatório: '+cfc.alta+' alta · '+cfc['média']+' média · '+cfc.baixa+' baixa. Para a melhorar, abra cada ecrã e preencha o tipo de local, as coordenadas e a contagem de pessoas. <button class="btn sm ghost" data-a="nav" data-v="ecras">Ir para os ecrãs</button></p>';
   const ag=aggByFile(recs);
   const fileCard=(c0&&!d.fid&&ag.keys.length>1)?'<div class="card"><div class="card-h"><h2>Por vídeo</h2></div><div class="scroll-x" style="margin-top:8px"><table class="tbl"><thead><tr><th>Vídeo</th><th class="num">Passagens</th><th class="num">Visualizações</th></tr></thead><tbody>'+ag.keys.map(k=>'<tr><td><b>'+esc(ag.name(k))+'</b></td><td class="num">'+fmt.format(ag.bf[k].plays)+'</td><td class="num">'+fmt.format(ag.bf[k].impr)+'</td></tr>').join('')+'</tbody></table></div></div>':'';
   const log=airLog(recs),shown=log.slice(0,state.logLimit);
