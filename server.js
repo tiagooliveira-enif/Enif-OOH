@@ -6,7 +6,7 @@ const { DatabaseSync } = require('node:sqlite');
 const S = require('./lib/schedule');
 const MAIL = require('./lib/mail'), REPORT = require('./lib/report');
 const A = require('./lib/auth');
-const M = require('./lib/media'), CAL = require('./lib/calendar');
+const M = require('./lib/media'), CAL = require('./lib/calendar'), POI = require('./lib/poi');
 
 const PORT = +process.env.PORT || 8080;
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -137,12 +137,16 @@ function cleanScreen(o, id, old) {
   const out = {
     id, venue: str(o.venue, 120, 'Local'), city: optStr(o.city, 80), spot: str(o.spot, 120, 'Posição'), type: optStr(o.type, 60) || 'Outro',
     res: optStr(o.res, 20) || 'auto', limit: Math.round(num(o.limit, 1, 99, 'Limite')), order: ids(o.order || [], 'Ordem'),
-    draft: null, loc: { addr: optStr(loc.addr, 200), lat: isNil(loc.lat) ? null : num(loc.lat, -90, 90, 'Latitude'), lng: isNil(loc.lng) ? null : num(loc.lng, -180, 180, 'Longitude'), env: optStr(loc.env, 40), pop: isNil(loc.pop) ? null : Math.round(num(loc.pop, 0, 2e6, 'Pessoas por dia')) },
+    draft: null, loc: { addr: optStr(loc.addr, 200), lat: isNil(loc.lat) ? null : num(loc.lat, -90, 90, 'Latitude'), lng: isNil(loc.lng) ? null : num(loc.lng, -180, 180, 'Longitude'), env: optStr(loc.env, 40), pop: isNil(loc.pop) ? null : Math.round(num(loc.pop, 0, 2e6, 'Pessoas por dia')), poi: null },
     on: num(isNil(o.on) ? 0 : o.on, 0, 24, 'Hora de ligar'), off: num(isNil(o.off) ? 24 : o.off, 0, 24, 'Hora de desligar'),
     onT: optStr(o.onT, 5) || '00:00', offT: optStr(o.offT, 5) || '23:59',
     fit: FITS.indexOf(o.fit) > -1 ? o.fit : ((old && old.fit) || 'caber'),
     bri: cleanBri(o.bri, old && old.bri)
   };
+  if (loc.poi && typeof loc.poi === 'object' && out.loc.lat !== null && out.loc.lng !== null) {
+    out.loc.poi = { r: POI.RADIUS, at: Math.round(num(isNil(loc.poi.at) ? 0 : loc.poi.at, 0, 1e14, 'Data do movimento')) };
+    POI.KINDS.forEach(k => { out.loc.poi[k[0]] = Math.round(num(isNil(loc.poi[k[0]]) ? 0 : loc.poi[k[0]], 0, 5000, 'Movimento à volta')); });
+  }
   if (!out.venue || !out.spot) throw bad('Indique o local e a posição do ecrã.');
   if (o.draft) out.draft = { order: ids(o.draft.order || [], 'Rascunho'), limit: Math.round(num(o.draft.limit, 1, 99, 'Limite')) };
   return out;
@@ -882,6 +886,11 @@ const router = async (req, res) => {
     return send(res, 200, { ok: true });
   }
   if (p === '/api/state' && m === 'GET') return send(res, 200, buildState(needUser(req, u)));
+  if (p === '/api/poi' && m === 'POST') {
+    const user = needUser(req, u); need(user, 'ecras.gerir'); const b = await readJson(req);
+    const lat = num(b.lat, -90, 90, 'Latitude'), lng = num(b.lng, -180, 180, 'Longitude');
+    try { return send(res, 200, await POI.fetchPoi(lat, lng, { url: process.env.POI_URL || undefined, allowHttp: process.env.POI_ALLOW_HTTP === '1' })); } catch (e) { throw new HttpError(502, e.message); }
+  }
   if (p === '/api/calendar' && m === 'GET') { needUser(req, u); await calRefresh(false); return send(res, 200, calendarView()); }
   if (p === '/api/calendar/read' && m === 'POST') {
     needUser(req, u); const b = await readJson(req), id = String(b.id || '');

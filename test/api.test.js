@@ -205,6 +205,32 @@ async function main() {
     delete process.env.CAL_ICS_URL; cs.close();
   }
 
+  // ---- movimento à volta do ecrã (OpenStreetMap, aqui um Overpass falso)
+  {
+    const http = require('node:http'), POI = require('../lib/poi'), AUD = require('../lib/audience');
+    const els = [{ tags: { shop: 'clothes' } }, { tags: { shop: 'bakery' } }, { tags: { amenity: 'cafe' } }, { tags: { highway: 'bus_stop' } }, { tags: { railway: 'station' } }, { tags: { amenity: 'school' } }, { tags: { amenity: 'hospital' } }, { tags: { building: 'yes' } }];
+    let got = '';
+    const ov = http.createServer((q, rs) => { let b = ''; q.on('data', c => { b += c; }); q.on('end', () => { got = decodeURIComponent(b); rs.writeHead(200, { 'Content-Type': 'application/json' }); rs.end(JSON.stringify({ elements: els })); }); });
+    await new Promise(r => ov.listen(0, '127.0.0.1', r));
+    process.env.POI_URL = 'http://127.0.0.1:' + ov.address().port + '/api/interpreter'; process.env.POI_ALLOW_HTTP = '1';
+    ok('movimento à volta exige sessão', (await call('POST', '/api/poi', { lat: 38.7, lng: -9.1 })).s === 401);
+    ok('movimento à volta exige permissão de ecrãs', (await call('POST', '/api/poi', { lat: 38.7, lng: -9.1 }, tpl2)).s === 403);
+    const pr = await call('POST', '/api/poi', { lat: 38.7369, lng: -9.1521 }, adm);
+    ok('conta lojas, restaurantes, paragens, escolas e hospitais', pr.s === 200 && pr.j.shops === 2 && pr.j.food === 1 && pr.j.transit === 2 && pr.j.edu === 1 && pr.j.health === 1 && pr.j.r === 250);
+    ok('a pergunta usa o raio de 250 m e as coordenadas', /around:250,38\.736900,-9\.152100/.test(got));
+    ok('coordenadas inválidas recusadas', (await call('POST', '/api/poi', { lat: 99, lng: 0 }, adm)).s === 400);
+    const f1 = POI.factor({ shops: 0, food: 0, transit: 0, edu: 0, health: 0 }), f2 = POI.factor({ shops: 200, food: 100, transit: 40, edu: 5, health: 5 });
+    ok('fator de movimento entre −15 % e +40 %', Math.abs(f1 - 0.85) < 1e-9 && f2 > 1.35 && f2 <= 1.4);
+    ok('o relatório final usa o mesmo fator que a aplicação', Math.abs(AUD.poiFactor({ shops: 17, food: 15, transit: 5, edu: 0, health: 0 }) - POI.factor({ shops: 17, food: 15, transit: 5, edu: 0, health: 0 })) < 1e-12);
+    const sc = (id, loc) => ({ id, venue: 'Praça', city: 'Lisboa', spot: 'A', type: 'Totem', res: '1080×1920', limit: 5, order: [], draft: null, loc, on: 0, off: 24 });
+    await sync(adm, [{ op: 'put', coll: 'screens', id: 'ECR-P1', doc: sc('ECR-P1', { addr: '', lat: 38.7369, lng: -9.1521, env: 'rua', pop: null, poi: Object.assign({}, pr.j, { evil: 1 }) }) }, { op: 'put', coll: 'screens', id: 'ECR-P2', doc: sc('ECR-P2', { addr: '', lat: null, lng: null, env: 'rua', pop: null, poi: pr.j }) }]);
+    const sp = (await call('GET', '/api/state', undefined, adm)).j.screens;
+    ok('movimento guardado com as coordenadas', sp.find(x => x.id === 'ECR-P1').loc.poi.shops === 2 && !('evil' in sp.find(x => x.id === 'ECR-P1').loc.poi));
+    ok('sem coordenadas o movimento é ignorado', sp.find(x => x.id === 'ECR-P2').loc.poi === null);
+    await sync(adm, [{ op: 'del', coll: 'screens', id: 'ECR-P1' }, { op: 'del', coll: 'screens', id: 'ECR-P2' }]);
+    ov.close(); delete process.env.POI_URL;
+  }
+
   console.log('\n' + passed + ' verificações ok');
 }
 main().then(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(0); }).catch(e => { console.error('FALHOU:', e); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(1); });

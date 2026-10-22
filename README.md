@@ -13,6 +13,7 @@ Plataforma interna de gestão de ecrãs OOH: **servidor** (API, base de dados, f
    - `emailRecuperacao`: para onde vão os códigos de recuperação e de entrada em dois passos.
    - `smtp`: a caixa de correio que envia (código, avisos de fim de campanha e relatórios finais). Sem isto a aplicação funciona, mas **não envia e-mails** e não deixa ligar os dois passos.
    - `calendario` (opcional): `link` = o **endereço secreto em formato iCal** do teu calendário Google (Google Calendar → Definições do calendário → «Endereço secreto em formato iCal»; só leitura) e `palavra` = só os eventos com esta palavra no título ou descrição aparecem no painel (por defeito «SPOTS DIGITAIS»). O painel avisa «Verificar Evento» 48 h antes e podes marcar como lido. **Quem tem este endereço consegue ler o calendário: escreve-o só neste ficheiro, nunca no GitHub nem em conversas.**
+   - **Movimento à volta do ecrã:** não precisa de configuração. Ao carregar em «Ver movimento à volta» (Localização e horário de um ecrã com coordenadas), o servidor pergunta ao OpenStreetMap (Overpass, https://overpass-api.de) quantas lojas, restaurantes, paragens, escolas e hospitais há num raio de 250 m e guarda os números. O servidor precisa de acesso à internet. Dados © colaboradores do OpenStreetMap.
 
 2. `node server.js` e abra http://localhost:8080/. A conta é criada no primeiro arranque; depois pode apagar a palavra-passe do ficheiro.
 3. Esquecida a palavra-passe? Ponha uma nova no ficheiro e corra `node server.js --reset-admin`.

@@ -1,4 +1,4 @@
-"""Teste de ponta a ponta das novidades da v93: cartão do Calendário (servidor a ler um .ics falso), prioridade só Alta/Normal
+"""Teste de ponta a ponta das novidades da v93: cartão do Calendário (servidor a ler um .ics falso) e movimento à volta (Overpass falso), prioridade só Alta/Normal
 e posição partilhada guardada no servidor. Corre: python3 test/e2e/novidades.py"""
 import subprocess, os, json, time, urllib.request, tempfile, threading, http.server, datetime
 from playwright.sync_api import sync_playwright
@@ -11,7 +11,14 @@ class H(http.server.BaseHTTPRequestHandler):
     def do_GET(self): self.send_response(200); self.send_header('Content-Type', 'text/calendar'); self.end_headers(); self.wfile.write(ics.encode())
     def log_message(self, *a): pass
 cs = http.server.ThreadingHTTPServer(('127.0.0.1', cport), H); threading.Thread(target=cs.serve_forever, daemon=True).start()
-env = dict(os.environ, DATA_DIR=data, ADMIN_NAME='Tiago', ADMIN_EMAIL='t@enif.pt', ADMIN_PASS='palavra-passe-longa', PORT=str(port), CAL_ICS_URL='http://127.0.0.1:%d/segredo.ics' % cport, CAL_ALLOW_HTTP='1')
+class OV(http.server.BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.rfile.read(int(self.headers.get('Content-Length', 0)))
+        self.send_response(200); self.send_header('Content-Type', 'application/json'); self.end_headers()
+        self.wfile.write(json.dumps({'elements': [{'tags': {'shop': 'x'}}, {'tags': {'shop': 'y'}}, {'tags': {'amenity': 'cafe'}}, {'tags': {'highway': 'bus_stop'}}]}).encode())
+    def log_message(self, *a): pass
+ovs = http.server.ThreadingHTTPServer(('127.0.0.1', 8769), OV); threading.Thread(target=ovs.serve_forever, daemon=True).start()
+env = dict(os.environ, DATA_DIR=data, ADMIN_NAME='Tiago', ADMIN_EMAIL='t@enif.pt', ADMIN_PASS='palavra-passe-longa', PORT=str(port), CAL_ICS_URL='http://127.0.0.1:%d/segredo.ics' % cport, CAL_ALLOW_HTTP='1', POI_URL='http://127.0.0.1:8769/api/interpreter', POI_ALLOW_HTTP='1')
 srv = subprocess.Popen(['node', '--disable-warning=ExperimentalWarning', 'server.js'], cwd=ROOT, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 time.sleep(1.5); B = 'http://127.0.0.1:%d' % port
 fails = []
@@ -54,12 +61,21 @@ try:
         pg.click('[data-a=nav][data-v=campanhas]'); time.sleep(.5); pg.click('[data-a=new-camp]'); time.sleep(.4)
         ok('prioridade só tem Alta e Normal', pg.eval_on_selector_all('#c-pri option', 'o=>o.map(x=>x.value)') == ['Alta', 'Normal'])
         ok('há explicação da prioridade Alta', 'garante' in pg.inner_text('#modal-root'))
+        call('POST', '/api/sync', {'ops': [{'op': 'put', 'coll': 'screens', 'id': 'ECR-001', 'doc': {'id': 'ECR-001', 'venue': 'Praça Teste', 'city': 'Lisboa', 'spot': 'Centro', 'type': 'Painel horizontal', 'res': '1920×1080', 'limit': 5, 'order': [], 'draft': None, 'loc': {'addr': '', 'lat': None, 'lng': None, 'env': 'rua', 'pop': None}, 'on': 0, 'off': 24}}]}, tok)
+        pg.reload(); pg.wait_for_selector('[data-a=nav][data-v=ecras]'); pg.click('[data-a=nav][data-v=ecras]'); time.sleep(.6)
+        pg.click('[data-a=open-screen]:has-text("ECR-001")'); time.sleep(.5)
+        pg.locator('[data-a=edit-place]').first.click(); time.sleep(.5)
+        pg.fill('#pf-maps', '38.7369, -9.1521'); pg.click('[data-a=poi-calc]'); time.sleep(1)
+        ok('movimento à volta calculado pelo servidor', '2 lojas' in pg.inner_text('#poi-res') and 'estimativa' in pg.inner_text('#poi-res'))
+        pg.click('form[data-form=place] button[type=submit]'); time.sleep(1.2)
+        st_ = call('GET', '/api/state', tok=tok); sc_ = [x for x in st_['screens'] if x['id'] == 'ECR-001'][0]
+        ok('movimento guardado no ecrã', (sc_['loc'].get('poi') or {}).get('shops') == 2)
         ok('zero erros na consola', not errs)
     sh = {'id': 'S1', 'name': 'Camp S1', 'client': 'c', 'venues': [], 'start': datetime.date.today().isoformat(), 'end': (datetime.date.today() + datetime.timedelta(days=5)).isoformat(), 'h0': 8, 'h1': 20, 'ppm': 1, 'dur': 10, 'priority': 'Alta', 'share': 'GX', 'manual': False, 'color': 1, 'items': [], 'pauses': []}
     call('POST', '/api/sync', {'ops': [{'op': 'put', 'coll': 'campaigns', 'id': 'S1', 'doc': sh}]}, tok)
     c1 = [c for c in call('GET', '/api/state', tok=tok)['campaigns'] if c['id'] == 'S1'][0]
     ok('Alta e posição partilhada ficam guardadas no servidor', c1['priority'] == 'Alta' and c1['share'] == 'GX')
 finally:
-    srv.terminate(); print(srv.stdout.read().decode()[-300:]); cs.shutdown()
+    srv.terminate(); print(srv.stdout.read().decode()[-300:]); cs.shutdown(); ovs.shutdown()
 print('\nFALHAS', fails)
 raise SystemExit(1 if fails else 0)

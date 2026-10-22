@@ -1813,6 +1813,17 @@ button.crow:hover {
   margin: 18px 0 8px;
   font-weight: 700;
 }
+.poi-box {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  font-size: 13px;
+}
+.poi-box .muted {
+  flex: 1 1 200px;
+  min-width: 0;
+}
 .cal-card .card-h {
   padding-bottom: 6px;
 }
@@ -4730,6 +4741,15 @@ function parseCoords(t) {
   const la = +m[1], ln = +m[2];
   return (Math.abs(la) <= 90 && Math.abs(ln) <= 180) ? [la, ln] : null;
 }
+/* movimento à volta do ecrã: pontos de interesse num raio de 250 m (OpenStreetMap, consultado pelo servidor ao calcular) */
+const POI_R = 250;
+const POI_KINDS = [['shops', 'lojas', 1], ['food', 'restaurantes e cafés', 1], ['transit', 'paragens e estações', 3], ['edu', 'escolas', 2], ['health', 'hospitais e clínicas', 2]];
+const poiScore = p=>POI_KINDS.reduce((a, k)=>a + (p[k[0]] || 0) * k[2], 0);
+const poiFactor = p=>0.85 + 0.55 * (1 - Math.exp(-poiScore(p) / 40));
+function poiTxt(p) {
+  const parts = POI_KINDS.filter(k=>p[k[0]]).sort((a, b)=>p[b[0]] * b[2] - p[a[0]] * a[2]).slice(0, 3).map(k=>p[k[0]] + ' ' + k[1]);
+  return 'à volta (' + (p.r || POI_R) + ' m): ' + (parts.length ? parts.join(', ') : 'quase nada');
+}
 function locInfo(s) {
   const L = s.loc || {}, env = ENV.find(e=>e.length && e[0] === L.env), why = [];
   const hasC = !isNil(L.lat) && !isNil(L.lng);
@@ -4744,7 +4764,11 @@ function locInfo(s) {
   if (env)why.unshift(env[1]);
   let f, conf;
   if (L.pop) {f = Math.max(0.15, Math.min(5, L.pop / REF_PASS)); conf = 'alta'; why.push('contagem de ' + fmt.format(L.pop) + ' pessoas por dia');}
-  else if (env) {f = env[2] * cityF * central; conf = hasC ? 'média' : 'baixa';}
+  else if (env) {
+    const pf = L.poi && hasC ? poiFactor(L.poi) : 1;
+    f = env[2] * cityF * central * pf; conf = hasC ? 'média' : 'baixa';
+    if (L.poi && hasC) why.push(poiTxt(L.poi) + (pf >= 1 ? ' (+' : ' (−') + Math.round(Math.abs(pf - 1) * 100) + ' %)');
+  }
   else {const n = parseInt(s.id.slice(4), 10) || 1; f = (0.75 + ((n * 37) % 11) / 20) * cityF; conf = 'baixa';}
   return {f:f, conf:conf, why:why, hasC:hasC};
 }
@@ -4767,6 +4791,7 @@ function placeFields(s, isNew) {
     + '<div class="field"><label for="pf-maps">Link do Google Maps ou coordenadas (opcional)</label><input id="pf-maps" name="maps" value="' + esc(coords) + '" placeholder="Ex.: 38.7223, -9.1393" autocomplete="off"><span class="hint">Cole o link completo da localização no Google Maps ou escreva as coordenadas com ponto decimal. Links curtos (maps.app.goo.gl) não funcionam.</span></div>'
     + '<div class="grid2"><div class="field"><label for="pf-env">Tipo de local</label><select id="pf-env" name="env"><option value="">Não sei</option>' + ENV.map(e=>'<option value="' + e[0] + '"' + (L.env === e[0] ? ' selected' : '') + '>' + e[1] + '</option>').join('') + '</select></div>'
     + '<div class="field"><label for="pf-pop">Pessoas que passam por dia (opcional)</label><input id="pf-pop" name="pop" type="number" min="0" step="50" value="' + (L.pop || '') + '" placeholder="Ex.: 12000"><span class="hint">Só se tiver uma contagem real.</span></div></div>'
+    + '<div class="field"><span class="lab">Movimento à volta do ecrã</span><div class="poi-box"><button type="button" class="btn sm" data-a="poi-calc">Ver movimento à volta (' + POI_R + ' m)</button><span id="poi-res" class="muted">' + (L.poi && !isNil(L.lat) ? esc(poiTxt(L.poi)) : 'Precisa das coordenadas acima.') + '</span></div><input type="hidden" id="pf-poi" name="poi" value="' + esc(L.poi && !isNil(L.lat) ? JSON.stringify(L.poi) : '') + '"><span class="hint">Conta lojas, restaurantes, paragens, escolas e hospitais perto do ecrã e ajusta a estimativa (de −15 % a +40 %). Se indicar uma contagem real acima, é essa que conta. Dados © OpenStreetMap.</span></div>'
     + '<p class="hint" style="margin:-4px 0 6px">Com isto a estimativa de visualizações deixa de ser genérica: pesa o tipo de local, a cidade e a distância ao centro. É um modelo, não uma medição.</p>'
     + '<h3 class="sec-t">Horário do ecrã</h3>'
     + '<label class="row-check"><input type="checkbox" name="always" data-a-change="always"' + (always ? ' checked' : '') + '>Sempre ligado (24 h)</label>'
@@ -4788,7 +4813,10 @@ function readPlace(fd) {
     if (off <= on) return {err:'O ecrã tem de desligar depois de ligar, no mesmo dia. Para funcionar 24 h, marque «Sempre ligado».'};
     onT = pad(+a[1]) + ':' + a[2]; offT = pad(+b[1]) + ':' + b[2];
   }
-  return {loc:{addr:addr, lat:lat, lng:lng, env:env, pop:pop}, on:on, off:off, onT:onT, offT:offT};
+  let poi = null;
+  try {poi = JSON.parse(String(fd.get('poi') || 'null'));} catch (e) {poi = null;}
+  if (!poi || isNil(lat) || typeof poi.shops !== 'number') poi = null;
+  return {loc:{addr:addr, lat:lat, lng:lng, env:env, pop:pop, poi:poi}, on:on, off:off, onT:onT, offT:offT};
 }
 function placeModal(id) {
   const s = screens.find(x=>x.id === id); if (!s) return;
@@ -5606,6 +5634,20 @@ const actions = {
   'camp-tab':function(t) {state.ctab = t.dataset.t; render();},
   'av-day':function(t) {const d = +t.dataset.d, b = dOf(state.av.d) || today; state.av.d = iso(d === 0 ? today : addDays(b, d)); render();},
   week:function(t) {const d = +t.dataset.d; state.week = d === 0 ? 0 : state.week + d; render();},
+  'poi-calc':function(t) {
+    const c = parseCoords(String(($('#pf-maps') || {}).value || '')), res = $('#poi-res'), hid = $('#pf-poi');
+    if (!c) {if (res)res.textContent = 'Indique primeiro as coordenadas ou o link do Google Maps.'; return;}
+    if (res)res.textContent = 'A consultar o mapa…';
+    t.disabled = true;
+    api('POST', '/api/poi', {lat:c[0], lng:c[1]}).then(function(p) {
+      t.disabled = false;
+      if (hid)hid.value = JSON.stringify(p);
+      if (res)res.textContent = poiTxt(p) + ' → ' + (poiFactor(p) >= 1 ? '+' : '−') + Math.round(Math.abs(poiFactor(p) - 1) * 100) + ' % na estimativa';
+    }).catch(function(e) {
+      t.disabled = false;
+      if (res)res.textContent = e.message;
+    });
+  },
   'cal-open':function(t) {state.calOpen[t.dataset.id] = !state.calOpen[t.dataset.id]; render();},
   'cal-read':function(t) {api('POST', '/api/calendar/read', {id:t.dataset.id}).then(function(r) {state.cal = r; render();}).catch(function(e) {toast(e.message);});},
   dismiss:function(t) {if (!guard('campanhas.gerir')) return; state.dismissed[t.dataset.id] = true; render();},
