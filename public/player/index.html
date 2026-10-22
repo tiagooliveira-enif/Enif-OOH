@@ -5,20 +5,123 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Enif DOOH · Player</title>
 <style>
-  html,body{margin:0;height:100%;background:#000;color:#fff;overflow:hidden;cursor:none;font-family:system-ui,Segoe UI,sans-serif}
-  #stage{position:fixed;inset:0;background:#000}
-  #stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;background:#fff}
-  #stage img,#stage video{position:absolute;inset:0;width:100%;height:100%;background:#000}
-  #brand{position:fixed;inset:0;display:none;place-items:center;text-align:center;background:#0b1020;color:#e8ecf8;font-size:3vw;letter-spacing:.04em}
-  #brand small{display:block;margin-top:1vw;font-size:1.3vw;color:#8f9bbd}
-  #dbg{position:fixed;left:8px;bottom:8px;font:12px/1.4 ui-monospace,Consolas,monospace;color:#9fb;background:rgba(0,0,0,.7);padding:6px 8px;border-radius:6px;display:none;white-space:pre;z-index:50}
-  #test{position:fixed;inset:0;display:none;z-index:40;background:#111;color:#fff;font:600 3vw/1.3 system-ui,sans-serif;padding:4vw;box-sizing:border-box}
-  #test .bars{position:absolute;left:0;right:0;bottom:0;height:22%;display:flex}
-  #test .bars i{flex:1}
-  #setup{position:fixed;inset:0;display:none;place-items:center;background:#0b1020;cursor:auto;z-index:60}
-  #setup form{display:grid;gap:12px;width:320px}
-  #setup input,#setup button{padding:12px;border-radius:10px;border:0;font-size:16px}
-  #setup button{background:#1D5FE5;color:#fff;font-weight:600}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: #000;
+  color: #fff;
+  overflow: hidden;
+  cursor: none;
+  font-family:
+    system-ui,
+    Segoe UI,
+    sans-serif;
+}
+#stage {
+  position: fixed;
+  inset: 0;
+  background: #000;
+}
+#stage iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+#stage img,
+#stage video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+#brand {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  text-align: center;
+  background: #0b1020;
+  color: #e8ecf8;
+  font-size: 3vw;
+  letter-spacing: 0.04em;
+}
+#brand small {
+  display: block;
+  margin-top: 1vw;
+  font-size: 1.3vw;
+  color: #8f9bbd;
+}
+#dbg {
+  position: fixed;
+  left: 8px;
+  bottom: 8px;
+  font:
+    12px/1.4 ui-monospace,
+    Consolas,
+    monospace;
+  color: #9fb;
+  background: rgba(0, 0, 0, 0.7);
+  padding: 6px 8px;
+  border-radius: 6px;
+  display: none;
+  white-space: pre;
+  z-index: 50;
+}
+#test {
+  position: fixed;
+  inset: 0;
+  display: none;
+  z-index: 40;
+  background: #111;
+  color: #fff;
+  font:
+    600 3vw/1.3 system-ui,
+    sans-serif;
+  padding: 4vw;
+  box-sizing: border-box;
+}
+#test .bars {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22%;
+  display: flex;
+}
+#test .bars i {
+  flex: 1;
+}
+#setup {
+  position: fixed;
+  inset: 0;
+  display: none;
+  place-items: center;
+  background: #0b1020;
+  cursor: auto;
+  z-index: 60;
+}
+#setup form {
+  display: grid;
+  gap: 12px;
+  width: 320px;
+}
+#setup input,
+#setup button {
+  padding: 12px;
+  border-radius: 10px;
+  border: 0;
+  font-size: 16px;
+}
+#setup button {
+  background: #1d5fe5;
+  color: #fff;
+  font-weight: 600;
+}
 </style>
 </head>
 <body>
@@ -28,220 +131,220 @@
 <div id="dbg"></div>
 <div id="setup"><form id="setup-f"><h2>Configurar ecrã</h2><input name="code" placeholder="Código (ex.: ECR-001)" required><input name="key" placeholder="Chave do ecrã" required><button>Guardar e iniciar</button></form></div>
 <script>
-(function(){
+(function() {
 'use strict';
-var VERSION='4';
-var Q=new URLSearchParams(location.search);
-var ls=function(k,v){try{if(v===undefined){var x=localStorage.getItem(k);return (x===null||x===undefined)?null:x;}if(v===null)localStorage.removeItem(k);else localStorage.setItem(k,v);}catch(e){return null;}};
-var code=Q.get('code')||ls('enif.code'),key=Q.get('key')||ls('enif.key');
-var HB=(+Q.get('hb')||30)*1000, FLUSH=(+Q.get('flush')||20)*1000, REFRESH=(+Q.get('refresh')||60)*1000;   // (parâmetros só para testes)
-var $=function(s){return document.querySelector(s);};
-var stage=$('#stage'),dbg=$('#dbg');
-var PL=null,cache=null,have={},counter={},cur={c:null,f:null},stats={plays:0,fails:0,net:'?',cached:0,err:''};
-var acks=0,lastSpotAt=Date.now(),lastFrameAt=Date.now(),testUntil=0,FIT_PX=10;
-var sleep=function(ms){return new Promise(function(r){setTimeout(r,ms);});};
-var uid=function(){return (crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2));};
+var VERSION = '4';
+var Q = new URLSearchParams(location.search);
+var ls = function(k, v) {try {if (v === undefined) {var x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
+var code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
+var HB = (+Q.get('hb') || 30) * 1000, FLUSH = (+Q.get('flush') || 20) * 1000, REFRESH = (+Q.get('refresh') || 60) * 1000;   // (parâmetros só para testes)
+var $ = function(s) {return document.querySelector(s);};
+var stage = $('#stage'), dbg = $('#dbg');
+var PL = null, cache = null, have = {}, counter = {}, cur = {c:null, f:null}, stats = {plays:0, fails:0, net:'?', cached:0, err:''};
+var acks = 0, lastSpotAt = Date.now(), lastFrameAt = Date.now(), testUntil = 0, FIT_PX = 10;
+var sleep = function(ms) {return new Promise(function(r) {setTimeout(r, ms);});};
+var uid = function() {return (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));};
 
-if(!code||!key){$('#setup').style.display='grid';
-  $('#setup-f').onsubmit=function(e){e.preventDefault();var f=new FormData(e.target);ls('enif.code',String(f.get('code')).trim());ls('enif.key',String(f.get('key')).trim());location.replace(location.pathname);};
+if (!code || !key) {$('#setup').style.display = 'grid';
+  $('#setup-f').onsubmit = function(e) {e.preventDefault(); var f = new FormData(e.target); ls('enif.code', String(f.get('code')).trim()); ls('enif.key', String(f.get('key')).trim()); location.replace(location.pathname);};
   return;
 }
-if(Q.get('code')&&Q.get('key')){ls('enif.code',code);ls('enif.key',key);}
-try{counter=JSON.parse(ls('enif.counter')||'{}');}catch(e){counter={};}
+if (Q.get('code') && Q.get('key')) {ls('enif.code', code); ls('enif.key', key);}
+try {counter = JSON.parse(ls('enif.counter') || '{}');} catch (e) {counter = {};}
 
 /* ---------- hora em Lisboa ---------- */
-function lisbon(){
-  var p={};new Intl.DateTimeFormat('en-GB',{timeZone:(PL&&PL.tz)||'Europe/Lisbon',hourCycle:'h23',year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}).formatToParts(new Date()).forEach(function(x){p[x.type]=x.value;});
-  return {date:p.year+'-'+p.month+'-'+p.day,h:+p.hour};
+function lisbon() {
+  var p = {}; new Intl.DateTimeFormat('en-GB', {timeZone:(PL && PL.tz) || 'Europe/Lisbon', hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}).formatToParts(new Date()).forEach(function(x) {p[x.type] = x.value;});
+  return {date:p.year + '-' + p.month + '-' + p.day, h:+p.hour};
 }
 /* ---------- fila de passagens (sobrevive a quedas de internet e a reinícios) ---------- */
-var queue=[];try{queue=JSON.parse(ls('enif.queue')||'[]');}catch(e){queue=[];}
-var saveQ=function(){ls('enif.queue',JSON.stringify(queue.slice(-5000)));};
-function logPlay(c,f,dur,ok){queue.push({pid:uid(),c:c,f:f,ts:Date.now(),dur:Math.round(dur*10)/10,ok:ok?1:0});saveQ();if(ok)stats.plays++;else stats.fails++;}
-function post(path,body){
-  body.code=code;body.key=key;
-  return fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();});
+var queue = []; try {queue = JSON.parse(ls('enif.queue') || '[]');} catch (e) {queue = [];}
+var saveQ = function() {ls('enif.queue', JSON.stringify(queue.slice(-5000)));};
+function logPlay(c, f, dur, ok) {queue.push({pid:uid(), c:c, f:f, ts:Date.now(), dur:Math.round(dur * 10) / 10, ok:ok ? 1 : 0}); saveQ(); if (ok)stats.plays++; else stats.fails++;}
+function post(path, body) {
+  body.code = code; body.key = key;
+  return fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}).then(function(r) {if (!r.ok) throw new Error('HTTP ' + r.status); return r.json();});
 }
-function flush(){
-  if(!queue.length)return Promise.resolve();
-  var batch=queue.slice(0,500);
-  return post('/api/player/plays',{plays:batch}).then(function(r){
-    var ok={};(r.received||[]).forEach(function(id){ok[id]=1;});
-    queue=queue.filter(function(x){return !ok[x.pid];});saveQ();stats.net='ok';
-  }).catch(function(){stats.net='sem ligação';});
+function flush() {
+  if (!queue.length) return Promise.resolve();
+  var batch = queue.slice(0, 500);
+  return post('/api/player/plays', {plays:batch}).then(function(r) {
+    var ok = {}; (r.received || []).forEach(function(id) {ok[id] = 1;});
+    queue = queue.filter(function(x) {return !ok[x.pid];}); saveQ(); stats.net = 'ok';
+  }).catch(function() {stats.net = 'sem ligação';});
 }
-async function diskInfo(){try{if(navigator.storage&&navigator.storage.estimate){var e=await navigator.storage.estimate();if(e.quota>0)return {free:Math.max(0,e.quota-(e.usage||0)),total:e.quota};}}catch(x){/* sem ação */}return null;}
-async function heartbeat(){
-  var body={c:cur.c,f:cur.f,queue:queue.length,ver:VERSION,w:Math.round(screen.width*(window.devicePixelRatio||1)),h:Math.round(screen.height*(window.devicePixelRatio||1)),ack:acks};
-  var d=await diskInfo();if(d)body.disk=d;
-  return post('/api/player/heartbeat',body).then(function(r){
-    stats.net='ok';
-    var rl=ls('enif.reload');
-    if(r.reload!==null&&r.reload!==undefined&&rl!==null&&+rl!==r.reload){ls('enif.reload',String(r.reload));location.reload();return;}
-    (r.cmds||[]).forEach(function(c){
-      if(c.id>acks)acks=c.id;
-      if(c.kind==='sync')refresh();
-      if(c.kind==='test')showTest();
+async function diskInfo() {try {if (navigator.storage && navigator.storage.estimate) {var e = await navigator.storage.estimate(); if (e.quota > 0) return {free:Math.max(0, e.quota - (e.usage || 0)), total:e.quota};}} catch (x) {/* sem ação */} return null;}
+async function heartbeat() {
+  var body = {c:cur.c, f:cur.f, queue:queue.length, ver:VERSION, w:Math.round(screen.width * (window.devicePixelRatio || 1)), h:Math.round(screen.height * (window.devicePixelRatio || 1)), ack:acks};
+  var d = await diskInfo(); if (d)body.disk = d;
+  return post('/api/player/heartbeat', body).then(function(r) {
+    stats.net = 'ok';
+    var rl = ls('enif.reload');
+    if (r.reload !== null && r.reload !== undefined && rl !== null && +rl !== r.reload) {ls('enif.reload', String(r.reload)); location.reload(); return;}
+    (r.cmds || []).forEach(function(c) {
+      if (c.id > acks)acks = c.id;
+      if (c.kind === 'sync')refresh();
+      if (c.kind === 'test')showTest();
     });
-  }).catch(function(){stats.net='sem ligação';});
+  }).catch(function() {stats.net = 'sem ligação';});
 }
 /* ---------- ecrã de teste (30 s) ---------- */
-function showTest(){
-  testUntil=Date.now()+30000;
-  var t=$('#test'),s=(PL&&PL.screen)||{};
-  t.innerHTML='<div>'+(s.venue||'')+' · '+code+'</div><div style="font-weight:400;font-size:2vw;margin-top:1vw">Resolução medida: '+window.innerWidth+'×'+window.innerHeight+' (configurada: '+(s.res||'-')+')<br>Player '+VERSION+' · '+new Date().toLocaleTimeString('pt-PT')+'</div><div class="bars">'+['#fff','#ff0','#0ff','#0f0','#f0f','#f00','#00f','#000'].map(function(c){return '<i style="background:'+c+'"></i>';}).join('')+'</div>';
-  t.style.display='block';
-  setTimeout(function(){if(Date.now()>=testUntil)t.style.display='none';},30500);
+function showTest() {
+  testUntil = Date.now() + 30000;
+  var t = $('#test'), s = (PL && PL.screen) || {};
+  t.innerHTML = '<div>' + (s.venue || '') + ' · ' + code + '</div><div style="font-weight:400;font-size:2vw;margin-top:1vw">Resolução medida: ' + window.innerWidth + '×' + window.innerHeight + ' (configurada: ' + (s.res || '-') + ')<br>Player ' + VERSION + ' · ' + new Date().toLocaleTimeString('pt-PT') + '</div><div class="bars">' + ['#fff', '#ff0', '#0ff', '#0f0', '#f0f', '#f00', '#00f', '#000'].map(function(c) {return '<i style="background:' + c + '"></i>';}).join('') + '</div>';
+  t.style.display = 'block';
+  setTimeout(function() {if (Date.now() >= testUntil)t.style.display = 'none';}, 30500);
 }
 /* ---------- playlist e ficheiros em cache ---------- */
-var mediaUrl=function(id){return '/media/'+id+'?code='+encodeURIComponent(code)+'&key='+encodeURIComponent(key);};
-var cacheKey=function(id,f){return '/cache/'+id+'/'+(f.size||0);};
-async function openCache(){try{if(window.caches)cache=await caches.open('enif-media-v1');}catch(e){cache=null;}}
-async function ensureFiles(){
-  if(!PL)return;
-  var ids=Object.keys(PL.files);
-  for(var i=0;i<ids.length;i++){
-    var id=ids[i],f=PL.files[id],k=cacheKey(id,f);
-    if(have[id]===k)continue;
-    try{
-      if(cache&&await cache.match(k)){have[id]=k;continue;}
-      var r=await fetch(mediaUrl(id));if(!r.ok)throw new Error('HTTP '+r.status);
-      if(cache){await cache.put(k,r);have[id]=k;}
-    }catch(e){stats.err='transferência '+id+': '+e.message;}
+var mediaUrl = function(id) {return '/media/' + id + '?code=' + encodeURIComponent(code) + '&key=' + encodeURIComponent(key);};
+var cacheKey = function(id, f) {return '/cache/' + id + '/' + (f.size || 0);};
+async function openCache() {try {if (window.caches)cache = await caches.open('enif-media-v1');} catch (e) {cache = null;}}
+async function ensureFiles() {
+  if (!PL) return;
+  var ids = Object.keys(PL.files);
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i], f = PL.files[id], k = cacheKey(id, f);
+    if (have[id] === k) continue;
+    try {
+      if (cache && await cache.match(k)) {have[id] = k; continue;}
+      var r = await fetch(mediaUrl(id)); if (!r.ok) throw new Error('HTTP ' + r.status);
+      if (cache) {await cache.put(k, r); have[id] = k;}
+    } catch (e) {stats.err = 'transferência ' + id + ': ' + e.message;}
   }
-  if(cache){ // apaga só o que já não é usado, e só depois de a lista nova estar completa
-    var allOk=ids.every(function(i){return have[i]===cacheKey(i,PL.files[i]);});
-    if(allOk){
-      var keys=await cache.keys(),want=ids.map(function(i){return location.origin+cacheKey(i,PL.files[i]);});
-      for(var j=0;j<keys.length;j++)if(want.indexOf(keys[j].url)<0)await cache.delete(keys[j]);
+  if (cache) { // apaga só o que já não é usado, e só depois de a lista nova estar completa
+    var allOk = ids.every(function(i) {return have[i] === cacheKey(i, PL.files[i]);});
+    if (allOk) {
+      var keys = await cache.keys(), want = ids.map(function(i) {return location.origin + cacheKey(i, PL.files[i]);});
+      for (var j = 0; j < keys.length; j++) if (want.indexOf(keys[j].url) < 0) await cache.delete(keys[j]);
     }
   }
-  stats.cached=Object.keys(have).length;
+  stats.cached = Object.keys(have).length;
 }
-async function refresh(){
-  try{
-    var r=await fetch('/api/player/playlist?code='+encodeURIComponent(code)+'&key='+encodeURIComponent(key));
-    if(r.status===401){stats.err='código/chave inválidos';return;}
-    if(!r.ok)throw new Error('HTTP '+r.status);
-    var j=await r.json();stats.net='ok';stats.err='';
-    if(j.playerVersion!==VERSION){location.reload();return;}
-    var rl=ls('enif.reload');if(rl!==null&&+rl!==j.reload){ls('enif.reload',String(j.reload));location.reload();return;}
-    ls('enif.reload',String(j.reload));
-    PL=j;ls('enif.playlist',JSON.stringify(j));
-  }catch(e){stats.net='sem ligação';if(!PL){try{PL=JSON.parse(ls('enif.playlist')||'null');}catch(x){PL=null;}}}
+async function refresh() {
+  try {
+    var r = await fetch('/api/player/playlist?code=' + encodeURIComponent(code) + '&key=' + encodeURIComponent(key));
+    if (r.status === 401) {stats.err = 'código/chave inválidos'; return;}
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    var j = await r.json(); stats.net = 'ok'; stats.err = '';
+    if (j.playerVersion !== VERSION) {location.reload(); return;}
+    var rl = ls('enif.reload'); if (rl !== null && +rl !== j.reload) {ls('enif.reload', String(j.reload)); location.reload(); return;}
+    ls('enif.reload', String(j.reload));
+    PL = j; ls('enif.playlist', JSON.stringify(j));
+  } catch (e) {stats.net = 'sem ligação'; if (!PL) {try {PL = JSON.parse(ls('enif.playlist') || 'null');} catch (x) {PL = null;}}}
   await ensureFiles();
 }
 /* ---------- reprodução ---------- */
-var dimsOf=function(r){var m=/(\d+)\s*[×x]\s*(\d+)/.exec(r||'');return m&&+m[1]>0&&+m[2]>0?{w:+m[1],h:+m[2]}:null;};
-function fitMode(f){
-  var mode=(PL&&PL.screen&&PL.screen.fit)||'caber';
-  var a=f.type==='HTML5'?null:dimsOf(f.res),b=dimsOf(PL&&PL.screen&&PL.screen.res)||{w:window.innerWidth,h:window.innerHeight};
-  if(a){var d=Math.min(Math.abs(a.h*b.w/a.w-b.h),Math.abs(a.w*b.h/a.h-b.w));if(d<=FIT_PX)return 'fill';}   // diferença até 10 px: ajusta sem se notar
-  return mode==='preencher'?'cover':mode==='esticar'?'fill':'contain';
+var dimsOf = function(r) {var m = /(\d+)\s*[×x]\s*(\d+)/.exec(r || ''); return m && +m[1] > 0 && +m[2] > 0 ? {w:+m[1], h:+m[2]} : null;};
+function fitMode(f) {
+  var mode = (PL && PL.screen && PL.screen.fit) || 'caber';
+  var a = f.type === 'HTML5' ? null : dimsOf(f.res), b = dimsOf(PL && PL.screen && PL.screen.res) || {w:window.innerWidth, h:window.innerHeight};
+  if (a) {var d = Math.min(Math.abs(a.h * b.w / a.w - b.h), Math.abs(a.w * b.h / a.h - b.w)); if (d <= FIT_PX) return 'fill';}   // diferença até 10 px: ajusta sem se notar
+  return mode === 'preencher' ? 'cover' : mode === 'esticar' ? 'fill' : 'contain';
 }
-async function srcFor(id,f){
-  if(cache){var r=await cache.match(cacheKey(id,f));if(r){var b=await r.blob();return {url:URL.createObjectURL(b),revoke:true};}}
+async function srcFor(id, f) {
+  if (cache) {var r = await cache.match(cacheKey(id, f)); if (r) {var b = await r.blob(); return {url:URL.createObjectURL(b), revoke:true};}}
   return null;
 }
 /* o conteúdo novo só substitui o anterior quando já está a mostrar imagem: nunca há um instante preto */
-function swapIn(el){
-  var old=Array.prototype.slice.call(stage.children);
+function swapIn(el) {
+  var old = Array.prototype.slice.call(stage.children);
   stage.appendChild(el);
-  setTimeout(function(){old.forEach(function(n){if(n.parentNode===stage){if(n.tagName==='VIDEO'){try{n.pause();n.removeAttribute('src');n.load();}catch(e){/* sem ação */}}stage.removeChild(n);}});},120);
-  $('#brand').style.display='none';
+  setTimeout(function() {old.forEach(function(n) {if (n.parentNode === stage) {if (n.tagName === 'VIDEO') {try {n.pause(); n.removeAttribute('src'); n.load();} catch (e) {/* sem ação */}}stage.removeChild(n);}});}, 120);
+  $('#brand').style.display = 'none';
 }
-async function playOne(c,id,secs){
-  var f=PL.files[id];if(!f)return false;
-  var s=await srcFor(id,f);
-  if(!s){ if(!cache&&stats.net==='ok')s={url:mediaUrl(id),revoke:false}; else return false; }
-  cur={c:c,f:id};var t0=Date.now(),ok=true,fm=fitMode(f);lastFrameAt=Date.now();
-  if(f.type==='Vídeo'){
-    var v=document.createElement('video');v.muted=true;v.playsInline=true;v.style.objectFit=fm;v.src=s.url;
-    await new Promise(function(done){
-      var fin=false,end=function(good){if(fin)return;fin=true;ok=good;done();};
-      v.onplaying=function(){swapIn(v);};
-      v.onended=function(){end(true);};v.onerror=function(){end(false);};
-      setTimeout(function(){end(false);},Math.max(20,(f.dur||10)*2+10)*1000);
-      setTimeout(function(){if(!v.parentNode)end(false);},8000);                    // não arrancou: passa ao seguinte (fica o último quadro)
-      var pr=v.play();if(pr&&pr.catch)pr.catch(function(){end(false);});
+async function playOne(c, id, secs) {
+  var f = PL.files[id]; if (!f) return false;
+  var s = await srcFor(id, f);
+  if (!s) { if (!cache && stats.net === 'ok')s = {url:mediaUrl(id), revoke:false}; else return false; }
+  cur = {c:c, f:id}; var t0 = Date.now(), ok = true, fm = fitMode(f); lastFrameAt = Date.now();
+  if (f.type === 'Vídeo') {
+    var v = document.createElement('video'); v.muted = true; v.playsInline = true; v.style.objectFit = fm; v.src = s.url;
+    await new Promise(function(done) {
+      var fin = false, end = function(good) {if (fin) return; fin = true; ok = good; done();};
+      v.onplaying = function() {swapIn(v);};
+      v.onended = function() {end(true);}; v.onerror = function() {end(false);};
+      setTimeout(function() {end(false);}, Math.max(20, (f.dur || 10) * 2 + 10) * 1000);
+      setTimeout(function() {if (!v.parentNode)end(false);}, 8000);                    // não arrancou: passa ao seguinte (fica o último quadro)
+      var pr = v.play(); if (pr && pr.catch)pr.catch(function() {end(false);});
     });
-    if(!v.parentNode){try{v.removeAttribute('src');v.load();}catch(e){/* sem ação */}}
-  }else if(f.type==='HTML5'){
-    var fr=document.createElement('iframe');fr.setAttribute('sandbox','allow-scripts');fr.src=s.url;swapIn(fr);
-    await sleep(Math.max(1,secs||f.dur||10)*1000);
-  }else{
-    var im=document.createElement('img');im.style.objectFit=fm;im.src=s.url;
-    await new Promise(function(d){im.onload=function(){swapIn(im);d();};im.onerror=function(){ok=false;d();};});
-    if(ok)await sleep(Math.max(1,secs||f.dur||10)*1000);
+    if (!v.parentNode) {try {v.removeAttribute('src'); v.load();} catch (e) {/* sem ação */}}
+  } else if (f.type === 'HTML5') {
+    var fr = document.createElement('iframe'); fr.setAttribute('sandbox', 'allow-scripts'); fr.src = s.url; swapIn(fr);
+    await sleep(Math.max(1, secs || f.dur || 10) * 1000);
+  } else {
+    var im = document.createElement('img'); im.style.objectFit = fm; im.src = s.url;
+    await new Promise(function(d) {im.onload = function() {swapIn(im); d();}; im.onerror = function() {ok = false; d();};});
+    if (ok) await sleep(Math.max(1, secs || f.dur || 10) * 1000);
   }
-  if(s.revoke)setTimeout(function(){URL.revokeObjectURL(s.url);},4000);
-  logPlay(c,id,(Date.now()-t0)/1000,ok);
+  if (s.revoke)setTimeout(function() {URL.revokeObjectURL(s.url);}, 4000);
+  logPlay(c, id, (Date.now() - t0) / 1000, ok);
   return ok;
 }
 /* nunca preto: sem nada para mostrar, deixa o último quadro; se não houver, o ecrã da marca */
-function showBrand(msg){
-  cur={c:null,f:null};
-  if(!stage.children.length){$('#brand').style.display='grid';$('#brand-t').textContent=msg||'';}
+function showBrand(msg) {
+  cur = {c:null, f:null};
+  if (!stage.children.length) {$('#brand').style.display = 'grid'; $('#brand-t').textContent = msg || '';}
 }
-function hourEntry(){
-  var now=lisbon(),day=PL.days[now.date],e=day?day[now.h]:undefined;
-  if(e===undefined){                       // sem dados para hoje (muito tempo sem ligação): repete a última informação que tem, à mesma hora
-    var ds=Object.keys(PL.days).sort();
-    for(var i=ds.length-1;i>=0;i--){var x=PL.days[ds[i]][now.h];if(x!==undefined){e=x;break;}}
+function hourEntry() {
+  var now = lisbon(), day = PL.days[now.date], e = day ? day[now.h] : undefined;
+  if (e === undefined) {                       // sem dados para hoje (muito tempo sem ligação): repete a última informação que tem, à mesma hora
+    var ds = Object.keys(PL.days).sort();
+    for (var i = ds.length - 1; i >= 0; i--) {var x = PL.days[ds[i]][now.h]; if (x !== undefined) {e = x; break;}}
   }
-  return {k:now.date+' '+now.h,e:e};
+  return {k:now.date + ' ' + now.h, e:e};
 }
-var lastHour=null,idx=0;
-function pick(en){                         // ficheiro desta passagem (alterna a cada vez)
-  var list=en.spot?en.files:en.items,k=en.spot?'__spot':en.c;
-  if(!list||!list.length)return null;
-  var n=counter[k]||0;counter[k]=n+1;ls('enif.counter',JSON.stringify(counter));
-  return list[n%list.length];
+var lastHour = null, idx = 0;
+function pick(en) {                         // ficheiro desta passagem (alterna a cada vez)
+  var list = en.spot ? en.files : en.items, k = en.spot ? '__spot' : en.c;
+  if (!list || !list.length) return null;
+  var n = counter[k] || 0; counter[k] = n + 1; ls('enif.counter', JSON.stringify(counter));
+  return list[n % list.length];
 }
-async function loop(){
-  for(;;){
-    try{
-      if(!PL){showBrand('A aguardar playlist…');await sleep(2000);continue;}
-      var h=hourEntry(),l=h.e;
-      if(h.k!==lastHour){lastHour=h.k;idx=0;}
-      if(l===null){                                                         // ecrã desligado a esta hora (horário definido)
-        clearAll();await sleep(5000);continue;}
-      if(!l||!l.seq||!l.seq.length){showBrand(PL.screen.venue);await sleep(5000);continue;}
-      var tried=0,played=false;
-      while(tried<l.seq.length+1&&!played){
+async function loop() {
+  for (;;) {
+    try {
+      if (!PL) {showBrand('A aguardar playlist…'); await sleep(2000); continue;}
+      var h = hourEntry(), l = h.e;
+      if (h.k !== lastHour) {lastHour = h.k; idx = 0;}
+      if (l === null) {                                                         // ecrã desligado a esta hora (horário definido)
+        clearAll(); await sleep(5000); continue;}
+      if (!l || !l.seq || !l.seq.length) {showBrand(PL.screen.venue); await sleep(5000); continue;}
+      var tried = 0, played = false;
+      while (tried < l.seq.length + 1 && !played) {
         var en;
-        if(l.spot5&&Date.now()-lastSpotAt>=(+Q.get("spotgap")||PL.spotGap||300)*1000){en=l.spot5;lastSpotAt=Date.now();}   // ecrã cheio: spot da Enif a cada 5 minutos (entra no fim da passagem em curso)
-        else{en=l.seq[idx%l.seq.length];idx++;}
-        if(en.spot)lastSpotAt=Date.now();
+        if (l.spot5 && Date.now() - lastSpotAt >= (+Q.get("spotgap") || PL.spotGap || 300) * 1000) {en = l.spot5; lastSpotAt = Date.now();}   // ecrã cheio: spot da Enif a cada 5 minutos (entra no fim da passagem em curso)
+        else {en = l.seq[idx % l.seq.length]; idx++;}
+        if (en.spot)lastSpotAt = Date.now();
         tried++;
-        var id=pick(en);if(!id)continue;
-        played=await playOne(en.spot?'__spot':en.c,id,en.dur);
-        if(!played&&en.spot&&l.spot5===en)lastSpotAt=0;
+        var id = pick(en); if (!id) continue;
+        played = await playOne(en.spot ? '__spot' : en.c, id, en.dur);
+        if (!played && en.spot && l.spot5 === en)lastSpotAt = 0;
       }
-      if(!played){showBrand(PL.screen.venue);await sleep(1500);}             // nada tocou: mantém o último quadro
-    }catch(err){stats.err=String(err&&err.message||err);await sleep(2000);}
+      if (!played) {showBrand(PL.screen.venue); await sleep(1500);}             // nada tocou: mantém o último quadro
+    } catch (err) {stats.err = String(err && err.message || err); await sleep(2000);}
   }
 }
-function clearAll(){while(stage.firstChild){var n=stage.firstChild;if(n.tagName==='VIDEO'){try{n.pause();n.removeAttribute('src');n.load();}catch(e){/* sem ação */}}stage.removeChild(n);}$('#brand').style.display='none';cur={c:null,f:null};}
+function clearAll() {while (stage.firstChild) {var n = stage.firstChild; if (n.tagName === 'VIDEO') {try {n.pause(); n.removeAttribute('src'); n.load();} catch (e) {/* sem ação */}}stage.removeChild(n);}$('#brand').style.display = 'none'; cur = {c:null, f:null};}
 /* ---------- arranque ---------- */
-function drawDbg(){dbg.textContent='Enif DOOH player '+VERSION+'\necrã '+code+'\nrede '+stats.net+'\npassagens '+stats.plays+' (falhas '+stats.fails+')\npor enviar '+queue.length+'\nficheiros em cache '+stats.cached+'\na passar '+(cur.c||'-')+' / '+(cur.f||'-')+(stats.err?'\n'+stats.err:'');}
-document.addEventListener('keydown',function(e){if(e.key==='d'||e.key==='D'){dbg.style.display=dbg.style.display==='block'?'none':'block';}if(e.key==='r'&&e.ctrlKey&&e.shiftKey){ls('enif.code',null);ls('enif.key',null);location.replace(location.pathname);}});
-if(Q.get('debug'))dbg.style.display='block';
-window.__enif={state:function(){return {cur:cur,stats:stats,queue:queue.length,children:stage.children.length};}};
-setInterval(drawDbg,1000);
-(async function(){
-  try{if('serviceWorker' in navigator)navigator.serviceWorker.register('/player/sw.js',{scope:'/player/'});}catch(e){/* sem ação */}
+function drawDbg() {dbg.textContent = 'Enif DOOH player ' + VERSION + '\necrã ' + code + '\nrede ' + stats.net + '\npassagens ' + stats.plays + ' (falhas ' + stats.fails + ')\npor enviar ' + queue.length + '\nficheiros em cache ' + stats.cached + '\na passar ' + (cur.c || '-') + ' / ' + (cur.f || '-') + (stats.err ? '\n' + stats.err : '');}
+document.addEventListener('keydown', function(e) {if (e.key === 'd' || e.key === 'D') {dbg.style.display = dbg.style.display === 'block' ? 'none' : 'block';} if (e.key === 'r' && e.ctrlKey && e.shiftKey) {ls('enif.code', null); ls('enif.key', null); location.replace(location.pathname);}});
+if (Q.get('debug'))dbg.style.display = 'block';
+window.__enif = {state:function() {return {cur:cur, stats:stats, queue:queue.length, children:stage.children.length};}};
+setInterval(drawDbg, 1000);
+(async function() {
+  try {if ('serviceWorker' in navigator)navigator.serviceWorker.register('/player/sw.js', {scope:'/player/'});} catch (e) {/* sem ação */}
   await openCache();
-  PL=null;try{PL=JSON.parse(ls('enif.playlist')||'null');}catch(e){/* sem ação */}
-  if(PL&&cache){Object.keys(PL.files).forEach(function(id){have[id]=cacheKey(id,PL.files[id]);});}   // arranca já com o que tinha guardado, sem esperar pela rede
+  PL = null; try {PL = JSON.parse(ls('enif.playlist') || 'null');} catch (e) {/* sem ação */}
+  if (PL && cache) {Object.keys(PL.files).forEach(function(id) {have[id] = cacheKey(id, PL.files[id]);});}   // arranca já com o que tinha guardado, sem esperar pela rede
   loop();
   await refresh();
-  setInterval(refresh,REFRESH);setInterval(heartbeat,HB);setInterval(flush,FLUSH);
+  setInterval(refresh, REFRESH); setInterval(heartbeat, HB); setInterval(flush, FLUSH);
   heartbeat();
   // vigilante: se nada mudar durante 10 minutos, recarrega a página (sem nunca ficar preto: arranca da lista guardada)
-  setInterval(function(){if(PL&&Date.now()-lastFrameAt>600e3)location.reload();},60000);
+  setInterval(function() {if (PL && Date.now() - lastFrameAt > 600e3)location.reload();}, 60000);
   // recarrega uma vez por dia (3h da manhã) para evitar fugas de memória
-  setInterval(function(){var n=new Date();if(n.getHours()===3&&n.getMinutes()===0&&performance.now()>3600e3)location.reload();},60000);
+  setInterval(function() {var n = new Date(); if (n.getHours() === 3 && n.getMinutes() === 0 && performance.now() > 3600e3)location.reload();}, 60000);
 })();
 })();
 </script>
