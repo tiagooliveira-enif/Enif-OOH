@@ -2896,6 +2896,29 @@ button.avatar {
     animation: none;
   }
 }
+
+/* ---------- telemóvel estreito (v97) ---------- */
+@media (max-width: 420px) {
+  .nav {
+    padding: 4px;
+    gap: 0;
+  }
+  .nav button {
+    font-size: 8.5px;
+    letter-spacing: -0.04em;
+  }
+  .cal-top .grow {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+  }
+  .modal-b .btn[data-a="pl-copy-venue"],
+  [data-a="pl-copy-venue"] {
+    white-space: normal;
+    text-align: left;
+    height: auto;
+  }
+}
 </style>
 </head>
 <body>
