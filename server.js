@@ -164,9 +164,13 @@ function cleanCampaign(o, id, old) {
     sector: optStr(o.sector, 40), sales: optStr(o.sales, 160).toLowerCase(),
     start: o.start, end: o.end, h0: num(o.h0, 0, 23, 'Hora de início'), h1: num(o.h1, 1, 24, 'Hora de fim'), ivs: null,
     ppm: num(o.ppm, 0.2, 12, 'Passagens por minuto'), dur: Math.round(num(isNil(o.dur) ? 10 : o.dur, 3, 60, 'Duração')),
-    priority: ['Alta', 'Normal', 'Baixa'].includes(o.priority) ? o.priority : 'Normal', manual: !!o.manual, color: Math.round(num(isNil(o.color) ? 1 : o.color, 1, 6, 'Cor')), items: [],
+    priority: o.priority === 'Alta' ? 'Alta' : 'Normal', share: null, manual: !!o.manual, color: Math.round(num(isNil(o.color) ? 1 : o.color, 1, 6, 'Cor')), items: [],
     pauses: []
   };
+  if (!isNil(o.share) && o.share !== '') {
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(String(o.share))) throw bad('Posição partilhada inválida.');
+    out.share = String(o.share);
+  } else delete out.share;
   if (!out.name) throw bad('Dê um nome à campanha.');
   if (out.sales && !validEmail(out.sales)) throw bad('O e-mail do comercial não parece válido.');
   if (!isDate(out.start) || !isDate(out.end) || out.end < out.start) throw bad('Datas inválidas.');
@@ -886,6 +890,9 @@ const server = http.createServer((req, res) => {
     else res.end();
   });
 });
+// só existem as prioridades Alta e Normal: as campanhas antigas com «Baixa» passam a Normal
+for (const c of docs('campaigns')) { if (c.priority !== 'Alta' && c.priority !== 'Normal') { c.priority = 'Normal'; putDoc('campaigns', c.id, c); } }
+
 if (require.main === module) {
   if (SEED === 'falta') {
     console.error('\nFalta a conta de administrador. Crie o ficheiro enif-config.json ao lado do server.js com:\n\n  { "nome": "O seu nome", "email": "o.seu@email.pt", "palavraPasse": "uma palavra-passe forte" }\n\ne volte a arrancar. (Este ficheiro nunca vai para o GitHub.)\n');

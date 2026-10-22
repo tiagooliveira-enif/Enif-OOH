@@ -120,6 +120,13 @@ async function main() {
   await sync(top, [camp('CJ', { ivs: [[7, 10], [9, 12]] })]);
   const cj = (await call('GET', '/api/state', undefined, top)).j.campaigns.find(x => x.id === 'CJ');
   ok('intervalos sobrepostos ficam juntos (7–10 + 9–12 = 7–12)', cj && !cj.ivs && cj.h0 === 7 && cj.h1 === 12);
+  await sync(top, [camp('CP', { priority: 'Baixa' }), camp('CQ', { priority: 'Alta', share: 'G1' }), camp('CR', { share: 'G1' })]);
+  const cps = (await call('GET', '/api/state', undefined, top)).j.campaigns;
+  ok('prioridade «Baixa» já não existe (passa a Normal)', cps.find(x => x.id === 'CP').priority === 'Normal');
+  ok('prioridade Alta guardada', cps.find(x => x.id === 'CQ').priority === 'Alta');
+  ok('posição partilhada guardada', cps.find(x => x.id === 'CQ').share === 'G1' && cps.find(x => x.id === 'CR').share === 'G1');
+  ok('posição partilhada inválida recusada', (await sync(top, [camp('CS', { share: 'a b<c>' })])).s === 400);
+  await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CP' }, { op: 'del', coll: 'campaigns', id: 'CQ' }, { op: 'del', coll: 'campaigns', id: 'CR' }]);
   await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CI' }, { op: 'del', coll: 'campaigns', id: 'CJ' }]);
   ok('gestor de conteúdos só mexe nos vídeos da campanha', (await sync(tcn, [op('campaigns', 'C1', { items: [{ f: f1.j.id, h0: null, h1: null, d0: null, d1: null, ppm: 1 }] }, ['items'])])).s === 200 && (await sync(tcn, [op('campaigns', 'C1', { name: 'Outro' }, ['name'])])).s === 403);
   await sync(top, [camp('C1')]);

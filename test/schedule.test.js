@@ -65,3 +65,29 @@ assert.deepEqual(S.civs(mk('S', { h0: 9, h1: 12 })), [[9, 12]], 'campanha de um 
 assert.equal(S.onAt(M, D, 12, scr, ctx), false);
 assert.equal(S.onAt(M, D, 20, scr, ctx), true);
 console.log('schedule: ok');
+
+/* ---------- prioridade Alta e posição partilhada ---------- */
+{
+  const S2 = require('../lib/schedule'), assert2 = require('node:assert');
+  const spot = { id: 'S', name: 'Spot', type: 'Vídeo', res: '1920×1080', dur: '20 s', house: true, screens: ['E1'], ready: true };
+  const mkF = (id) => ({ id, name: id, type: 'Vídeo', res: '1920×1080', dur: '10 s', house: false, screens: ['E1'], ready: true });
+  const ctx = { contents: [spot, mkF('f1'), mkF('f2'), mkF('f3'), mkF('f4'), mkF('f5')] };
+  const sc = { id: 'E1', venue: 'V', res: '1920×1080', limit: 14, order: [], on: 0, off: 24, fit: null };
+  const mk = (id, ppm, pri, share) => ({ id, name: id, client: 'c', sector: '', venues: ['V'], start: '2026-10-01', end: '2026-10-31', h0: 0, h1: 24, ppm, dur: 10, priority: pri, share: share || undefined, manual: false, pauses: [], items: [{ f: 'f' + id.slice(1), h0: null, h1: null, d0: null, d1: null, ppm: 1 }] });
+  // 5 campanhas Normal: o loop dura 50 s + spot; a campanha 1 pede 2×/min
+  const camps = [mk('c1', 2, 'Normal'), mk('c2', 0.2, 'Normal'), mk('c3', 0.2, 'Normal'), mk('c4', 0.2, 'Normal'), mk('c5', 0.2, 'Normal')];
+  const rate = (list) => { const L = S2.loopFrom(list, 14, '2026-10-20', 12, sc, ctx); return { L, r: S2.rateOf(list[0], L) }; };
+  const normal = rate(camps);
+  assert2.ok(normal.r < 2 - 1e-9, 'Normal sem garantia fica abaixo do pedido');
+  const altaList = camps.map((c, i) => i === 0 ? Object.assign({}, c, { priority: 'Alta' }) : c);
+  const alta = rate(altaList);
+  assert2.ok(alta.r >= 2 - 1e-9, 'Alta cumpre as passagens por minuto pedidas (' + alta.r + ')');
+  assert2.ok(alta.L.cycle > normal.L.cycle, 'o loop cresce para a Alta repetir');
+  // posição partilhada: duas campanhas à vez, uma por volta, ocupam um só lugar
+  const sh = [mk('c1', 1, 'Normal', 'G1'), mk('c2', 1, 'Normal', 'G1'), mk('c3', 1, 'Normal')];
+  const L2 = S2.loopFrom(sh, 2, '2026-10-20', 12, sc, ctx);
+  assert2.strictEqual(L2.loop.length, 3, 'as três entram: o grupo conta como um lugar');
+  assert2.strictEqual(L2.per, 2, 'duas voltas por ronda');
+  assert2.deepStrictEqual(L2.seq.filter(c => !c.house).map(c => c.id), ['c1', 'c3', 'c2', 'c3']);
+  console.log('prioridade Alta e posição partilhada: ok');
+}
