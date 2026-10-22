@@ -10,5 +10,9 @@
     "utilizador": "relatorios@enif.pt",
     "palavraPasse": "a palavra-passe da caixa de correio que envia",
     "de": "Enif DOOH <relatorios@enif.pt>"
+  },
+  "calendario": {
+    "link": "o endereço secreto do calendário Google em formato iCal (https://calendar.google.com/calendar/ical/…/basic.ics)",
+    "palavra": "SPOTS DIGITAIS"
   }
 }

@@ -181,6 +181,30 @@ async function main() {
   ok('sessão terminada deixa de servir', await (async () => { await call('POST', '/api/logout', {}, tcn); return (await call('GET', '/api/state', undefined, tcn)).s === 401; })());
   ok('páginas estáticas', (await fetch(base + '/player/')).status === 200 || true);
 
+  // ---- calendário (só leitura, endereço secreto iCal)
+  {
+    const http = require('node:http'), fmt = ms => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+    const now = Date.now(), ev = (uid, title, h) => ['BEGIN:VEVENT', 'UID:' + uid, 'SUMMARY:' + title, 'DESCRIPTION:Detalhe do evento', 'DTSTART:' + fmt(now + h * 3600000), 'END:VEVENT'].join('\r\n');
+    const ics = ['BEGIN:VCALENDAR', ev('u1', 'SPOTS DIGITAIS – Entrega', 30), ev('u2', 'Almoço de equipa', 20), ev('u3', 'SPOTS DIGITAIS – Instalação', 110), ev('u4', 'spots digitais – passado', -5), 'END:VCALENDAR'].join('\r\n');
+    const cs = http.createServer((q, rs) => { rs.writeHead(200, { 'Content-Type': 'text/calendar' }); rs.end(ics); });
+    await new Promise(r => cs.listen(0, '127.0.0.1', r));
+    ok('calendário sem endereço: não configurado', (await call('GET', '/api/calendar', undefined, adm)).j.configured === false);
+    process.env.CAL_ICS_URL = 'http://127.0.0.1:' + cs.address().port + '/secreto.ics'; process.env.CAL_ALLOW_HTTP = '1';
+    ok('calendário exige sessão', (await call('GET', '/api/calendar')).s === 401);
+    let cv = (await call('GET', '/api/calendar', undefined, adm)).j;
+    ok('só os eventos com a palavra, no futuro', cv.configured && cv.events.length === 2 && cv.events.every(e => /SPOTS DIGITAIS/.test(e.title)));
+    ok('a resposta nunca inclui o endereço secreto', !JSON.stringify(cv).includes('secreto'));
+    ok('evento com descrição e hora', cv.events[0].desc === 'Detalhe do evento' && cv.events[0].at > now);
+    const id0 = cv.events[0].id;
+    ok('marcar como lida', (await call('POST', '/api/calendar/read', { id: id0 }, adm)).j.events.find(e => e.id === id0).read === true);
+    ok('evento desconhecido recusado', (await call('POST', '/api/calendar/read', { id: 'deadbeefdeadbeef' }, adm)).s === 400);
+    ok('palavra só com permissão de ecrãs', (await call('POST', '/api/calendar/keyword', { kw: 'x' }, tpl2)).s === 403);
+    cv = (await call('POST', '/api/calendar/keyword', { kw: 'Almoço' }, adm)).j;
+    ok('mudar a palavra muda os eventos lidos', cv.events.length === 1 && cv.events[0].title === 'Almoço de equipa');
+    await call('POST', '/api/calendar/keyword', { kw: 'SPOTS DIGITAIS' }, adm);
+    delete process.env.CAL_ICS_URL; cs.close();
+  }
+
   console.log('\n' + passed + ' verificações ok');
 }
 main().then(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(0); }).catch(e => { console.error('FALHOU:', e); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(1); });

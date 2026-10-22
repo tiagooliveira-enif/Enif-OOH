@@ -6,7 +6,7 @@ const { DatabaseSync } = require('node:sqlite');
 const S = require('./lib/schedule');
 const MAIL = require('./lib/mail'), REPORT = require('./lib/report');
 const A = require('./lib/auth');
-const M = require('./lib/media');
+const M = require('./lib/media'), CAL = require('./lib/calendar');
 
 const PORT = +process.env.PORT || 8080;
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS beats(screen TEXT NOT NULL, minute INTEGER NOT NULL, 
 CREATE TABLE IF NOT EXISTS plays(pid TEXT PRIMARY KEY, screen TEXT, camp TEXT, file TEXT, ts INTEGER, day TEXT, hour INTEGER, dur REAL, ok INTEGER);
 CREATE INDEX IF NOT EXISTS plays_day ON plays(day);
 CREATE TABLE IF NOT EXISTS resolved(id TEXT PRIMARY KEY, ts INTEGER);
+CREATE TABLE IF NOT EXISTS cal_read(id TEXT PRIMARY KEY, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, who TEXT, ip TEXT, what TEXT NOT NULL, detail TEXT);
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT, 'O registo de auditoria só se acrescenta'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT, 'O registo de auditoria só se acrescenta'); END;
@@ -400,6 +401,27 @@ function screenViews(withKeys) {
   });
   return { screens: list, alerts };
 }
+/* ---------- calendário Google (só leitura): endereço secreto iCal no enif-config.json ---------- */
+const CAL_WINDOW_DAYS = 14;               // eventos mais à frente não interessam ao painel
+const cal = { at: 0, ok: 0, error: '', events: [], busy: false };
+const calUrl = () => String(process.env.CAL_ICS_URL || (readConfig().calendario || {}).link || '').trim();
+const calKeyword = () => { const d = getDoc('settings', 'calendar'); return d && typeof d.kw === 'string' ? d.kw : String((readConfig().calendario || {}).palavra || 'SPOTS DIGITAIS'); };
+async function calRefresh(force) {
+  const url = calUrl();
+  if (!url || cal.busy || (!force && Date.now() - cal.at < 5 * 60000)) return;
+  cal.busy = true; cal.at = Date.now();
+  try {
+    const txt = await CAL.fetchIcs(url, { allowHttp: process.env.CAL_ALLOW_HTTP === '1' });
+    cal.events = CAL.eventsBetween(txt, Date.now() - 3600000, Date.now() + CAL_WINDOW_DAYS * 86400000, TZ);
+    cal.ok = Date.now(); cal.error = '';
+  } catch (e) { cal.error = e.message; } finally { cal.busy = false; }
+  run('DELETE FROM cal_read WHERE ts<?', Date.now() - 45 * 86400000);
+}
+function calendarView() {
+  const kw = calKeyword().trim().toLowerCase(), read = new Set(q('SELECT id FROM cal_read').map(r => r.id)), now = Date.now();
+  const list = !calUrl() || !kw ? [] : cal.events.filter(e => e.at > now && (e.title + ' ' + e.desc).toLowerCase().includes(kw)).map(e => ({ id: e.id, title: e.title, desc: e.desc.slice(0, 600), at: e.at, allDay: e.allDay, read: read.has(e.id) }));
+  return { configured: !!calUrl(), kw: calKeyword(), warnHours: 48, serverTime: now, updated: cal.ok, error: cal.error, events: list };
+}
 function buildState(user) {
   const sv = screenViews(A.can(user, 'ecras.gerir'));
   const st = {
@@ -733,6 +755,7 @@ async function tick(force) {
     if ((ln.h > 3 || (ln.h === 3 && ln.m >= 30)) && !backupList(100).some(b => b.auto && S.lisbonNow(TZ, new Date(b.t)).date === today)) {
       try { const b = backupNow(true); audit('sistema', 'Cópia de segurança automática', b.mb + ' MB'); } catch (e) { console.error('Cópia de segurança falhou:', e.message); audit('sistema', 'Cópia de segurança automática falhou', e.message); }
     }
+    await calRefresh(false);
     if (!smtpReady()) return;
     for (const c0 of docs('campaigns')) {
       if (!c0.sales) continue;
@@ -859,6 +882,16 @@ const router = async (req, res) => {
     return send(res, 200, { ok: true });
   }
   if (p === '/api/state' && m === 'GET') return send(res, 200, buildState(needUser(req, u)));
+  if (p === '/api/calendar' && m === 'GET') { needUser(req, u); await calRefresh(false); return send(res, 200, calendarView()); }
+  if (p === '/api/calendar/read' && m === 'POST') {
+    needUser(req, u); const b = await readJson(req), id = String(b.id || '');
+    if (!/^[0-9a-f]{16}$/.test(id) || !cal.events.some(e => e.id === id)) throw bad('Evento desconhecido.');
+    run('INSERT OR REPLACE INTO cal_read(id,ts) VALUES(?,?)', id, Date.now()); return send(res, 200, calendarView());
+  }
+  if (p === '/api/calendar/keyword' && m === 'POST') {
+    const user = needUser(req, u); need(user, 'ecras.gerir'); const b = await readJson(req), kw = str(b.kw, 80, 'Palavra');
+    putDoc('settings', 'calendar', { kw }); audit(user, 'Mudou a palavra do calendário', kw); return send(res, 200, calendarView());
+  }
   if (p === '/api/sync' && m === 'POST') { const user = needUser(req, u), b = await readJson(req); sync(user, b.ops); return send(res, 200, { ok: true }); }
   if (p === '/api/upload' && m === 'PUT') return upload(req, res, u);
   if (p === '/api/plays' && m === 'GET') return playsApi(res, u, needUser(req, u));
