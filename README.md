@@ -46,6 +46,7 @@ Variáveis opcionais: `PORT` (8080), `DATA_DIR`, `TZ_NAME` (Europe/Lisbon), `MAX
 npm test                 # loop (e comparação com o protótipo: 22 mil verificações), API, segurança, e-mail e relatório final (servidor SMTP falso)
 python3 test/e2e/player.py   # player real num browser: passa conteúdo, arranca sem internet, spot a cada 5 min, comandos (precisa de playwright e ffmpeg)
 python3 test/e2e/comprovativo.py   # comprovativo: a lista só mostra o que serve ao ecrã, o player passa só o escolhido e volta ao normal, nada fica nos relatórios
+python3 test/e2e/avisos.py   # aviso «campanha abaixo do contratado» e «Ocupação por mês» (demora ~2 min: a conta fica guardada 1 minuto)
 python3 test/e2e/app.py      # interface real num browser: entrar, páginas, carregar ficheiro, brilho, dois passos, recuperação, telemóvel
 ```
 
@@ -74,6 +75,14 @@ A aplicação mostra este comando já preenchido na janela do ecrã (botão «Co
 ## Gravar comprovativo
 
 Para o vídeo semanal de prova: na ficha do ecrã, **Gravar comprovativo** (precisa da permissão de playlist e de o ecrã estar online). A lista mostra **todos os conteúdos da biblioteca que servem a esse ecrã** (os de outra resolução ou proporção não aparecem); escolhem-se 1 ou 2 e a duração (30 s a 2 min; o máximo de 2 minutos é imposto no servidor). Enquanto dura, o ecrã passa **só** esses conteúdos e todo o resto fica em pausa, spot da Enif incluído; o player muda em poucos segundos (sinal de vida a cada 10 s) e volta ao normal sozinho no fim, ou com «Terminar já». As passagens do comprovativo **não são guardadas**, por isso não entram nos relatórios nem no PDF final; ficam só na auditoria e na lista «Comprovativos gravados» da ficha do ecrã. Dados: tabelas `proofs` e `proof_log`; API `POST /api/screens/:id/proof` e `/proof/stop`.
+
+## Aviso «campanha abaixo do contratado»
+
+Só aviso interno (painel «Precisa de atenção» e notificações do tipo «Campanha abaixo do contratado»); **nunca entra nos relatórios**. O servidor compara, hora a hora, as passagens que o loop prevê nas últimas 24 h com as que o player registou. Se uma campanha ativa ficou abaixo de 90 % (e eram previstas pelo menos 20), avisa com a causa principal (ecrã sem sinal, falhas de reprodução ou passagens a menos) e o ecrã mais afetado. «Marcar como resolvido» vale para esse dia. A conta fica guardada 1 minuto no servidor. Constantes `UNDER_PCT` e `UNDER_MIN` em `server.js`.
+
+## Ocupação por mês
+
+Em Campanhas › Disponibilidade, por ecrã e para o mês atual (de hoje), o seguinte e o outro: percentagem das vagas do loop que já têm campanha e média de vagas livres por hora, só nas horas em que o ecrã está ligado, mais a média da rede. Calculado na aplicação com a mesma lógica da disponibilidade.
 
 ## Relatórios
 

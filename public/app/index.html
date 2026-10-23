@@ -2926,6 +2926,80 @@ button.avatar {
     padding-left: 28px;
   }
 }
+
+.occ-r {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.3fr) repeat(3, minmax(0, 1fr));
+  gap: 10px 14px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.occ-r.occ-h {
+  border-top: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.occ-r.occ-t {
+  background: var(--accent-soft);
+  border-radius: 10px;
+  padding: 8px 10px;
+  margin: 4px -10px;
+}
+.occ-n {
+  min-width: 0;
+}
+.occ-n b,
+.occ-n small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.occ-n small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.occ-c {
+  min-width: 0;
+  font-size: 12px;
+}
+.occ-bar {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--line);
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.occ-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+}
+.occ-ok {
+  background: var(--ok);
+}
+.occ-mid {
+  background: var(--warn);
+}
+.occ-hi {
+  background: var(--bad);
+}
+@media (max-width: 560px) {
+  .occ-r {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .occ-r .occ-n {
+    grid-column: 1 / -1;
+  }
+  .occ-r.occ-h span:first-child {
+    display: none;
+  }
+  .occ-c {
+    font-size: 11px;
+  }
+}
 </style>
 
 
@@ -3578,6 +3652,7 @@ function suggestions() {
 const NT = [
   ['alert', 'Ecrã sem ligação ou com falhas', 'ecras.ver', true],
   ['pred', 'Manutenção preditiva (IA)', 'ecras.ver', false],
+  ['under', 'Campanha abaixo do contratado', 'campanhas.ver', true],
   ['start', 'Campanha a começar sem estar pronta', 'campanhas.ver', true],
   ['end', 'Campanha a terminar', 'campanhas.ver', true],
   ['vend', 'Vídeo a sair da campanha', 'campanhas.ver', true],
@@ -3593,6 +3668,7 @@ function np(u) {
     const t = {}; NT.forEach(n=>{t[n[0]] = {app:n[3], email:false, sms:false};});
     u.notif = {types:t, email:u.email, phone:'', inbox:[], sent:[], seen:{}};
   }
+  NT.forEach(n=>{if (!u.notif.types[n[0]])u.notif.types[n[0]] = {app:n[3], email:false, sms:false};});   // tipos novos para quem já tinha preferências guardadas
   return u.notif;
 }
 const permState = function() {try {return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;} catch (e) {return 'unsupported';}};
@@ -3618,7 +3694,7 @@ function feed() {
   });
   alerts.forEach(function(a) {
     const sc = screens.find(x=>x.id === a.screen);
-    out.push({id:'al-' + a.id, type:a.sev === 'ia' ? 'pred' : 'alert', title:a.title + (sc ? ' · ' + sc.venue + ', ' + sc.spot : ''), text:a.detail});
+    out.push({id:'al-' + a.id, type:a.camp ? 'under' : (a.sev === 'ia' ? 'pred' : 'alert'), title:a.title + (sc ? ' · ' + sc.venue + ', ' + sc.spot : ''), text:a.detail});
   });
   return out;
 }
@@ -3899,8 +3975,8 @@ function viewDash() {
   const alReal = alerts.length ? alerts.map(function(a) {
     const s = screens.find(x=>x.id === a.screen);
     const icon = a.sev === 'bad' ? 'off' : (a.sev === 'ia' ? 'spark' : 'alert');
-    const acts = (cSee ? '<button class="btn sm" data-a="open-screen" data-id="' + s.id + '">Ver ecrã</button>' : '') + (cRes ? '<button class="btn sm ghost" data-a="resolve-alert" data-id="' + a.id + '">' + ic('check') + 'Marcar como resolvido</button>' : '');
-    return '<div class="item"><span class="ico ' + a.sev + '">' + ic(icon, '') + '</span><div class="grow"><div class="title">' + esc(a.title) + ' · <span class="muted" style="font-weight:500">' + esc(s.venue) + ', ' + esc(s.spot) + '</span></div><div class="muted">' + esc(a.detail) + '</div>' + (acts ? '<div class="acts">' + acts + '</div>' : '') + '</div><span class="muted mono">' + a.time + '</span></div>';
+    const acts = (cSee && s ? '<button class="btn sm" data-a="open-screen" data-id="' + s.id + '">Ver ecrã</button>' : '') + (a.camp && campById(a.camp) && can('campanhas.ver') ? '<button class="btn sm" data-a="edit-camp" data-id="' + a.camp + '">Ver campanha</button>' : '') + (cRes ? '<button class="btn sm ghost" data-a="resolve-alert" data-id="' + a.id + '">' + ic('check') + 'Marcar como resolvido</button>' : '');
+    return '<div class="item"><span class="ico ' + a.sev + '">' + ic(icon, '') + '</span><div class="grow"><div class="title">' + esc(a.title) + ' · <span class="muted" style="font-weight:500">' + (s ? esc(s.venue) + ', ' + esc(s.spot) : '') + '</span></div><div class="muted">' + esc(a.detail) + '</div>' + (acts ? '<div class="acts">' + acts + '</div>' : '') + '</div><span class="muted mono">' + a.time + '</span></div>';
   }).join('') : '';
   const plAl = G.map(function(g) {
     const s0 = g.screens[0];
@@ -4262,6 +4338,41 @@ function availSum(s, d) {
   if (low.length) return 'Com vagas · só 1 vaga ' + txt(low);
   return xs.some(x=>x < 0) ? 'Com vagas enquanto está ligado' : 'Com vagas o dia todo';
 }
+/* ocupação média das vagas do loop, por ecrã e por mês (só nas horas em que o ecrã está ligado). O mês atual conta de hoje até ao fim. */
+const mShort = new Intl.DateTimeFormat('pt-PT', {month:'short'});
+function occMonths() {
+  const y = today.getFullYear(), m = today.getMonth(), out = [];
+  for (let k = 0; k < 3; k++)out.push({a:new Date(y, m + k, k === 0 ? today.getDate() : 1), b:new Date(y, m + k + 1, 0), label:mShort.format(new Date(y, m + k, 1)).replace('.', '').replace(/^./, x=>x.toUpperCase()) + (k === 0 ? ' (de hoje)' : '')});
+  return out;
+}
+function occOf(s, mo) {
+  const pl = playlistOf(s, false); let slots = 0, used = 0, hrs = 0;
+  for (let d = mo.a; d <= mo.b; d = addDays(d, 1)) {
+    for (let h = 0; h < 24; h++) {
+      if (!screenOn(s, h)) continue;
+      slots += s.limit; hrs++; used += Math.min(s.limit, pl.filter(c=>onAt(c, d, h, s)).length);
+    }
+  }
+  return {slots:slots, used:used, pct:slots ? used / slots : 0, free:hrs ? (slots - used) / hrs : 0};
+}
+function occHtml(list) {
+  const ms = occMonths();
+  const cell = function(o) {
+    const p = Math.round(o.pct * 100), cls = p >= 90 ? 'occ-hi' : (p >= 70 ? 'occ-mid' : 'occ-ok');
+    return '<div class="occ-c"><div class="occ-bar"><i class="' + cls + '" style="width:' + Math.max(2, p) + '%"></i></div><span><b>' + p + ' %</b> · ' + String(o.free.toFixed(1)).replace('.', ',') + ' livres</span></div>';
+  };
+  const rows = list.map(function(s) {
+    return '<div class="occ-r"><div class="occ-n"><b>' + esc(s.spot) + '</b><small>' + esc(s.venue) + ' · ' + s.limit + ' vagas</small></div>' + ms.map(m=>cell(occOf(s, m))).join('') + '</div>';
+  }).join('');
+  const tot = ms.map(function(m) {
+    let slots = 0, used = 0, free = 0, n = 0;
+    list.forEach(function(s) {const o = occOf(s, m); slots += o.slots; used += o.used; free += o.free; n++;});
+    return {pct:slots ? used / slots : 0, free:n ? free / n : 0};
+  });
+  const head = '<div class="occ-r occ-h"><span></span>' + ms.map(m=>'<span>' + esc(m.label) + '</span>').join('') + '</div>';
+  const sum = '<div class="occ-r occ-t"><div class="occ-n"><b>Média da rede</b><small>' + list.length + (list.length === 1 ? ' ecrã' : ' ecrãs') + '</small></div>' + tot.map(cell).join('') + '</div>';
+  return '<div class="card" style="margin-top:14px"><div class="card-h"><h2>Ocupação por mês</h2><span class="hint">% das vagas do loop com campanha</span></div><div class="card-b occ">' + (list.length ? head + sum + rows : '<p class="muted">Sem ecrãs neste local.</p>') + '<p class="hint" style="margin:10px 0 0">Conta só as horas em que o ecrã está ligado. «Livres» é a média de vagas livres por hora. O mês atual conta de hoje até ao fim.</p></div></div>';
+}
 function viewAvail() {
   const A = state.av, d = dOf(A.d) || today;
   const list = screens.filter(s=>A.v === 'all' || s.venue === A.v);
@@ -4280,7 +4391,7 @@ function viewAvail() {
   const grid = '<div class="card"><div class="card-h camp-h" style="flex-wrap:wrap">' + day + vsel + '</div><div class="av2" style="margin-top:10px">' + ax + (body || '<p class="muted">Sem ecrãs neste local.</p>') + '</div><div class="av-leg"><span><i class="av-ok"></i>Com vagas</span><span><i class="av-low"></i>Só 1 vaga</span><span><i class="av-full"></i>Cheio</span><span><i class="av-off"></i>Desligado</span></div></div>';
   const hs0 = hourOpts(0, 23, A.h0), hs1 = hourOpts(1, 24, A.h1);
   const search = '<div class="card" style="margin-top:14px"><div class="card-h"><h2>Procurar espaço</h2><span class="hint">para uma campanha nova, em todos os ecrãs</span></div><div class="card-b"><div class="grid2"><div class="field"><label for="av-f">De</label><input id="av-f" type="date" data-a-change="av" value="' + esc(A.f) + '"></div><div class="field"><label for="av-t">Até</label><input id="av-t" type="date" data-a-change="av" value="' + esc(A.t) + '"></div></div><div class="grid2"><div class="field"><label for="av-h0">Das</label><select id="av-h0" data-a-change="av">' + hs0 + '</select></div><div class="field"><label for="av-h1">Até às</label><select id="av-h1" data-a-change="av">' + hs1 + '</select></div></div>' + availSearch() + '<p class="hint" style="margin-top:10px">Conta o limite de campanhas em simultâneo de cada ecrã. Não verifica o ritmo de passagens nem a proporção do conteúdo.</p></div></div>';
-  return grid + search;
+  return grid + occHtml(list) + search;
 }
 function viewCamp() {
   const tabs = '<div class="chips" style="margin:0 0 12px">' + [['cal', 'Calendário'], ['disp', 'Disponibilidade']].map(t=>'<button class="chip" data-a="camp-tab" data-t="' + t[0] + '" aria-pressed="' + (state.ctab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>';
@@ -4498,6 +4609,7 @@ const MANUAL = {
   {h:'Ler o painel', steps:[
    ['Veja os números do topo', 'Ecrãs online, campanhas ativas, alertas abertos e visualizações estimadas de hoje. Se algum número estiver a vermelho, comece por aí.'],
    ['Trate do que precisa de atenção', 'Em «Precisa de atenção» aparecem os alertas: ecrãs sem sinal, disco quase cheio, conflitos na playlist. Carregue em «Ver ecrã» para abrir o ecrã em causa.', 'ecras.ver'],
+   ['Perceba o aviso «abaixo do contratado»', 'Quando uma campanha passa menos de 90 % das passagens previstas nas últimas 24 h, aparece um alerta com a causa principal (por exemplo, um ecrã sem sinal). Carregue em «Ver campanha» ou «Ver ecrã». Este aviso é só interno: não aparece nos relatórios.', 'campanhas.ver'],
    ['Dê o alerta como resolvido', 'Depois de tratar do problema, carregue em «Marcar como resolvido» para o alerta sair da lista.', 'alertas.resolver'],
    ['Confira o que está no ar', 'Em «A reproduzir agora» vê as campanhas que estão a passar neste momento e em quantos ecrãs.'],
    ['Veja o Calendário', 'O cartão «Calendário» lê só os eventos com a palavra definida (por exemplo «SPOTS DIGITAIS»). Quando faltam 48 horas exatas para um evento aparece «Verificar Evento». Carregue em + para ver os detalhes e em «Lida» para o aviso desaparecer.'],
@@ -4556,6 +4668,7 @@ const MANUAL = {
   {h:'Ver a disponibilidade', steps:[
    ['Abra o separador «Disponibilidade»', 'Fica por cima do calendário.'],
    ['Escolha o dia e o local', 'Cada ecrã tem uma barra com as 24 horas: verde tem vagas, amarelo só uma vaga, vermelho está cheio e cinzento está desligado. A frase ao lado resume o dia.'],
+   ['Veja a ocupação por mês', 'Mais abaixo, «Ocupação por mês» mostra, para cada ecrã, que percentagem das vagas do loop já tem campanha neste mês (de hoje), no seguinte e no outro, e quantas vagas ficam livres em média. Verde tem folga, amarelo está a encher e vermelho está quase cheio. Serve para propor campanhas onde há espaço.'],
    ['Procure espaço para uma campanha nova', 'Em «Procurar espaço» indique as datas e as horas. A plataforma diz em quantos ecrãs há lugar e, nos outros, a primeira hora em que falha.']]}],
   tips:[['Uma campanha só passa num ecrã se tiver lá um conteúdo permitido e com a proporção certa.'], ['Se duas campanhas do mesmo tipo ficarem seguidas por falta de outras, aparece um conflito no painel.']]},
  conteudos:{t:'Conteúdos', intro:'A biblioteca de imagens, vídeos e páginas HTML5. É aqui que guarda os ficheiros e escolhe em que ecrãs podem passar.', blocks:[

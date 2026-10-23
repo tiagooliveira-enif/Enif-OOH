@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'enif-'));
 process.env.DATA_DIR = tmp; process.env.ADMIN_NAME = 'Tiago'; process.env.ADMIN_EMAIL = 'Tiago@Enif.pt'; process.env.ADMIN_PASS = 'segredo1'; process.env.PORT = '0';
-const { server, db } = require('../server');
+const { server, db, underReset } = require('../server');
 const S = require('../lib/schedule');
 
 let passed = 0;
@@ -267,6 +267,30 @@ async function main() {
     db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 10 * 60000, 'ECR-001');
     ok('ecrã offline não aceita comprovativo', (await proof(top, { files: [pA.j.id], secs: 30 })).s === 400);
     await hb({});
+  }
+
+  // ---- aviso «campanha abaixo do contratado» (só interno: painel e notificações)
+  {
+    const fU = await up(top, 'abaixo.png', 'image/png', mkPng(1080, 1920));
+    const cU = { id: 'CU1', name: 'Campanha Alvo', client: 'Cli', venues: ['Fórum'], start: plus(-5), end: plus(5), h0: 0, h1: 24, ppm: 2, dur: 10, priority: 'Normal', manual: false, color: 1, items: [{ f: fU.j.id, h0: null, h1: null, d0: null, d1: null, ppm: 2 }], sector: '', sales: '', pauses: [] };
+    await sync(top, [op('campaigns', 'CU1', cU)]);
+    db.prepare('UPDATE live SET first_seen=?, last_seen=? WHERE screen=?').run(Date.now() - 24 * 3600000, Date.now(), 'ECR-001');
+    db.prepare("DELETE FROM plays WHERE camp='CU1'").run();
+    underReset();
+    const alertsOf = async () => (await call('GET', '/api/state', undefined, adm)).j.alerts.filter(a => a.camp === 'CU1');
+    let al = await alertsOf();
+    ok('sem passagens, a campanha aparece «abaixo do contratado»', al.length === 1 && al[0].screen === 'ECR-001' && /abaixo do contratado/.test(al[0].title) && /das passagens previstas/.test(al[0].detail));
+    ok('o aviso diz que não aparece nos relatórios', /Não aparece nos relatórios/.test(al[0].detail));
+    const ins = db.prepare('INSERT INTO plays(pid,screen,camp,file,ts,day,hour,dur,ok) VALUES(?,?,?,?,?,?,?,?,?)');
+    for (let i = 0; i < 9000; i++) ins.run('u' + i, 'ECR-001', 'CU1', fU.j.id, Date.now() - 60000 - i * 9000, today, 12, 10, 1);   // 1 volta de 10 s: o loop prevê ~6 passagens por minuto
+    underReset();
+    ok('com passagens a chegar, o aviso desaparece', (await alertsOf()).length === 0);
+    db.prepare("DELETE FROM plays WHERE camp='CU1'").run(); underReset();
+    ok('o aviso volta se faltarem passagens', (await alertsOf()).length === 1);
+    r = await sync(adm, [{ op: 'del', coll: 'alerts', id: al[0].id }]); underReset();
+    ok('marcar como resolvido tira o aviso', r.s === 200 && (await alertsOf()).length === 0);
+    await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CU1' }]);
+    db.prepare("DELETE FROM resolved WHERE id LIKE 'under-%'").run();
   }
 
   console.log('\n' + passed + ' verificações ok');

@@ -384,6 +384,43 @@ function proofRow(id) {
   return r;
 }
 const proofView = r => r ? { files: JSON.parse(r.files), t0: r.t0, secs: r.secs, by: r.who, until: r.t0 + r.secs * 1000, serverTime: Date.now() } : null;
+/* campanha abaixo do contratado: nas últimas 24 h passou menos de UNDER_PCT das passagens previstas (as que o loop prevê, hora a hora).
+   Só aviso interno (painel e notificações): nunca entra nos relatórios. Guardado 1 minuto para não repetir a conta a cada pedido. */
+const UNDER_PCT = 0.9, UNDER_MIN = 20;
+let underCache = { at: 0, list: [] };
+function underList() {
+  const now = Date.now();
+  if (now - underCache.at < 60000) return underCache.list;
+  const all = docs('campaigns'), camps = all.filter(c => S.statusOf(c, S.lisbonNow(TZ).date) === 'Ativa'), ctx = sharedCtx(), scrs = docs('screens'), from = now - 24 * 3600000;
+  const exp = {};                                                                  // exp[camp][screen] = passagens previstas
+  scrs.forEach(sc => {
+    const lv = q1('SELECT first_seen FROM live WHERE screen=?', sc.id); if (!lv || !lv.first_seen) return;
+    const lists = {};
+    for (let t = Math.floor(from / 3600000) * 3600000; t < now; t += 3600000) {
+      const a = Math.max(t, from, lv.first_seen), b = Math.min(t + 3600000, now); if (b <= a) continue;
+      const ln = S.lisbonNow(TZ, new Date(t + 1800000));
+      if (!S.screenOn(sc, ln.h)) continue;
+      const list = lists[ln.date] || (lists[ln.date] = S.playlistOf(sc, all, ctx, ln.date)), L = S.loopFrom(list, sc.limit || 14, ln.date, ln.h, sc, ctx);
+      L.loop.forEach(c => { if (c.house || !camps.some(x => x.id === c.id)) return; const r = exp[c.id] = exp[c.id] || {}; r[sc.id] = (r[sc.id] || 0) + S.rateOf(c, L) * (b - a) / 60000; });
+    }
+  });
+  const act = {}; q('SELECT camp, screen, SUM(ok) n FROM plays WHERE ts>=? GROUP BY camp, screen', from).forEach(r => { (act[r.camp] = act[r.camp] || {})[r.screen] = r.n; });
+  const day = S.lisbonNow(TZ).date, list = [];
+  camps.forEach(c => {
+    const e = exp[c.id]; if (!e) return;
+    const tot = Object.values(e).reduce((a, x) => a + x, 0), got = Object.values(act[c.id] || {}).reduce((a, x) => a + x, 0);
+    if (tot < UNDER_MIN || got >= tot * UNDER_PCT) return;
+    let worst = null;
+    Object.keys(e).forEach(id => { const miss = e[id] - ((act[c.id] || {})[id] || 0); if (!worst || miss > worst.miss) worst = { id, miss }; });
+    const sc = scrs.find(x => x.id === worst.id), lv = q1('SELECT last_seen FROM live WHERE screen=?', sc.id);
+    const beats = q1('SELECT COUNT(*) n FROM beats WHERE screen=? AND minute>=?', sc.id, Math.floor(from / 60000)).n, expM = expectedMinutes(sc, from, now);
+    const bad = q1('SELECT COUNT(*) n, SUM(1-ok) f FROM plays WHERE screen=? AND ts>=?', sc.id, from);
+    const cause = !lv || now - lv.last_seen > ONLINE_MS || (expM >= 60 && beats < expM * 0.9) ? 'o ecrã ' + sc.id + ' (' + sc.venue + ') esteve sem sinal' : (bad.n >= 10 && bad.f / bad.n >= 0.05 ? 'houve falhas de reprodução no ecrã ' + sc.id + ' (' + sc.venue + ')' : 'o ecrã ' + sc.id + ' (' + sc.venue + ') passou menos do que o previsto: confirme a playlist');
+    list.push({ id: 'under-' + c.id + '-' + day, camp: c.id, screen: sc.id, title: '«' + c.name + '» abaixo do contratado', pct: Math.round(got / tot * 100), miss: Math.round(tot - got), cause });
+  });
+  underCache = { at: now, list };
+  return list;
+}
 function screenViews(withKeys) {
   const now = Date.now(), ln = S.lisbonNow(TZ), hourF = ln.h + ln.m / 60;
   const today = q('SELECT screen, SUM(ok) good, COUNT(*) total FROM plays WHERE day=? GROUP BY screen', ln.date);
@@ -425,6 +462,10 @@ function screenViews(withKeys) {
       o.uptime = (Math.min(1, got / exp) * 100).toFixed(1).replace('.', ',') + ' %';
     } else o.uptime = '';
     return o;
+  });
+  underList().forEach(u => {
+    if (resolved.has(u.id)) return;
+    alerts.push({ id: u.id, sev: 'warn', screen: u.screen, camp: u.camp, title: u.title, detail: 'Passou ' + u.pct + ' % das passagens previstas nas últimas 24 h (cerca de ' + u.miss + ' em falta). Principal causa: ' + u.cause + '. Não aparece nos relatórios.', time: fmtHM(Date.now()) });
   });
   return { screens: list, alerts };
 }
@@ -994,4 +1035,5 @@ if (require.main === module) {
     if (SEED === 'reposto') console.log('Palavra-passe do administrador reposta. Pode apagá-la do enif-config.json.');
   });
 }
-module.exports = { server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
+const underReset = () => { underCache = { at: 0, list: [] }; };
+module.exports = { underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
