@@ -3158,7 +3158,6 @@ function spotOf(sc) {
 const emailLog = [];
 const mailWhen = t=>new Intl.DateTimeFormat('pt-PT', {timeZone:'Europe/Lisbon', dateStyle:'short', timeStyle:'medium'}).format(new Date(t));
 const mailUtc = t=>new Date(t).toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
-const rndHex = n=>{const a = new Uint8Array(n / 2); try {crypto.getRandomValues(a);} catch (e) {for (let i = 0; i < a.length; i++)a[i] = Math.floor(Math.random() * 256);} return Array.prototype.map.call(a, b=>('0' + b.toString(16)).slice(-2)).join('');};
 const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
@@ -3254,7 +3253,6 @@ function loginStep(step) {
     body = '<h1>Recuperar palavra-passe</h1><p class="muted">Só para o administrador. Os outros utilizadores pedem uma nova palavra-passe ao administrador.</p>'
       + '<form data-form="forgot" novalidate style="margin-top:18px"><div class="field"><label for="fg-email">E-mail da conta</label><input id="fg-email" name="email" type="email" autocomplete="username"></div><p class="err" id="form-err" role="alert"></p><button class="btn primary" type="submit">Enviar código</button> <button type="button" class="btn" data-a="login-back">Voltar</button></form>';
   } else if (step === 'forgotcode') {
-    const r = state.rec;
     body = '<h1>Introduza o código</h1><p class="muted">Se este e-mail for o do administrador, enviámos um código de 6 dígitos, válido 15 minutos.</p>'
       + '<form data-form="forgotcode" novalidate style="margin-top:18px"><div class="field"><label for="fc-code">Código</label><input id="fc-code" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div>'
       + '<div class="field"><label for="fc-new">Nova palavra-passe</label><input id="fc-new" name="new" type="password" autocomplete="new-password" placeholder="Mínimo de 10 caracteres"></div>'
@@ -3262,7 +3260,6 @@ function loginStep(step) {
       + '<p class="err" id="form-err" role="alert"></p><button class="btn primary" type="submit">Guardar nova palavra-passe</button> <button type="button" class="btn" data-a="login-back">Cancelar</button></form>'
       ;
   } else if (step === 'twofa') {
-    const r = state.l2;
     body = '<h1>Verificação em dois passos</h1><p class="muted">Enviámos um código de 6 dígitos para o seu e-mail.</p>'
       + '<form data-form="twofa" novalidate style="margin-top:18px"><div class="field"><label for="tf-code">Código</label><input id="tf-code" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div><p class="err" id="form-err" role="alert"></p><button class="btn primary" type="submit">Confirmar</button> <button type="button" class="btn" data-a="login-back">Cancelar</button></form>'
       ;
@@ -3315,24 +3312,12 @@ function winsOf(c, fid) {
   return out.filter(w=>w.b > w.a && w.d1 >= w.d0).sort((x, y)=>x.a - y.a);
 }
 /* troços do dia: em cada troço os mesmos vídeos estão ativos e dividem as passagens da campanha por igual */
-function segsOf(c, fid, d, sc) {
-  if (!c.items.length) return civs(c).map(function(v) {return {a:v[0], b:v[1], f:null, share:1};});
-  const act = c.items.map(function(i) {return {i:i, v:itemIvs(c, i), y:itemDays(c, i)};}).filter(x=>x.v.length && d >= x.y[0] && d <= x.y[1] && (!sc || okFor(fileById(x.i.f), sc)));
-  const pts = []; act.forEach(function(x) {x.v.forEach(function(w) {w.forEach(function(v) {if (pts.indexOf(v) < 0)pts.push(v);});});}); pts.sort((a, b)=>a - b);
-  const out = [];
-  for (let k = 0; k + 1 < pts.length; k++) {
-    const a = pts[k], b = pts[k + 1], on = act.filter(x=>x.v.some(w=>w[0] <= a && w[1] >= b));
-    on.forEach(function(x) {const n = x.i.ppm || 1; if (!fid || x.i.f === fid)out.push({a:a, b:b, f:x.i.f, share:1 / on.length, mult:n > 1 ? Math.max(c.ppm, n) / c.ppm : 1});});
-  }
-  return out;
-}
 const onAt = (c, d, h, sc)=>c.start <= d && c.end >= d && !pausedOn(c, d) && inIvs(civs(c), h) && (!c.items.length || itemsOn(c, h, d, sc).length > 0);
 const names = ids=>ids.map(id=>'«' + campById(id).name + '»').join(', ');
 /* horário do ecrã (liga/desliga, no mesmo dia) */
 const sOn = s=>isNil(s.on) ? 0 : s.on, sOff = s=>isNil(s.off) ? 24 : s.off;
 const screenOn = (s, h)=>h + 1 > sOn(s) && h < sOff(s);
 const isOnNow = s=>hourNow >= sOn(s) && hourNow < sOff(s);
-const clipOn = (s, a, b)=>{const x = Math.max(a, sOn(s)), y = Math.min(b, sOff(s)); return y > x ? [x, y] : null;};
 const always24 = s=>sOn(s) <= 0 && sOff(s) >= 24;
 const onTxt = s=>s.onT || fmtHM(sOn(s)), offTxt = s=>s.offT || (sOff(s) >= 24 ? '23:59' : fmtHM(sOff(s)));
 const schedTxt = s=>always24(s) ? 'Sempre ligado (24 h)' : 'ON ' + onTxt(s) + ' – ' + offTxt(s);
@@ -3502,18 +3487,6 @@ function playingOn(s) {
   if (pf) return [];
   if (s.status === 'offline' || s.status === 'novo' || !isOnNow(s)) return [];
   return loopFrom(playlistOf(s, false), s.limit, today, Math.floor(hourNow), s).loop;
-}
-function playsFor(s, c, d, from, to) {
-  if (to <= from) return 0;
-  const base = playlistOf(s, false);
-  const list = d < today ? base.concat(campaigns.filter(x=>statusOf(x) === 'Terminada' && x.venues.indexOf(s.venue) > -1 && base.indexOf(x) < 0).sort((a, b)=>(PRI[b.priority] || 1) - (PRI[a.priority] || 1) || a.start - b.start)) : base;
-  let t = 0;
-  for (let h = Math.floor(from); h < Math.ceil(to); h++) {
-    const L = loopS(s, list, s.limit, d, h);
-    if (L.loop.indexOf(c) < 0) continue;
-    t += (Math.min(to, h + 1) - Math.max(from, h)) * 3600 / L.cycle * (L.occ[c.id] || 1) * spotCut(L);
-  }
-  return Math.floor(t);
 }
 /* campanhas cujas passagens ficam seguidas na volta (contando a volta seguinte), quando há outras campanhas para as separar */
 function adjOf(L) {
@@ -3982,7 +3955,6 @@ function viewDash() {
   const sched = campaigns.filter(c=>statusOf(c) === 'Agendada').length;
   const crit = alerts.filter(a=>a.sev === 'bad').length;
   const G = allIssues();
-  const fl = Math.floor(hourNow);
   const impr = dashImpr();
   const kpis = '<div class="kpis">'
     + '<div class="card kpi"><div class="label">Ecrãs online</div><div class="val">' + online + ' <small>/ ' + total + '</small></div><div class="note">' + (att ? att + ' a precisar de atenção' : 'Tudo a funcionar') + '</div></div>'
@@ -5036,10 +5008,6 @@ function locInfo(s) {
   else {const n = parseInt(s.id.slice(4), 10) || 1; f = (0.75 + ((n * 37) % 11) / 20) * cityF; conf = 'baixa';}
   return {f:f, conf:conf, why:why, hasC:hasC};
 }
-const fw = function(s) {
-  if (s.status === 'novo') return 0;
-  return locInfo(s).f * (s.status === 'offline' ? 0.8 : (s.status === 'atencao' ? 0.95 : 1));
-};
 const locTxt = s=>{const L = s.loc || {}; return (L.addr ? esc(L.addr) : '<span class="muted">Sem morada</span>') + (!isNil(L.lat) ? ' <a href="https://www.google.com/maps?q=' + L.lat + ',' + L.lng + '" target="_blank" rel="noopener">Abrir no mapa</a>' : '');};
 function confBox(s) {
   const i = locInfo(s);
@@ -5097,17 +5065,6 @@ function repSelected(scope) {
   return state.repScreens ? scope.filter(s=>state.repScreens.has(s.id)) : scope;
 }
 /* hora a que o vídeo deixa de passar num dado dia e ecrã (hoje conta só até agora e até ao último sinal) */
-function outOf(b, d, s) {
-  if (d < today) return b;
-  let o = Math.min(b, hourNow);
-  if (s.status === 'offline' && s.sinceMin)o = Math.min(o, hourNow - s.sinceMin / 60);
-  return o;
-}
-function unitsBetween(x, y) {
-  let t = 0;
-  for (let h = Math.floor(x); h < Math.ceil(y) && h < 24; h++)t += curve[h] * (Math.min(y, h + 1) - Math.max(x, h));
-  return t;
-}
 const dYear = new Intl.DateTimeFormat('pt-PT', {day:'numeric', month:'short', year:'numeric'});
 function repRange() {
   if (state.custom) {
@@ -5312,7 +5269,6 @@ function mailStatusLine(c) {
   return '<p class="hint" id="c-mail-st" style="margin:-4px 0 14px">Último envio do relatório final: ' + mailPill(mailStatus(e)) + ' · ' + esc(e.to) + ' · ' + esc(mailWhen(e.events[0].t)) + ' <button type="button" class="linklike" data-a="mail-detail" data-id="' + e.id + '">Ver comprovativo</button>' + avLine + '</p>';
 }
 function mailSection() {
-  const withSales = campaigns.filter(c=>c.sales);
   const F = state.mailF, total = emailLog.length;
   const list = emailLog.filter(function(e) {
     if (F.camp !== 'all' && e.camp !== F.camp) return false;
@@ -5721,7 +5677,7 @@ async function saveNow() {
   if (!state.user) return;
   if (saving) {clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 150); return;}
   const d = diffOps(); if (!d.ops.length) return;
-  saving = true; const sent = d.ops.length - extraOps.length;
+  saving = true;
   const mine = extraOps.slice();
   try {
     await api('POST', '/api/sync', {ops:d.ops});
@@ -6120,7 +6076,7 @@ const actions = {
   'u-photo-pick':function() {const i = $('#u-photo'); if (i)i.click();},
   'u-photo-rm':function() {pendingPhoto = null; const u = pvUser(); photoPreview(u, null);},
   'edit-user':function(t) {userModal(t.dataset.id);},
-  logout:function() {const tk = TOKEN; flushSave().then(function() {api('POST', '/api/logout', {}).catch(function() {}); setToken(null); state.user = null; state.loginDrawn = false; state.loginMsg = ''; setArr(screens, []); setArr(campaigns, []); setArr(contents, []); setArr(folders, []); setArr(users, []); alerts = []; base = emptyBase(); closeModal(); render();});},
+  logout:function() {flushSave().then(function() {api('POST', '/api/logout', {}).catch(function() {}); setToken(null); state.user = null; state.loginDrawn = false; state.loginMsg = ''; setArr(screens, []); setArr(campaigns, []); setArr(contents, []); setArr(folders, []); setArr(users, []); alerts = []; base = emptyBase(); closeModal(); render();});},
   theme:function(t) {applyTheme(t.dataset.m); try {localStorage.setItem('enif-theme', t.dataset.m);} catch (e) {/* sem ação */}}
 };
 function applyTheme(m) {
