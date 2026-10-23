@@ -4765,10 +4765,14 @@ function houseCard() {
   return '<p class="hint" style="margin:0 0 10px">Spot da Enif: ' + hs.length + (hs.length === 1 ? ' conteúdo' : ' conteúdos') + ' (máximo ' + HOUSE_MAX + ' por ecrã), cobre os ' + screens.length + ' ecrãs. Com 2 num ecrã, alternam. Entra 1 vez em cada volta do loop quando há vaga; com o ecrã cheio, passa a cada 5 minutos.</p>';
 }
 function cleanBar() {
-  const cG = can('conteudos.gerir'), v = state.cview;
+  const v = state.cview;
   const b = (k, t, n)=>'<button class="seg-b" data-a="cview" data-v="' + k + '" aria-pressed="' + (v === k) + '">' + t + ' <b>' + n + '</b></button>';
+  return '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Biblioteca">' + b('lib', 'Biblioteca', contents.length) + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div></div>';
+}
+function cleanCfg() {
+  const cG = can('conteudos.gerir');
   const cfg = cG && isAdm() ? '<div class="few-ctl"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="30" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="14" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado (e ' + state.clean.bin + ' dias na reciclagem).</span></div>' : '';
-  return '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Biblioteca">' + b('lib', 'Biblioteca', contents.length) + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div></div>' + cfg;
+  return cfg;
 }
 function binHtml() {
   const cG = can('conteudos.gerir'), L = binList();
@@ -4779,8 +4783,8 @@ function binHtml() {
   return '<p class="hint">Aqui ficam, durante ' + state.clean.bin + ' dias, os conteúdos apagados por falta de uso. Passado esse prazo são apagados definitivamente (os relatórios das campanhas já terminadas mantêm-se).</p>' + (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">A reciclagem está vazia.</div></div>');
 }
 function viewContent() {
-  if (state.cview === 'bin') {head('Conteúdos', 'Reciclagem de conteúdos sem uso', ''); return cleanBar() + binHtml();}
-  return cleanBar() + viewContentBase();
+  if (state.cview === 'bin') {head('Conteúdos', 'Reciclagem de conteúdos sem uso', ''); return cleanBar() + binHtml() + cleanCfg();}
+  return cleanBar() + viewContentBase() + cleanCfg();
 }
 function viewContentBase() {
   const cG = can('conteudos.gerir');
