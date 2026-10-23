@@ -137,10 +137,11 @@ var VERSION = '4';
 var Q = new URLSearchParams(location.search);
 var ls = function(k, v) {try {if (v === undefined) {var x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 var code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
-var HB = (+Q.get('hb') || 30) * 1000, FLUSH = (+Q.get('flush') || 20) * 1000, REFRESH = (+Q.get('refresh') || 60) * 1000;   // (parâmetros só para testes)
+var HB = (+Q.get('hb') || 10) * 1000, FLUSH = (+Q.get('flush') || 20) * 1000, REFRESH = (+Q.get('refresh') || 60) * 1000;   // (parâmetros só para testes)
 var $ = function(s) {return document.querySelector(s);};
 var stage = $('#stage'), dbg = $('#dbg');
 var PL = null, cache = null, have = {}, counter = {}, cur = {c:null, f:null}, stats = {plays:0, fails:0, net:'?', cached:0, err:''};
+var PROOF = null, cancelFn = null, proofIdx = 0;
 var acks = 0, lastSpotAt = Date.now(), lastFrameAt = Date.now(), testUntil = 0, FIT_PX = 10;
 var sleep = function(ms) {return new Promise(function(r) {setTimeout(r, ms);});};
 var uid = function() {return (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));};
@@ -181,6 +182,10 @@ async function heartbeat() {
     stats.net = 'ok';
     var rl = ls('enif.reload');
     if (r.reload !== null && r.reload !== undefined && rl !== null && +rl !== r.reload) {ls('enif.reload', String(r.reload)); location.reload(); return;}
+    var pr = r.proof || null;
+    if ((pr ? pr.id : null) !== (PROOF ? PROOF.id : null)) {
+      if (pr)refresh().then(function() {setProof(pr);}); else setProof(null);
+    }
     (r.cmds || []).forEach(function(c) {
       if (c.id > acks)acks = c.id;
       if (c.kind === 'sync')refresh();
@@ -188,6 +193,15 @@ async function heartbeat() {
     });
   }).catch(function() {stats.net = 'sem ligação';});
 }
+/* ---------- comprovativo: só passam 1 ou 2 conteúdos, o resto (spot incluído) fica em pausa ---------- */
+function setProof(p) {
+  var prev = PROOF ? PROOF.id : null;
+  PROOF = p ? {id:p.id, files:p.files, until:Date.now() + (p.until - p.serverTime)} : null;
+  proofIdx = 0;
+  if ((PROOF ? PROOF.id : null) !== prev && cancelFn)cancelFn();
+}
+var proofOn = function() {return PROOF && Date.now() < PROOF.until;};
+function waitMs(ms) {return new Promise(function(r) {var t = setTimeout(function() {cancelFn = null; r();}, ms); cancelFn = function() {clearTimeout(t); cancelFn = null; r();};});}
 /* ---------- ecrã de teste (30 s) ---------- */
 function showTest() {
   testUntil = Date.now() + 30000;
@@ -257,11 +271,12 @@ async function playOne(c, id, secs) {
   var f = PL.files[id]; if (!f) return false;
   var s = await srcFor(id, f);
   if (!s) { if (!cache && stats.net === 'ok')s = {url:mediaUrl(id), revoke:false}; else return false; }
-  cur = {c:c, f:id}; var t0 = Date.now(), ok = true, fm = fitMode(f); lastFrameAt = Date.now();
+  cur = {c:c, f:id}; var t0 = Date.now(), ok = true, aborted = false, fm = fitMode(f); lastFrameAt = Date.now();
   if (f.type === 'Vídeo') {
     var v = document.createElement('video'); v.muted = true; v.playsInline = true; v.style.objectFit = fm; v.src = s.url;
     await new Promise(function(done) {
       var fin = false, end = function(good) {if (fin) return; fin = true; ok = good; done();};
+      cancelFn = function() {aborted = true; cancelFn = null; end(true);};
       v.onplaying = function() {swapIn(v);};
       v.onended = function() {end(true);}; v.onerror = function() {end(false);};
       setTimeout(function() {end(false);}, Math.max(20, (f.dur || 10) * 2 + 10) * 1000);
@@ -271,13 +286,19 @@ async function playOne(c, id, secs) {
     if (!v.parentNode) {try {v.removeAttribute('src'); v.load();} catch (e) {/* sem ação */}}
   } else if (f.type === 'HTML5') {
     var fr = document.createElement('iframe'); fr.setAttribute('sandbox', 'allow-scripts'); fr.src = s.url; swapIn(fr);
-    await sleep(Math.max(1, secs || f.dur || 10) * 1000);
+    await waitMs(Math.max(1, secs || f.dur || 10) * 1000);
+    aborted = Date.now() - t0 < Math.max(1, secs || f.dur || 10) * 1000 - 50;
   } else {
     var im = document.createElement('img'); im.style.objectFit = fm; im.src = s.url;
     await new Promise(function(d) {im.onload = function() {swapIn(im); d();}; im.onerror = function() {ok = false; d();};});
-    if (ok) await sleep(Math.max(1, secs || f.dur || 10) * 1000);
+    if (ok) {
+      await waitMs(Math.max(1, secs || f.dur || 10) * 1000);
+      aborted = Date.now() - t0 < Math.max(1, secs || f.dur || 10) * 1000 - 50;
+    }
   }
+  cancelFn = null;
   if (s.revoke)setTimeout(function() {URL.revokeObjectURL(s.url);}, 4000);
+  if (aborted) return true;                                              // interrompido por um comprovativo: não conta
   logPlay(c, id, (Date.now() - t0) / 1000, ok);
   return ok;
 }
@@ -305,6 +326,11 @@ async function loop() {
   for (;;) {
     try {
       if (!PL) {showBrand('A aguardar playlist…'); await sleep(2000); continue;}
+      if (proofOn()) {                                                          // comprovativo a decorrer: só os conteúdos escolhidos
+        var pid = PROOF.files[proofIdx++ % PROOF.files.length];
+        if (!await playOne('__proof', pid, 0)) await sleep(1500);
+        continue;
+      }
       var h = hourEntry(), l = h.e;
       if (h.k !== lastHour) {lastHour = h.k; idx = 0;}
       if (l === null) {                                                         // ecrã desligado a esta hora (horário definido)

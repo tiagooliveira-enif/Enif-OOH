@@ -45,6 +45,7 @@ Variáveis opcionais: `PORT` (8080), `DATA_DIR`, `TZ_NAME` (Europe/Lisbon), `MAX
 ```
 npm test                 # loop (e comparação com o protótipo: 22 mil verificações), API, segurança, e-mail e relatório final (servidor SMTP falso)
 python3 test/e2e/player.py   # player real num browser: passa conteúdo, arranca sem internet, spot a cada 5 min, comandos (precisa de playwright e ffmpeg)
+python3 test/e2e/comprovativo.py   # comprovativo: a lista só mostra o que serve ao ecrã, o player passa só o escolhido e volta ao normal, nada fica nos relatórios
 python3 test/e2e/app.py      # interface real num browser: entrar, páginas, carregar ficheiro, brilho, dois passos, recuperação, telemóvel
 ```
 
@@ -65,10 +66,14 @@ A aplicação mostra este comando já preenchido na janela do ecrã (botão «Co
 - O ecrã deve ligar sozinho quando a luz volta: ativar na BIOS «Power on after power failure» (ou equivalente) e usar o instalador, que põe o player a arrancar com o Windows.
 - Spot da Enif: com o ecrã cheio, passa 1 vez a cada 5 minutos, a seguir à passagem em curso.
 - Sem internet continua a passar o que tem. As passagens ficam numa fila e seguem quando a internet volta (sem duplicados).
-- A cada 30 s envia um sinal de vida (e a resolução do ecrã). Sem sinal há mais de 2,5 minutos, o ecrã fica **offline** e gera um alerta.
+- A cada 10 s envia um sinal de vida (e a resolução do ecrã). Sem sinal há mais de 2,5 minutos, o ecrã fica **offline** e gera um alerta.
 - «Reiniciar player», «Atualizar agora» e «Teste no ecrã» (padrão de teste durante 30 s) são comandos enviados da aplicação; o ecrã recebe-os em menos de um minuto.
 - O player comunica a resolução medida e o espaço livre em disco.
 - Brilho: a aplicação guarda o brilho por horário e o manual, mas **um browser não controla o brilho do LED**. É preciso ligar o controlador (Novastar, Colorlight, Linsn…) ou um agente no mini PC: ver as notas do projeto.
+
+## Gravar comprovativo
+
+Para o vídeo semanal de prova: na ficha do ecrã, **Gravar comprovativo** (precisa da permissão de playlist e de o ecrã estar online). A lista mostra **todos os conteúdos da biblioteca que servem a esse ecrã** (os de outra resolução ou proporção não aparecem); escolhem-se 1 ou 2 e a duração (30 s a 2 min; o máximo de 2 minutos é imposto no servidor). Enquanto dura, o ecrã passa **só** esses conteúdos e todo o resto fica em pausa, spot da Enif incluído; o player muda em poucos segundos (sinal de vida a cada 10 s) e volta ao normal sozinho no fim, ou com «Terminar já». As passagens do comprovativo **não são guardadas**, por isso não entram nos relatórios nem no PDF final; ficam só na auditoria e na lista «Comprovativos gravados» da ficha do ecrã. Dados: tabelas `proofs` e `proof_log`; API `POST /api/screens/:id/proof` e `/proof/stop`.
 
 ## Relatórios
 

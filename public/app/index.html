@@ -2896,6 +2896,38 @@ button.avatar {
     animation: none;
   }
 }
+.pr-files {
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px 10px;
+}
+.pr-files .row-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.pr-files .row-check {
+  flex-wrap: wrap;
+  padding: 6px 0;
+}
+.pr-files .row-check .grow {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.pr-files .row-check small {
+  flex: 0 0 auto;
+}
+@media (max-width: 420px) {
+  .pr-files .row-check small {
+    flex-basis: 100%;
+    padding-left: 28px;
+  }
+}
+</style>
+
 
 /* ---------- telemóvel estreito (v97) ---------- */
 @media (max-width: 420px) {
@@ -3347,7 +3379,41 @@ function noPlayWhy(c) {
   if (ok.every(x=>!isOnNow(x))) return 'os ecrãs estão desligados a esta hora.';
   return 'ficou fora do limite de campanhas em simultâneo dos ecrãs.';
 }
+/* comprovativo: o ecrã repõe só 1 ou 2 conteúdos da biblioteca que servem neste ecrã (mesma resolução ou proporção), no máximo 2 minutos, para filmar o vídeo de prova.
+   Tudo o resto pausa (incluindo o spot da Enif). As passagens não contam nos relatórios. */
+const PROOF_MAX = 120;
+function proofOf(s) {
+  const p = s.proof;
+  return p && Date.now() < p.localUntil ? p : null;
+}
+function proofBar(s) {
+  const p = proofOf(s); if (!p) return '';
+  const left = Math.max(0, Math.ceil((p.localUntil - Date.now()) / 1000));
+  return '<div class="pl-draft proof-bar">' + ic('alert') + '<p><b>A gravar comprovativo.</b> Só passa ' + p.files.map(id=>'«' + esc((fileById(id) || {name:id}).name) + '»').join(' e ') + '. Tudo o resto está em pausa, incluindo o spot da Enif. Termina em <b class="proof-cd" data-id="' + s.id + '">' + fmtMS(left) + '</b>.</p>'
+    + (can('playlist.gerir') ? '<button class="btn sm" data-a="proof-stop" data-id="' + s.id + '">Terminar já</button>' : '') + '</div>';
+}
+const fmtMS = n=>Math.floor(n / 60) + ':' + pad(n % 60);
+function proofLogHtml(s) {
+  const L = s.proofLog || []; if (!L.length) return '';
+  return '<h3 class="sec-t">Comprovativos gravados</h3>' + L.slice(0, 5).map(x=>'<div class="pl-warn info">' + ic('check') + '<span><b>' + esc(dFull.format(new Date(x.t))) + ' ' + esc(fmtHM(new Date(x.t).getHours() + new Date(x.t).getMinutes() / 60)) + '</b> · ' + x.files.map(esc).join(' e ') + ' · ' + x.secs + ' s · por ' + esc(x.by) + '. <span class="muted">Não conta nos relatórios.</span></span></div>').join('');
+}
+function proofModal(id) {
+  const s = screens.find(x=>x.id === id); if (!s || !guard('playlist.gerir')) return;
+  if (s.status === 'offline' || s.status === 'novo') {toast('O ecrã não está online. Só se pode gravar com o ecrã ligado.'); return;}
+  if (!proofFiles(s).fs.length) {toast('Não há conteúdos na biblioteca que sirvam neste ecrã.'); return;}
+  modal('<form data-form="proof" data-id="' + id + '" novalidate><div class="modal-h"><div><h2>Gravar comprovativo</h2><p class="muted">' + esc(s.venue) + ' · ' + esc(s.spot) + ' · ' + esc(s.res || '') + '</p></div><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
+    + '<div class="field"><span class="lab">Conteúdos a repor (1 ou 2)</span><div id="pr-files" class="pr-files">' + proofFiles(s).html + '</div><span class="hint">Aparecem todos os conteúdos da biblioteca que passam neste ecrã. Os que não servem (outra resolução ou proporção) não aparecem.</span></div>'
+    + '<div class="field"><label for="pr-secs">Durante quanto tempo (máximo 2 minutos)</label><select id="pr-secs" name="secs"><option value="30">30 segundos</option><option value="60">1 minuto</option><option value="90">1 minuto e 30</option><option value="120" selected>2 minutos</option></select></div>'
+    + '<div class="pl-warn">' + ic('alert') + '<span>Enquanto grava, o ecrã passa <b>só</b> o que escolher. Todo o resto pausa, incluindo o spot da Enif, e volta ao normal sozinho no fim do tempo (ou ao carregar em «Terminar já»). <b>Estas passagens não contam nos relatórios.</b></span></div>'
+    + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Começar a gravar</button></div></form>');
+}
+function proofFiles(s) {
+  const fs = contents.filter(f=>f.ready !== false && okFor(f, s));
+  return {fs:fs, html:fs.map(f=>'<label class="row-check"><input type="checkbox" name="file" value="' + f.id + '" data-a-change="proof-pick"><span class="grow">' + esc(f.name) + '</span><small class="muted">' + esc(f.type) + (f.res ? ' · ' + esc(f.res) : '') + '</small></label>').join('')};
+}
 function playingOn(s) {
+  const pf = proofOf(s);
+  if (pf) return [];
   if (s.status === 'offline' || s.status === 'novo' || !isOnNow(s)) return [];
   return loopFrom(playlistOf(s, false), s.limit, today, Math.floor(hourNow), s).loop;
 }
@@ -3865,6 +3931,8 @@ function viewDash() {
 }
 /* ---------- ecrãs ---------- */
 function plState(c, s, L, h) {
+  const pf = proofOf(s);
+  if (pf) return ['off', 'Em pausa (comprovativo)', ''];
   if (statusOf(c) === 'Pausada') return ['off', 'Em pausa', ''];
   if (statusOf(c) === 'Agendada') return ['sched', 'Agendada · ' + dShort.format(c.start), 'accent'];
   if (!screenOn(s, h)) return ['off', 'Ecrã desligado', ''];
@@ -3924,10 +3992,12 @@ function playlistHtml(s) {
       + '<div class="pl-gm">' + b.m.map(function(c) {const q = act.indexOf(c); return row(c, 0, q > -1 && k > 1 ? ' · volta ' + (q + 1) + ' de ' + k : '');}).join('') + '</div></div>';
   });
   const sameVenue = screens.filter(x=>x.venue === s.venue).length > 1;
-  return draftBar + '<div class="pl-head"><div><b>' + list.length + (list.length === 1 ? ' campanha' : ' campanhas') + '</b> <span class="muted">na playlist' + (blocks.length < list.length ? ' · ' + blocks.length + ' posições (há campanhas a partilhar a mesma posição)' : '') + '</span></div><div class="pl-limit"><span class="muted">Máximo em simultâneo</span>' + stepper + '</div></div>'
+  const proofBtn = edit && !proofOf(s) && s.status !== 'novo' ? '<div style="margin-top:8px"><button class="btn sm" data-a="proof-open" data-id="' + s.id + '">' + ic('eye') + 'Gravar comprovativo (máx. 2 min)</button></div>' : '';
+  return proofBar(s) + draftBar + '<div class="pl-head"><div><b>' + list.length + (list.length === 1 ? ' campanha' : ' campanhas') + '</b> <span class="muted">na playlist' + (blocks.length < list.length ? ' · ' + blocks.length + ' posições (há campanhas a partilhar a mesma posição)' : '') + '</span></div><div class="pl-limit"><span class="muted">Máximo em simultâneo</span>' + stepper + '</div></div>'
     + strip + warns + screenNotes(s)
     + (items || '<p class="muted">Nenhuma campanha associada a este local.</p>')
     + '<p class="hint" style="margin-top:8px">A playlist corre sempre em loop, pela ordem acima, sem interrupções. Se o minuto não estiver completo, recomeça logo do início. O horário de cada campanha só diz quando ela entra e sai do loop.</p>'
+    + proofBtn
     + (edit && sameVenue ? '<div style="margin-top:8px"><button class="btn sm" data-a="pl-copy-venue" data-id="' + s.id + '">Copiar esta playlist para os outros ecrãs de ' + esc(s.venue) + '</button></div>' : '');
 }
 
@@ -3986,7 +4056,7 @@ function screenModal(id) {
     + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? (s.disk.total - s.disk.free) + ' de ' + s.disk.total + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + s.disk.free + ' GB</span>') : '—') + '</dd></div><div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + '</dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
     + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
-    + (s.status === 'novo' ? '' : '<h3 class="sec-t">Playlist</h3>' + playlistHtml(s))
+    + (s.status === 'novo' ? '' : '<h3 class="sec-t">Playlist</h3>' + playlistHtml(s) + proofLogHtml(s))
     + '<h3 class="sec-t">Registo recente</h3>' + logsFor(s).map(l=>'<div class="log ' + l[2] + '"><time>' + l[0] + '</time><span>' + esc(l[1]) + '</span></div>').join('')
     + (canG ? playerBox(s) : '') + '</div>'
     + '<div class="modal-f scr-f"><div class="scr-acts">' + (al.length && canA ? '<button class="btn" data-a="resolve-screen" data-id="' + s.id + '">Resolver alertas</button>' : '') + ((canG || can('playlist.gerir')) && s.status !== 'novo' && s.status !== 'offline' ? '<button class="btn" data-a="sync-now" data-id="' + s.id + '">Atualizar agora</button>' : '') + (canG && s.status !== 'novo' ? '<button class="btn" data-a="restart" data-id="' + s.id + '">Reiniciar player</button>' : '') + (canG && s.status !== 'novo' && s.status !== 'offline' ? '<button class="btn" data-a="screen-test" data-id="' + s.id + '">Teste no ecrã</button>' : '') + (canG ? '<button class="btn" data-a="del-screen" data-id="' + s.id + '" style="color:var(--bad)">Eliminar ecrã</button>' : '') + '</div><button class="btn primary" data-a="close">Fechar</button></div>');
@@ -4455,6 +4525,11 @@ const MANUAL = {
    ['Indique as coordenadas', 'Em «Alterar» na localização, preencha as coordenadas do ecrã.'],
    ['Carregue em «Ver movimento à volta»', 'Conta lojas, restaurantes, paragens, escolas e hospitais num raio de 250 m.'],
    ['Guarde', 'A estimativa de visualizações desse ecrã sobe até 40 % ou desce até 15 %. Se indicar uma contagem real de pessoas, é essa que conta.']]},
+  {h:'Gravar comprovativo', need:'playlist.gerir', steps:[
+   ['Abra o ecrã e carregue em «Gravar comprovativo»', 'Serve para repor um vídeo de comprovativo no ecrã.'],
+   ['Escolha 1 ou 2 conteúdos e a duração', 'A lista mostra todos os conteúdos da biblioteca que passam neste ecrã (os de outra resolução não aparecem). Duração de 30, 60, 90 ou 120 segundos (máximo 2 minutos).'],
+   ['Comece', 'Enquanto grava, o ecrã passa só esses conteúdos; o resto da playlist e o spot da Enif ficam em pausa. Termina sozinho, ou carregue em «Terminar» na barra do ecrã.'],
+   ['Relatórios', 'Estas passagens não contam nos relatórios e ficam registadas no histórico.']]},
   {h:'Manutenção', need:'ecras.gerir', steps:[
    ['Atualizar agora', 'Faz o ecrã mostrar já a programação mais recente. Serve para quando está um cliente à frente do ecrã; no dia a dia o ecrã atualiza-se sozinho.'],
    ['Reiniciar o player e Teste no ecrã', '«Reiniciar player» reinicia o programa do ecrã. «Teste no ecrã» mostra durante 30 segundos uma imagem de teste, para confirmar a posição e a resolução.'],
@@ -5529,6 +5604,7 @@ function applyState(st) {
   const me = st.me; me.until = me.until ? parseISO(me.until) : null;
   state.user = users.find(u=>u.id === me.id) || me;
   alerts = st.alerts || [];
+  screens.forEach(function(s) {if (s.proof)s.proof.localUntil = Date.now() + (s.proof.until - st.serverTime); s.proofLog = s.proofLog || [];});
   setArr(venues, Array.from(new Set(screens.map(s=>s.venue))).sort(function(a, b) {return a.localeCompare(b, 'pt');}));
   snapshot();
 }
@@ -5677,6 +5753,12 @@ const actions = {
       t.disabled = false;
       if (res)res.textContent = e.message;
     });
+  },
+  'proof-open':function(t) {proofModal(t.dataset.id);},
+  'proof-stop':function(t) {
+    if (!guard('playlist.gerir')) return;
+    const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
+    api('POST', '/api/screens/' + encodeURIComponent(s.id) + '/proof/stop', {}).then(function() {toast('Comprovativo terminado. O ecrã ' + s.id + ' voltou ao normal.'); return poll(true);}).then(function() {reopenScreen(s.id);}).catch(function(e) {toast(e.message);});
   },
   'cal-open':function(t) {state.calOpen[t.dataset.id] = !state.calOpen[t.dataset.id]; render();},
   'cal-read':function(t) {api('POST', '/api/calendar/read', {id:t.dataset.id}).then(function(r) {state.cal = r; render();}).catch(function(e) {toast(e.message);});},
@@ -5870,6 +5952,14 @@ function applyTheme(m) {
   document.querySelectorAll('[data-a="theme"]').forEach(function(b) {b.setAttribute('aria-pressed', String(b.dataset.m === m));});
 }
 setInterval(function() {if (state.user)checkNotifs();}, NSEC);
+setInterval(function() {
+  screens.forEach(function(s) {
+    if (!s.proof) return;
+    if (!proofOf(s)) {poll(true).then(function() {if ($('.overlay'))reopenScreen(s.id);}); return;}
+    const left = Math.max(0, Math.ceil((s.proof.localUntil - Date.now()) / 1000));
+    document.querySelectorAll('.proof-cd[data-id="' + s.id + '"]').forEach(function(e) {e.textContent = fmtMS(left);});
+  });
+}, 1000);
 document.addEventListener('click', function(e) {
   const t = e.target.closest('[data-a]'); if (!t) return;
   const fn = actions[t.dataset.a]; if (fn)fn(t, e);
@@ -5903,6 +5993,10 @@ document.addEventListener('change', function(e) {
     const k = t.id === 'rep-from' ? 'from' : 'to';
     state.custom = state.custom || {from:null, to:null};
     state.custom[k] = t.value ? parseISO(t.value) : null; state.logLimit = 25; render();
+  }
+  else if (ac === 'proof-pick') {
+    const f = t.closest('form'), n = f.querySelectorAll('input[name=file]:checked').length;
+    if (n > 2) {t.checked = false; toast('Escolha no máximo 2 conteúdos.');}
   }
   else if (ac === 'always') {const w = $('#sch-times'); if (w)w.hidden = t.checked;}
   else if (ac === 'notif-pref') {
@@ -6112,6 +6206,15 @@ document.addEventListener('submit', function(e) {
     if (f.dataset.id) {folderById(f.dataset.id).name = name; toast('Pasta renomeada.');}
     else {const p = {id:'P' + (Date.now() % 100000), name:name}; folders.push(p); state.folder = p.id; toast('Pasta «' + name + '» criada.');}
     closeModal(); render(); return;
+  }
+  if (kind === 'proof') {
+    if (!guard('playlist.gerir')) return;
+    const s = screens.find(x=>x.id === f.dataset.id); if (!s) return;
+    const files = fd.getAll('file'), secs = Math.min(PROOF_MAX, Math.max(10, +fd.get('secs') || PROOF_MAX));
+    if (!files.length) {err.textContent = 'Escolha 1 ou 2 conteúdos.'; return;}
+    if (files.length > 2) {err.textContent = 'Escolha no máximo 2 conteúdos.'; return;}
+    api('POST', '/api/screens/' + encodeURIComponent(s.id) + '/proof', {files:files, secs:secs}).then(function() {closeModal(); toast('A gravar comprovativo no ecrã ' + s.id + '. O resto fica em pausa até terminar (o ecrã pode demorar uns segundos a mudar).'); return poll(true);}).then(function() {screenModal(s.id);}).catch(function(e) {err.textContent = e.message;});
+    return;
   }
   if (kind === 'place') {
     if (!guard('ecras.gerir')) return;

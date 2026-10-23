@@ -231,6 +231,44 @@ async function main() {
     ov.close(); delete process.env.POI_URL;
   }
 
+  // ---- comprovativo (1 ou 2 conteúdos que servem ao ecrã, máx. 2 min, fora dos relatórios)
+  {
+    const pA = await up(top, 'prova-a.png', 'image/png', mkPng(1080, 1920)), pB = await up(top, 'prova-b.png', 'image/png', mkPng(1080, 1920));
+    const proof = (tk, o) => call('POST', '/api/screens/ECR-001/proof', o, tk), stop = tk => call('POST', '/api/screens/ECR-001/proof/stop', {}, tk);
+    const scrView = async () => (await call('GET', '/api/state', undefined, adm)).j.screens.find(x => x.id === 'ECR-001');
+    const tvwP = await tok('cn@x.pt');
+    await hb({});
+    ok('comprovativo exige permissão de playlist', (await proof(tvwP, { files: [pA.j.id], secs: 30 })).s === 403);
+    ok('comprovativo exige sessão', (await proof(undefined, { files: [pA.j.id], secs: 30 })).s === 401);
+    ok('sem conteúdos recusado', (await proof(top, { files: [], secs: 30 })).s === 400);
+    ok('mais de 2 conteúdos recusado', (await proof(top, { files: [pA.j.id, pB.j.id, f3.j.id], secs: 30 })).s === 400);
+    ok('conteúdo que não serve ao ecrã (outra resolução) recusado', (await proof(top, { files: [f1.j.id], secs: 30 })).s === 400);
+    ok('conteúdo que não existe recusado', (await proof(top, { files: ['naoexiste'], secs: 30 })).s === 400);
+    r = await proof(top, { files: [pA.j.id, pB.j.id], secs: 9999 });
+    ok('comprovativo começa e o limite de 2 minutos é imposto no servidor', r.s === 200 && r.j.proof.secs === 120);
+    ok('só um comprovativo de cada vez por ecrã', (await proof(top, { files: [pA.j.id], secs: 30 })).s === 400);
+    let sv = await scrView();
+    ok('o estado do ecrã mostra o comprovativo', sv.proof && sv.proof.files.join() === [pA.j.id, pB.j.id].join() && sv.proof.by && sv.proof.until > Date.now());
+    r = await hb({});
+    ok('o player recebe o comprovativo no heartbeat', r.j.proof && r.j.proof.files.length === 2 && r.j.proof.until - r.j.proof.serverTime > 100000);
+    r = await call('GET', '/api/player/playlist?code=ECR-001&key=' + key);
+    ok('a playlist traz os ficheiros do comprovativo', r.j.proof && r.j.proof.files.length === 2 && r.j.files[pA.j.id] && r.j.files[pB.j.id]);
+    const n0 = db.prepare('SELECT COUNT(*) n FROM plays').get().n;
+    r = await call('POST', '/api/player/plays', { code: 'ECR-001', key, plays: [{ pid: 'prova-1', c: '__proof', f: pA.j.id, ts: Date.now(), dur: 10, ok: 1 }] });
+    ok('passagens do comprovativo são confirmadas mas não contam', r.j.received.includes('prova-1') && r.j.saved === 0 && db.prepare('SELECT COUNT(*) n FROM plays').get().n === n0);
+    ok('terminar exige permissão', (await stop(tvwP)).s === 403);
+    ok('terminar já', (await stop(top)).s === 200 && !(await scrView()).proof);
+    sv = await scrView();
+    ok('fica no registo do ecrã e na auditoria', sv.proofLog.length === 1 && sv.proofLog[0].files.join() === 'prova-a.png,prova-b.png' && db.prepare("SELECT COUNT(*) n FROM audit WHERE what LIKE 'Comprovativo%'").get().n === 2);
+    ok('depois de terminar o player já não recebe comprovativo', (await hb({})).j.proof === null && (await call('GET', '/api/player/playlist?code=ECR-001&key=' + key)).j.proof === null);
+    await proof(top, { files: [pA.j.id], secs: 10 });
+    db.prepare('UPDATE proofs SET t0=? WHERE screen=?').run(Date.now() - 11000, 'ECR-001');
+    ok('termina sozinho quando passa o tempo', !(await scrView()).proof && (await scrView()).proofLog.length === 2);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 10 * 60000, 'ECR-001');
+    ok('ecrã offline não aceita comprovativo', (await proof(top, { files: [pA.j.id], secs: 30 })).s === 400);
+    await hb({});
+  }
+
   console.log('\n' + passed + ' verificações ok');
 }
 main().then(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(0); }).catch(e => { console.error('FALHOU:', e); fs.rmSync(tmp, { recursive: true, force: true }); process.exit(1); });

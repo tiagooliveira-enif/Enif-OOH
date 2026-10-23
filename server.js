@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGE
 CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT RAISE(ABORT, 'O registo de auditoria só se acrescenta'); END;
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT, 'O registo de auditoria só se acrescenta'); END;
 CREATE TABLE IF NOT EXISTS cmds(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS proofs(screen TEXT PRIMARY KEY, files TEXT NOT NULL, t0 INTEGER NOT NULL, secs INTEGER NOT NULL, who TEXT);
+CREATE TABLE IF NOT EXISTS proof_log(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, t0 INTEGER NOT NULL, files TEXT NOT NULL, secs INTEGER NOT NULL, who TEXT);
 `);
 for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
 const q = (sql, ...a) => db.prepare(sql).all(...a);
@@ -364,6 +366,24 @@ function expectedMinutes(scr, from, to) {
   }
   return total;
 }
+/* comprovativo: o ecrã repõe só 1 ou 2 conteúdos (que servem ao ecrã), no máximo 2 minutos, para filmar o vídeo de prova.
+   Tudo o resto pausa (spot da Enif incluído). As passagens do comprovativo não são guardadas, por isso não entram nos relatórios. */
+const PROOF_MAX = 120;
+const fileNames = ids => ids.map(id => { const f = getDoc('contents', id); return f ? f.name : id; }).join(' e ');
+function proofEnd(id, who, manual) {
+  const r = q1('SELECT * FROM proofs WHERE screen=?', id); if (!r) return;
+  run('DELETE FROM proofs WHERE screen=?', id);
+  const secs = Math.max(0, Math.min(r.secs, Math.round((Date.now() - r.t0) / 1000))), files = JSON.parse(r.files);
+  run('INSERT INTO proof_log(screen,t0,files,secs,who) VALUES(?,?,?,?,?)', id, r.t0, r.files, secs, r.who);
+  run('DELETE FROM proof_log WHERE screen=? AND id NOT IN (SELECT id FROM proof_log WHERE screen=? ORDER BY id DESC LIMIT 20)', id, id);
+  audit(who || 'sistema', 'Comprovativo ' + (manual ? 'terminado' : 'terminado (tempo)'), fileNames(files) + ' · ' + id + ' · ' + secs + ' s');
+}
+function proofRow(id) {
+  const r = q1('SELECT * FROM proofs WHERE screen=?', id); if (!r) return null;
+  if (Date.now() >= r.t0 + r.secs * 1000) { proofEnd(id, null, false); return null; }
+  return r;
+}
+const proofView = r => r ? { files: JSON.parse(r.files), t0: r.t0, secs: r.secs, by: r.who, until: r.t0 + r.secs * 1000, serverTime: Date.now() } : null;
 function screenViews(withKeys) {
   const now = Date.now(), ln = S.lisbonNow(TZ), hourF = ln.h + ln.m / 60;
   const today = q('SELECT screen, SUM(ok) good, COUNT(*) total FROM plays WHERE day=? GROUP BY screen', ln.date);
@@ -373,6 +393,9 @@ function screenViews(withKeys) {
   const list = docs('screens').map(s => {
     const lv = q1('SELECT * FROM live WHERE screen=?', s.id);
     const o = Object.assign({}, s);
+    const pr = proofView(proofRow(s.id));
+    if (pr) { delete pr.serverTime; o.proof = pr; }
+    o.proofLog = q('SELECT t0,files,secs,who FROM proof_log WHERE screen=? ORDER BY id DESC LIMIT 5', s.id).map(x => ({ t: x.t0, files: JSON.parse(x.files).map(id => { const f = getDoc('contents', id); return f ? f.name : id; }), secs: x.secs, by: x.who }));
     if (withKeys) { const sc = secret('screens', s.id); o.playerKey = sc ? sc.a : ''; }
     const inSched = hourF >= s.on && hourF < s.off;
     if (!lv || !lv.last_seen) { o.status = 'novo'; o.ping = ''; o.uptime = ''; return o; }
@@ -382,7 +405,7 @@ function screenViews(withKeys) {
       o.disk = { free: lv.disk_free, total: lv.disk_total };
       if (lv.disk_free / lv.disk_total < 0.1) { const dk = 'disk-' + s.id + '-' + ln.date; if (!resolved.has(dk)) alerts.push({ id: dk, sev: 'warn', screen: s.id, title: 'Disco quase cheio', detail: 'Só restam ' + lv.disk_free + ' GB livres no PC deste ecrã (de ' + lv.disk_total + ' GB). Liberte espaço ou use um disco maior.', time: fmtHM(now) }); }
     }
-    o.nowCamp = age < ONLINE_MS ? lv.now_c : null; o.nowFile = age < ONLINE_MS ? lv.now_f : null;
+    o.nowCamp = age < ONLINE_MS && lv.now_c !== '__proof' ? lv.now_c : null; o.nowFile = age < ONLINE_MS ? lv.now_f : null;
     o.ping = age < 90000 ? 'há ' + Math.max(1, Math.round(age / 1000)) + ' s' : 'há ' + mins + ' min';
     const tt = tmap[s.id], total = tt ? tt.total : 0, failed = tt ? total - tt.good : 0;
     if (age > ONLINE_MS && inSched) {
@@ -448,7 +471,8 @@ function buildState(user) {
    spot5: o spot que interrompe o loop a cada SPOT_GAP segundos quando o ecrã está cheio. */
 function playlistFor(scr) {
   const camps = docs('campaigns'), ctx = sharedCtx();
-  const now = S.lisbonNow(TZ), days = {}, used = {};
+  const now = S.lisbonNow(TZ), days = {}, used = {}, proof = proofView(proofRow(scr.id));
+  if (proof) proof.files.forEach(f => { used[f] = 1; });
   [now.date, S.addDay(now.date, 1)].forEach(d => {
     days[d] = S.dayLoops(scr, camps, d, ctx, now.date);
     Object.values(days[d]).forEach(l => { if (l) l.seq.concat(l.spot5 ? [l.spot5] : []).forEach(e => (e.spot ? e.files : e.items).forEach(f => { used[f] = 1; })); });
@@ -467,7 +491,7 @@ function playlistFor(scr) {
   }));
   const lv = q1('SELECT reload FROM live WHERE screen=?', scr.id);
   return { playerVersion: PLAYER_VERSION, tz: TZ, generated: Date.now(), reload: lv ? lv.reload : 0, spotGap: S.SPOT_GAP,
-    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', bri: scr.bri || null }, days, files };
+    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', bri: scr.bri || null }, days, files, proof: proof ? { id: proof.t0, files: proof.files.filter(f => files[f]), until: proof.until, serverTime: proof.serverTime } : null };
 }
 function screenAuth(code, key) {
   const s = getDoc('screens', String(code || '')); if (!s) return null;
@@ -493,7 +517,8 @@ function playerApi(req, res, u, body) {
     run('INSERT OR IGNORE INTO beats(screen,minute) VALUES(?,?)', s.id, Math.floor(now / 60000));
     if (s.res === 'auto' && w && h && w >= 240 && h >= 240) putDoc('screens', s.id, Object.assign({}, s, { res: w + '×' + h }));
     const lv2 = q1('SELECT reload FROM live WHERE screen=?', s.id);
-    return send(res, 200, { ok: true, serverTime: now, reload: lv2 ? lv2.reload : 0, cmds: q('SELECT id,kind FROM cmds WHERE screen=? ORDER BY id', s.id) });
+    const pv = proofView(proofRow(s.id));
+    return send(res, 200, { ok: true, serverTime: now, reload: lv2 ? lv2.reload : 0, proof: pv ? { id: pv.t0, files: pv.files, until: pv.until, serverTime: now } : null, cmds: q('SELECT id,kind FROM cmds WHERE screen=? ORDER BY id', s.id) });
   }
   if (req.method === 'POST' && p === '/api/player/plays') {
     const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
@@ -502,6 +527,7 @@ function playerApi(req, res, u, body) {
     try {
       (Array.isArray(body.plays) ? body.plays : []).slice(0, 2000).forEach(x => {
         if (!x || !x.pid) return;
+        if (x.c === '__proof') { got.push(x.pid); return; }                          // comprovativo: confirma a receção mas não conta nos relatórios
         const ts = Math.min(+x.ts || Date.now(), Date.now() + 60000), ln = S.lisbonNow(TZ, new Date(ts));
         const r = run('INSERT OR IGNORE INTO plays(pid,screen,camp,file,ts,day,hour,dur,ok) VALUES(?,?,?,?,?,?,?,?,?)', String(x.pid).slice(0, 80), s.id, String(x.c || '').slice(0, 80), String(x.f || '').slice(0, 80), ts, ln.date, ln.h, +x.dur || 0, x.ok ? 1 : 0);
         saved += Number(r.changes); got.push(x.pid);
@@ -760,6 +786,7 @@ async function tick(force) {
       try { const b = backupNow(true); audit('sistema', 'Cópia de segurança automática', b.mb + ' MB'); } catch (e) { console.error('Cópia de segurança falhou:', e.message); audit('sistema', 'Cópia de segurança automática falhou', e.message); }
     }
     await calRefresh(false);
+    q('SELECT screen FROM proofs WHERE t0+secs*1000<=?', Date.now()).forEach(x => proofEnd(x.screen, null, false));
     if (!smtpReady()) return;
     for (const c0 of docs('campaigns')) {
       if (!c0.sales) continue;
@@ -918,6 +945,26 @@ const router = async (req, res) => {
     run('DELETE FROM cmds WHERE screen=? AND kind=?', sc.id, r[2]);
     run('INSERT INTO cmds(screen,kind,ts) VALUES(?,?,?)', sc.id, r[2], Date.now());
     audit(user, r[2] === 'test' ? 'Teste no ecrã' : 'Atualizar agora no ecrã', sc.id + ' · ' + sc.venue);
+    return send(res, 200, { ok: true });
+  }
+  if ((r = /^\/api\/screens\/([\w.\-]+)\/proof$/.exec(p)) && m === 'POST') {
+    const user = needUser(req, u); need(user, 'playlist.gerir');
+    const sc = getDoc('screens', r[1]); if (!sc) throw new HttpError(404, 'Ecrã não existe');
+    const b = await readJson(req), files = Array.isArray(b.files) ? [...new Set(b.files.map(String))] : [];
+    if (files.length < 1 || files.length > 2) throw bad('Escolha 1 ou 2 conteúdos.');
+    const lv = q1('SELECT last_seen FROM live WHERE screen=?', sc.id);
+    if (!lv || !lv.last_seen || Date.now() - lv.last_seen > ONLINE_MS) throw bad('O ecrã não está online. Só se pode gravar com o ecrã ligado.');
+    files.forEach(id => { const f = getDoc('contents', id); if (!f || f.ready === false || !S.okFor(f, sc) || !q1('SELECT 1 FROM files WHERE id=?', id)) throw bad('Um dos conteúdos não serve a este ecrã.'); });
+    if (proofRow(sc.id)) throw bad('Já há um comprovativo a decorrer neste ecrã.');
+    const secs = Math.min(PROOF_MAX, Math.max(10, Math.round(+b.secs) || PROOF_MAX));
+    run('INSERT INTO proofs(screen,files,t0,secs,who) VALUES(?,?,?,?,?)', sc.id, JSON.stringify(files), Date.now(), secs, user.name);
+    audit(user, 'Comprovativo iniciado', fileNames(files) + ' · ' + sc.id + ' · ' + secs + ' s');
+    return send(res, 200, { ok: true, proof: proofView(proofRow(sc.id)) });
+  }
+  if ((r = /^\/api\/screens\/([\w.\-]+)\/proof\/stop$/.exec(p)) && m === 'POST') {
+    const user = needUser(req, u); need(user, 'playlist.gerir');
+    if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
+    proofEnd(r[1], user, true);
     return send(res, 200, { ok: true });
   }
   if (p.startsWith('/api/player/')) return playerApi(req, res, u, m === 'POST' ? await readJson(req, 5e6) : {});
