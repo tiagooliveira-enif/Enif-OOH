@@ -4771,10 +4771,10 @@ function cleanBar() {
 }
 function cleanCfg() {
   const cG = can('conteudos.gerir');
-  const cfg = cG && isAdm() ? '<div class="few-ctl"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="30" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="14" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado (e ' + state.clean.bin + ' dias na reciclagem).</span></div>' : '';
+  const cfg = cG && isAdm() ? '<div class="few-ctl" style="margin:0;padding:0;border:0"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="30" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="14" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado (e ' + state.clean.bin + ' dias na reciclagem).</span></div>' : '';
   const v = state.cview, b = (k, t, n)=>'<button class="seg-b" data-a="cview" data-v="' + k + '" aria-pressed="' + (v === k) + '">' + t + ' <b>' + n + '</b></button>';
-  const bottom = '<div class="tools" style="margin-top:18px"><div class="seg sm" role="group" aria-label="Limpeza de conteúdos">' + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div></div>';
-  return bottom + cfg;
+  const bottom = '<div class="tools" style="margin-top:18px"><div class="seg sm" role="group" aria-label="Limpeza de conteúdos">' + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div>' + cfg + '</div>';
+  return bottom;
 }
 function binHtml() {
   const cG = can('conteudos.gerir'), L = binList();
