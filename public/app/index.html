@@ -4764,14 +4764,12 @@ function houseCard() {
   if (miss.length) return '<div class="banner">' + ic('alert') + '<p><b>Spot da Enif:</b> cobre ' + (screens.length - miss.length) + ' de ' + screens.length + ' ecrãs. Sem versão para: ' + miss.map(s=>esc(s.id) + ' (' + esc(resTxt(s)) + ')').join(', ') + '.</p></div>';
   return '<p class="hint" style="margin:0 0 10px">Spot da Enif: ' + hs.length + (hs.length === 1 ? ' conteúdo' : ' conteúdos') + ' (máximo ' + HOUSE_MAX + ' por ecrã), cobre os ' + screens.length + ' ecrãs. Com 2 num ecrã, alternam. Entra 1 vez em cada volta do loop quando há vaga; com o ecrã cheio, passa a cada 5 minutos.</p>';
 }
-function cleanBar() {
-  const v = state.cview;
-  const b = (k, t, n)=>'<button class="seg-b" data-a="cview" data-v="' + k + '" aria-pressed="' + (v === k) + '">' + t + ' <b>' + n + '</b></button>';
-  return '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Biblioteca">' + b('lib', 'Biblioteca', contents.length) + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div></div>';
+function backBar() {
+  return '<div class="tools" style="margin-bottom:10px"><button class="btn sm" data-a="cview" data-v="lib">' + ic('left') + 'Voltar à biblioteca</button>' + (state.cview === 'exp' ? '<span class="hint" style="margin:0">A mostrar só os conteúdos que vão ser apagados em breve.</span>' : '') + '</div>';
 }
 function cleanCfg() {
   const cG = can('conteudos.gerir');
-  const cfg = cG && isAdm() ? '<div class="few-ctl" style="margin:0;padding:0;border:0"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="30" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="14" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado (e ' + state.clean.bin + ' dias na reciclagem).</span></div>' : '';
+  const cfg = cG && isAdm() ? '<div class="few-ctl" style="margin:0;padding:0;border:0;gap:6px"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="30" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used" style="width:56px"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="14" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" style="width:56px" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado.</span></div>' : '';
   const v = state.cview, b = (k, t, n)=>'<button class="seg-b" data-a="cview" data-v="' + k + '" aria-pressed="' + (v === k) + '">' + t + ' <b>' + n + '</b></button>';
   const bottom = '<div class="tools" style="margin-top:18px"><div class="seg sm" role="group" aria-label="Limpeza de conteúdos">' + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div>' + cfg + '</div>';
   return bottom;
@@ -4785,8 +4783,8 @@ function binHtml() {
   return '<p class="hint">Aqui ficam, durante ' + state.clean.bin + ' dias, os conteúdos apagados por falta de uso. Passado esse prazo são apagados definitivamente (os relatórios das campanhas já terminadas mantêm-se).</p>' + (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">A reciclagem está vazia.</div></div>');
 }
 function viewContent() {
-  if (state.cview === 'bin') {head('Conteúdos', 'Reciclagem de conteúdos sem uso', ''); return cleanBar() + binHtml() + cleanCfg();}
-  return cleanBar() + viewContentBase() + cleanCfg();
+  if (state.cview === 'bin') {head('Conteúdos', 'Reciclagem de conteúdos sem uso', ''); return backBar() + binHtml() + cleanCfg();}
+  return (state.cview === 'exp' ? backBar() : '') + viewContentBase() + cleanCfg();
 }
 function viewContentBase() {
   const cG = can('conteudos.gerir');
@@ -4814,11 +4812,11 @@ function viewContentBase() {
     const fsel = cG ? '<select data-a-change="mvfolder" data-id="' + x.id + '" aria-label="Pasta"><option value="">Sem pasta</option>' + folders.map(p=>'<option value="' + p.id + '"' + (x.folder === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('') + '</select>' : (fol ? '<span class="muted" style="font-size:13px">Pasta: ' + esc(fol.name) + '</span>' : '');
     return '<article class="card tile"><div class="thumb" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div><div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
   }).join('');
-  return upBanner() + houseCard() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
+  return upBanner() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
     + '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Tipo de conteúdo">' + chips + '</div><div class="tools c-tools-r">' + newBtn + '<label class="field-inline" for="c-folder"><select id="c-folder" data-a-change="folderSel" aria-label="Pasta" style="width:auto">' + fopts + '</select></label>' + folderBtns + '</div></div>'
     + '<div class="tools" style="margin-top:0"><span class="hint" style="margin:0">' + shownC.length + (shownC.length === 1 ? ' ficheiro' : ' ficheiros') + ' · ' + fmtBytes(shownC.reduce((a, x)=>a + sizeBytes(x.size), 0)) + ' · armazenamento do servidor: ' + diskInfo().pct.toFixed(0) + ' % usado (' + fmtBytes(diskInfo().free) + ' livres)</span><span style="flex:1"></span><label class="field-inline" for="c-sort"><span class="lab">Ordenar</span><select id="c-sort" data-a-change="csort" style="width:auto"><option value="recent"' + (state.csort === 'recent' ? ' selected' : '') + '>Mais recentes</option><option value="size"' + (state.csort === 'size' ? ' selected' : '') + '>Maior tamanho</option></select></label></div>'
     + (diskInfo().pct >= 80 ? '<div class="banner">' + ic('alert') + '<p><b>Armazenamento quase cheio:</b> ' + diskInfo().pct.toFixed(0) + ' % usado. Apague conteúdos que já não usa ou aumente o espaço do servidor.</p></div>' : '')
-    + (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">Sem conteúdos nesta seleção.</div></div>');
+    + houseCard() + (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">Sem conteúdos nesta seleção.</div></div>');
 }
 function folderModal(id) {
   const p = id ? folderById(id) : null;
@@ -6010,7 +6008,7 @@ const actions = {
   'help-go':function() {const b = document.querySelector('#head .head-actions .btn.primary'); closeModal(); if (b)setTimeout(function() {b.click();}, 60);},
   'cont-screens':function(t) {if (guard('conteudos.gerir'))contScreensModal(t.dataset.id);},
   cfilter:function(t) {state.cfilter = t.dataset.f; render();},
-  cview:function(t) {state.cview = t.dataset.v; render();},
+  cview:function(t) {state.cview = state.cview === t.dataset.v ? 'lib' : t.dataset.v; render();},
   'clean-see':function() {state.cview = 'exp'; state.view = 'conteudos'; render(); window.scrollTo(0, 0);},
   keep:function(t) {
     if (!guard('conteudos.gerir')) return;
