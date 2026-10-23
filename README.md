@@ -47,6 +47,7 @@ npm test                 # loop (e comparação com o protótipo: 22 mil verific
 python3 test/e2e/player.py   # player real num browser: passa conteúdo, arranca sem internet, spot a cada 5 min, comandos (precisa de playwright e ffmpeg)
 python3 test/e2e/comprovativo.py   # comprovativo: a lista só mostra o que serve ao ecrã, o player passa só o escolhido e volta ao normal, nada fica nos relatórios
 python3 test/e2e/avisos.py   # aviso «campanha abaixo do contratado» e «Ocupação por mês» (demora ~2 min: a conta fica guardada 1 minuto)
+python3 test/e2e/limpeza.py   # limpeza de conteúdos sem uso: aviso no painel e «Manter», reciclagem e «Restaurar», prazos
 python3 test/e2e/app.py      # interface real num browser: entrar, páginas, carregar ficheiro, brilho, dois passos, recuperação, telemóvel
 ```
 
@@ -79,6 +80,14 @@ Para o vídeo semanal de prova: na ficha do ecrã, **Gravar comprovativo** (prec
 ## Aviso «campanha abaixo do contratado»
 
 Só aviso interno (painel «Precisa de atenção» e notificações do tipo «Campanha abaixo do contratado»); **nunca entra nos relatórios**. O servidor compara, hora a hora, as passagens que o loop prevê nas últimas 24 h com as que o player registou. Se uma campanha ativa ficou abaixo de 90 % (e eram previstas pelo menos 20), avisa com a causa principal (ecrã sem sinal, falhas de reprodução ou passagens a menos) e o ecrã mais afetado. «Marcar como resolvido» vale para esse dia. A conta fica guardada 1 minuto no servidor. Constantes `UNDER_PCT` e `UNDER_MIN` em `server.js`.
+
+## Limpeza de conteúdos sem uso
+Um conteúdo que não está em nenhuma campanha ativa, agendada ou em pausa (e que não é spot da Enif) caduca **180 dias depois de a última campanha acabar**, ou **60 dias depois de carregado** se nunca foi usado. Os dois prazos são do administrador (barra por cima da biblioteca, `POST /api/clean`, guardados em `settings/clean`).
+- 30 dias antes aparece uma sugestão no painel e a etiqueta «Sem uso» no ficheiro, com «Manter» (`POST /api/contents/keep`, dá mais 180 dias).
+- Caducado, o conteúdo passa da coleção `contents` para `bin` (reciclagem, 30 dias, «Restaurar» em `POST /api/contents/restore`). Não entra nas playlists nem na lista de ecrãs. O ficheiro continua no disco.
+- Passados os 30 dias, o ficheiro e a linha em `files` são apagados e fica só o nome (`gone: true`), para os relatórios e comprovativos das campanhas já terminadas continuarem a mostrar o nome.
+- A limpeza corre uma vez por dia no `tick` (`cleanSweep`). Tudo fica no registo de auditoria. As datas de caducidade (`exp`) são calculadas no servidor.
+- Uma campanha terminada que seja prolongada e use um conteúdo já reciclado fica sem esse conteúdo até ele ser restaurado.
 
 ## Ocupação por mês
 

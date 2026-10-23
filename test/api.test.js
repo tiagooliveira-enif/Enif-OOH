@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'enif-'));
 process.env.DATA_DIR = tmp; process.env.ADMIN_NAME = 'Tiago'; process.env.ADMIN_EMAIL = 'Tiago@Enif.pt'; process.env.ADMIN_PASS = 'segredo1'; process.env.PORT = '0';
-const { server, db, underReset } = require('../server');
+const { server, db, underReset, cleanSweep } = require('../server');
 const S = require('../lib/schedule');
 
 let passed = 0;
@@ -291,6 +291,53 @@ async function main() {
     ok('marcar como resolvido tira o aviso', r.s === 200 && (await alertsOf()).length === 0);
     await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CU1' }]);
     db.prepare("DELETE FROM resolved WHERE id LIKE 'under-%'").run();
+  }
+
+  // ---- limpeza de conteúdos sem uso
+  {
+    const mk = async nm => (await up(top, nm, 'image/png', mkPng(1080, 1920))).j.id;
+    const fNew = await mk('lx-novo.png'), fOld = await mk('lx-velho.png'), fUsed = await mk('lx-usado.png'), fAct = await mk('lx-ativo.png');
+    const putRaw = (id, f) => { const d = JSON.parse(db.prepare("SELECT json FROM docs WHERE coll='contents' AND id=?").get(id).json); f(d); db.prepare("UPDATE docs SET json=? WHERE coll='contents' AND id=?").run(JSON.stringify(d), id); };
+    const day = 864e5;
+    putRaw(fOld, d => { d.up = Date.now() - 50 * day; });
+    putRaw(fUsed, d => { d.up = Date.now() - 400 * day; });
+    const cOld = { id: 'CL1', name: 'Velha', client: 'C', venues: ['Fórum'], start: plus(-200), end: plus(-170), h0: 0, h1: 24, ppm: 1, dur: 10, priority: 'Normal', manual: false, color: 1, items: [{ f: fUsed, h0: null, h1: null, d0: null, d1: null, ppm: 1 }], sector: '', sales: '', pauses: [] };
+    const cAct = Object.assign({}, cOld, { id: 'CL2', name: 'Ativa', start: plus(-5), end: plus(5), items: [{ f: fAct, h0: null, h1: null, d0: null, d1: null, ppm: 1 }] });
+    await sync(top, [op('campaigns', 'CL1', cOld), op('campaigns', 'CL2', cAct)]);
+    putRaw(fAct, d => { d.up = Date.now() - 900 * day; });
+    let stc = (await call('GET', '/api/state', undefined, adm)).j;
+    const ex = id => (stc.contents.find(f => f.id === id) || {}).exp;
+    ok('conteúdo novo e nunca usado: caduca 60 dias depois do carregamento', ex(fNew) === plus(60));
+    ok('conteúdo nunca usado há 50 dias: já na janela de aviso (10 dias)', ex(fOld) === plus(10));
+    ok('conteúdo usado: caduca 180 dias depois do fim da última campanha', ex(fUsed) === plus(10));
+    ok('conteúdo numa campanha ativa nunca caduca', ex(fAct) === undefined);
+    ok('o estado traz a configuração e a reciclagem', stc.clean.used === 180 && stc.clean.never === 60 && stc.clean.bin === 30 && Array.isArray(stc.bin));
+    r = await call('POST', '/api/contents/keep', { ids: [fOld] }, await tok('vw@x.pt')); ok('quem só consulta não consegue manter', r.s === 403);
+    ok('«Manter» num conteúdo fora da janela de aviso é ignorado', (await call('POST', '/api/contents/keep', { ids: [fNew] }, top)).j.n === 0);
+    r = await call('POST', '/api/contents/keep', { ids: [fOld] }, top);
+    stc = (await call('GET', '/api/state', undefined, adm)).j;
+    ok('«Manter» dá mais 180 dias', r.j.n === 1 && ex(fOld) === plus(180));
+    ok('só o administrador muda os prazos', (await call('POST', '/api/clean', { used: 90, never: 30 }, top)).s === 403 && (await call('POST', '/api/clean', { used: 5, never: 30 }, adm)).s === 400);
+    cleanSweep(plus(11));
+    stc = (await call('GET', '/api/state', undefined, adm)).j;
+    ok('depois do prazo vai para a reciclagem (e a ativa e a mantida ficam)', !ex(fUsed) && stc.bin.some(f => f.id === fUsed) && stc.contents.some(f => f.id === fOld) && stc.contents.some(f => f.id === fAct) && stc.contents.some(f => f.id === fNew));
+    ok('o ficheiro continua no disco enquanto está na reciclagem', !!db.prepare('SELECT 1 FROM files WHERE id=?').get(fUsed) && fs.existsSync(path.join(tmp, 'media', fUsed)));
+    ok('um conteúdo reciclado não entra na playlist (já não existe na biblioteca)', (await sync(top, [op('campaigns', 'CL1', Object.assign({}, cOld, { end: plus(1) }))])).s === 400);
+    r = await call('POST', '/api/contents/restore', { id: fUsed }, top);
+    stc = (await call('GET', '/api/state', undefined, adm)).j;
+    ok('restaurar devolve à biblioteca com mais 180 dias', r.s === 200 && ex(fUsed) === plus(180));
+    cleanSweep(plus(70));
+    stc = (await call('GET', '/api/state', undefined, adm)).j;
+    ok('um conteúdo nunca usado vai para a reciclagem ao fim de 60 dias', stc.bin.some(f => f.id === fNew) && !stc.contents.some(f => f.id === fNew));
+    cleanSweep(plus(70 + 31));
+    stc = (await call('GET', '/api/state', undefined, adm)).j;
+    const tomb = JSON.parse(db.prepare("SELECT json FROM docs WHERE coll='bin' AND id=?").get(fNew).json);
+    ok('passados 30 dias na reciclagem, o ficheiro é apagado de vez', !stc.bin.some(f => f.id === fNew) && !db.prepare('SELECT 1 FROM files WHERE id=?').get(fNew) && !fs.existsSync(path.join(tmp, 'media', fNew)));
+    ok('fica só o nome, para os relatórios antigos', tomb.gone === true && tomb.name === 'lx-novo.png' && !tomb.screens);
+    r = await call('POST', '/api/clean', { used: 90, never: 30 }, adm);
+    ok('o administrador muda os prazos', r.s === 200 && r.j.used === 90);
+    await call('POST', '/api/clean', { used: 180, never: 60 }, adm);
+    await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CL1' }, { op: 'del', coll: 'campaigns', id: 'CL2' }]);
   }
 
   console.log('\n' + passed + ' verificações ok');

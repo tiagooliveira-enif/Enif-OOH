@@ -369,7 +369,7 @@ function expectedMinutes(scr, from, to) {
 /* comprovativo: o ecrã repõe só 1 ou 2 conteúdos (que servem ao ecrã), no máximo 2 minutos, para filmar o vídeo de prova.
    Tudo o resto pausa (spot da Enif incluído). As passagens do comprovativo não são guardadas, por isso não entram nos relatórios. */
 const PROOF_MAX = 120;
-const fileNames = ids => ids.map(id => { const f = getDoc('contents', id); return f ? f.name : id; }).join(' e ');
+const fileNames = ids => ids.map(id => { const f = contentAny(id); return f ? f.name : id; }).join(' e ');
 function proofEnd(id, who, manual) {
   const r = q1('SELECT * FROM proofs WHERE screen=?', id); if (!r) return;
   run('DELETE FROM proofs WHERE screen=?', id);
@@ -432,7 +432,7 @@ function screenViews(withKeys) {
     const o = Object.assign({}, s);
     const pr = proofView(proofRow(s.id));
     if (pr) { delete pr.serverTime; o.proof = pr; }
-    o.proofLog = q('SELECT t0,files,secs,who FROM proof_log WHERE screen=? ORDER BY id DESC LIMIT 5', s.id).map(x => ({ t: x.t0, files: JSON.parse(x.files).map(id => { const f = getDoc('contents', id); return f ? f.name : id; }), secs: x.secs, by: x.who }));
+    o.proofLog = q('SELECT t0,files,secs,who FROM proof_log WHERE screen=? ORDER BY id DESC LIMIT 5', s.id).map(x => ({ t: x.t0, files: JSON.parse(x.files).map(id => { const f = contentAny(id); return f ? f.name : id; }), secs: x.secs, by: x.who }));
     if (withKeys) { const sc = secret('screens', s.id); o.playerKey = sc ? sc.a : ''; }
     const inSched = hourF >= s.on && hourF < s.off;
     if (!lv || !lv.last_seen) { o.status = 'novo'; o.ping = ''; o.uptime = ''; return o; }
@@ -490,11 +490,60 @@ function calendarView() {
   const list = !calUrl() || !kw ? [] : cal.events.filter(e => e.at > now && (e.title + ' ' + e.desc).toLowerCase().includes(kw)).map(e => ({ id: e.id, title: e.title, desc: e.desc.slice(0, 600), at: e.at, allDay: e.allDay, read: read.has(e.id) }));
   return { configured: !!calUrl(), kw: calKeyword(), warnHours: 48, serverTime: now, updated: cal.ok, error: cal.error, events: list };
 }
+/* ---------- limpeza de conteúdos sem uso ---------- */
+/* Um conteúdo fora de campanhas ativas, agendadas ou em pausa (e que não é spot da Enif) caduca X dias depois de a última
+   campanha acabar, ou Y dias depois de carregado se nunca foi usado. Caducado, vai para a reciclagem (coleção «bin»),
+   onde fica Z dias e pode ser restaurado; depois o ficheiro é apagado e fica só o nome (para os relatórios antigos). */
+const CLEAN_DEF = { used: 180, never: 60, bin: 30 }, CLEAN_WARN = 30;
+const cleanCfg = () => Object.assign({}, CLEAN_DEF, getDoc('settings', 'clean') || {});
+const addDayIso = (d, n) => { const t = new Date(d + 'T00:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+const dayOfTs = ts => S.lisbonNow(TZ, new Date(ts)).date;
+const contentAny = id => getDoc('contents', id) || getDoc('bin', id);
+function contentUse(f, camps, today) {
+  if (f.house) return { prot: true };
+  let last = f.lastUse || null;
+  for (const c of camps) {
+    if (!(c.items || []).some(i => i.f === f.id)) continue;
+    if (S.statusOf(c, today) !== 'Terminada') return { prot: true };
+    if (!last || c.end > last) last = c.end;
+  }
+  return { prot: false, last };
+}
+function contentExpiry(f, camps, today, cfg) {                 // data de caducidade, ou null se está protegido
+  const u = contentUse(f, camps, today); if (u.prot) return null;
+  let e = u.last ? addDayIso(u.last, cfg.used) : addDayIso(dayOfTs(f.up || Date.now()), cfg.never);
+  if (f.keep) { const k = addDayIso(f.keep, cfg.used); if (k > e) e = k; }
+  return e;
+}
+function cleanSweep(today) {
+  today = today || S.lisbonNow(TZ).date;
+  const cfg = cleanCfg(), camps = docs('campaigns'); let moved = 0, erased = 0;
+  docs('contents').forEach(f => {
+    const u = contentUse(f, camps, today);
+    if ((!f.up) || (u.last && u.last !== f.lastUse)) { f.up = f.up || Date.now(); if (u.last) f.lastUse = u.last; putDoc('contents', f.id, f); }
+    const e = contentExpiry(f, camps, today, cfg);
+    if (e === null || e > today) return;
+    delDoc('contents', f.id); putDoc('bin', f.id, Object.assign({}, f, { del: today })); moved++;
+    audit('sistema', 'Conteúdo movido para a reciclagem (sem uso)', f.name);
+  });
+  docs('bin').forEach(f => {
+    if (f.gone || addDayIso(f.del, cfg.bin) > today) return;
+    try { fs.unlinkSync(path.join(MEDIA, path.basename(f.id))); } catch (e) { /* sem ação */ }
+    run('DELETE FROM files WHERE id=?', f.id);
+    putDoc('bin', f.id, { id: f.id, name: f.name, type: f.type, res: f.res, dur: f.dur, size: f.size, del: f.del, gone: true });
+    audit('sistema', 'Conteúdo apagado definitivamente', f.name); erased++;
+  });
+  return { moved, erased };
+}
+function contentsView() {
+  const cfg = cleanCfg(), camps = docs('campaigns'), today = S.lisbonNow(TZ).date;
+  return docs('contents', true).map(f => { const e = contentExpiry(f, camps, today, cfg); return e ? Object.assign({}, f, { exp: e }) : f; });
+}
 function buildState(user) {
   const sv = screenViews(A.can(user, 'ecras.gerir'));
   const st = {
     me: publicUser(user), now: S.lisbonNow(TZ), serverTime: Date.now(), tz: TZ,
-    screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: docs('contents', true), folders: docs('folders'),
+    screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: contentsView(), bin: docs('bin').filter(f => !f.gone), clean: cleanCfg(), folders: docs('folders'),
     users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady()
   };
   if (user.admin) {
@@ -632,7 +681,7 @@ async function upload(req, res, u) {
   const resTxt = html ? 'Responsivo' : (got.res || hint || 'Por detetar');
   const secs0 = got.secs || Math.round((+u.searchParams.get('secs') || 0) * 10) / 10;
   const dur = type === 'Imagem' ? 10 : (secs0 > 0 ? secs0 : 10);
-  const doc = { id, name, type, res: resTxt, dur: type === 'Imagem' ? '' : Math.round(dur) + ' s', secs: dur, size: sizeTxt(n), bytes: n, folder, ready: true, house: wantHouse };
+  const doc = { id, name, type, res: resTxt, dur: type === 'Imagem' ? '' : Math.round(dur) + ' s', secs: dur, size: sizeTxt(n), bytes: n, folder, ready: true, house: wantHouse, up: Date.now() };
   try { doc.screens = checkContentScreens(doc, screenIds); } catch (e) { drop(); throw e; }
   db.exec('BEGIN');
   try { run('INSERT INTO files(id,mime,size) VALUES(?,?,?)', id, mime, n); putDoc('contents', id, doc); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); drop(); throw e; }
@@ -762,7 +811,7 @@ async function finalReportPdf(c) {
   try {
     const ids = [...new Set(rows.filter(r => r.c === c.id).map(r => r.f))];
     for (const id of ids) {
-      const f = getDoc('contents', id); if (!f) continue;
+      const f = contentAny(id); if (!f || f.gone) continue;
       const out = path.join(tmp, id + '.jpg'); let jpg = null;
       try { if (await M.jpegStill(path.join(MEDIA, path.basename(id)), f.type, out, 2)) jpg = fs.readFileSync(out); } catch (e) { /* sem ação */ }
       files[id] = { name: f.name, jpg };
@@ -826,6 +875,8 @@ async function tick(force) {
     if ((ln.h > 3 || (ln.h === 3 && ln.m >= 30)) && !backupList(100).some(b => b.auto && S.lisbonNow(TZ, new Date(b.t)).date === today)) {
       try { const b = backupNow(true); audit('sistema', 'Cópia de segurança automática', b.mb + ' MB'); } catch (e) { console.error('Cópia de segurança falhou:', e.message); audit('sistema', 'Cópia de segurança automática falhou', e.message); }
     }
+    const cr = getDoc('settings', 'cleanrun');
+    if (!cr || cr.day !== today) { cleanSweep(today); putDoc('settings', 'cleanrun', { day: today }); }
     await calRefresh(false);
     q('SELECT screen FROM proofs WHERE t0+secs*1000<=?', Date.now()).forEach(x => proofEnd(x.screen, null, false));
     if (!smtpReady()) return;
@@ -922,6 +973,31 @@ const router = async (req, res) => {
       return send(res, 200, { ok: true });
     }
     throw new HttpError(404, 'Não encontrado');
+  }
+  if (p === '/api/contents/keep' && m === 'POST') {
+    const user = needUser(req, u); need(user, 'conteudos.gerir'); const b = await readJson(req), today = S.lisbonNow(TZ).date;
+    const ids = Array.isArray(b.ids) ? b.ids.slice(0, 500).map(String) : [];
+    const camps = docs('campaigns'), cfg = cleanCfg(); let n = 0;
+    ids.forEach(id => {
+      const f = getDoc('contents', id); if (!f) return;
+      const e = contentExpiry(f, camps, today, cfg); if (e === null || dayDiff(e, today) > CLEAN_WARN) return;
+      f.keep = today; putDoc('contents', id, f); n++; audit(user, 'Manteve o conteúdo na biblioteca', f.name, ipOf(req));
+    });
+    return send(res, 200, { ok: true, n });
+  }
+  if (p === '/api/contents/restore' && m === 'POST') {
+    const user = needUser(req, u); need(user, 'conteudos.gerir'); const b = await readJson(req), f = getDoc('bin', String(b.id || ''));
+    if (!f || f.gone) throw bad('Este conteúdo já não está na reciclagem.');
+    const o = Object.assign({}, f); delete o.del; o.keep = S.lisbonNow(TZ).date;
+    putDoc('contents', f.id, o); delDoc('bin', f.id); audit(user, 'Restaurou da reciclagem', f.name, ipOf(req));
+    return send(res, 200, { ok: true });
+  }
+  if (p === '/api/clean' && m === 'POST') {
+    const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
+    const b = await readJson(req), used = Math.round(+b.used), never = Math.round(+b.never);
+    if (!(used >= 30 && used <= 1000) || !(never >= 14 && never <= 1000)) throw bad('Indique entre 30 e 1000 dias (14 e 1000 se nunca foi usado).');
+    putDoc('settings', 'clean', { used, never, bin: CLEAN_DEF.bin }); audit(user, 'Alterou a limpeza de conteúdos', used + ' dias após a última campanha · ' + never + ' dias se nunca usado', ipOf(req));
+    return send(res, 200, cleanCfg());
   }
   if (p === '/api/backup-now' && m === 'POST') {
     const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
@@ -1036,4 +1112,4 @@ if (require.main === module) {
   });
 }
 const underReset = () => { underCache = { at: 0, list: [] }; };
-module.exports = { underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
+module.exports = { cleanSweep, underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };

@@ -3163,7 +3163,7 @@ const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
 
-const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:14, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:25, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null};
+const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:14, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:25, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib'};
 
 /* ---------- derived data ---------- */
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
@@ -3270,9 +3270,21 @@ function loginStep(step) {
   $('#login').innerHTML = '<div class="card login-card">' + LOGIN_BRAND + body + '</div>';
   const i = $('#login input:not([type=hidden])'); if (i)i.focus();
 }
-const fileById = id=>contents.find(f=>f.id === id);
+const bin = [];
+const fileById = id=>contents.find(f=>f.id === id) || bin.find(f=>f.id === id);
 const folderById = id=>folders.find(p=>p.id === id);
 const campsOfFile = f=>campaigns.filter(c=>c.items.some(i=>i.f === f.id));
+
+/* ---------- limpeza de conteúdos sem uso (as datas de caducidade vêm do servidor) ---------- */
+const CLEAN_WARN = 30;
+const leftDays = f=>f.exp ? dayDiff(parseISO(f.exp), today) : null;
+const expiring = ()=>contents.filter(f=>{const n = leftDays(f); return n !== null && n <= CLEAN_WARN;}).sort((a, b)=>leftDays(a) - leftDays(b));
+const binList = ()=>bin.slice();
+const daysTxt = n=>n <= 0 ? 'hoje' : (n === 1 ? 'amanhã' : 'daqui a ' + n + ' dias');
+function expLine(x, cG) {
+  const n = leftDays(x); if (n === null || n > CLEAN_WARN) return '';
+  return '<div class="pills"><span class="pill warn">Sem uso: apaga ' + daysTxt(n) + '</span>' + (cG ? '<button class="btn sm ghost" data-a="keep" data-id="' + x.id + '">Manter</button>' : '') + '</div>';
+}
 /* janela efetiva de um vídeo dentro da campanha (vazio = acompanha a campanha) */
 /* intervalos efetivos de um vídeo: os dele (ou o seu h0–h1) cortados pelos da campanha */
 function itemIvs(c, i) {
@@ -3643,6 +3655,8 @@ function suggestions() {
     });
     Object.keys(g).forEach(function(k) {push({id:'few-' + k + '-' + state.fewMin, kind:'few', ord:3, venue:g[k].venue, n:g[k].n, screens:g[k].screens});});
   }
+  const exp = expiring();
+  if (exp.length && can('conteudos.gerir'))push({id:'clean-' + exp.length + '-' + exp[0].id, kind:'clean', ord:3, list:exp});
   campaigns.filter(c=>statusOf(c) !== 'Terminada' && !G.some(x=>x.i.ids.indexOf(c.id) > -1))
     .map(c=>({c:c, b:bestShift(c, 2)})).filter(o=>o.b.gain >= 0.05).sort((p, q)=>q.b.gain - p.b.gain)
     .forEach(function(o) {push({id:'op-' + o.c.id + '-' + o.c.h0, kind:'optimize', ord:4, c:o.c, b:o.b});});
@@ -3786,6 +3800,11 @@ function sugHtml(g, cCamp, cSee, cRep) {
     ico = 'download'; cls = 'ok'; title = 'Relatório final de «' + esc(g.c.name) + '»';
     txt = 'A campanha terminou ' + (g.ago <= 0 ? 'hoje' : (g.ago === 1 ? 'ontem' : 'há ' + g.ago + ' dias')) + '. Gere o relatório para enviar a ' + esc(g.c.client) + '. Este aviso desaparece 24 horas depois de aparecer.';
     acts = (cRep ? '<button class="btn sm primary" data-a="final-report" data-id="' + g.c.id + '">Gerar relatório</button>' : '') + ig;
+  } else if (g.kind === 'clean') {
+    const n = g.list.length;
+    ico = 'folder'; cls = 'warn'; title = n === 1 ? 'Conteúdo sem uso vai ser apagado: «' + esc(g.list[0].name) + '»' : n + ' conteúdos sem uso vão ser apagados';
+    txt = g.list.slice(0, 3).map(f=>'«' + esc(f.name) + '» ' + daysTxt(leftDays(f))).join(' · ') + (n > 3 ? ' e mais ' + (n - 3) : '') + '. Primeiro vão para a reciclagem, onde ficam ' + state.clean.bin + ' dias e podem ser restaurados.';
+    acts = '<button class="btn sm primary" data-a="keep-all">' + (n === 1 ? 'Manter' : 'Manter todos') + '</button><button class="btn sm" data-a="clean-see">Ver conteúdos</button>' + (cCamp ? ig : '');
   } else if (g.kind === 'few') {
     ico = 'monitor'; cls = 'ia'; title = 'Poucas campanhas: ' + esc(g.venue);
     txt = (g.screens.length === 1 ? 'O ecrã «' + esc(g.screens[0].spot) + '» tem' : g.screens.length + ' ecrãs têm') + ' só ' + g.n + (g.n === 1 ? ' campanha ativa' : ' campanhas ativas') + ' (aviso abaixo de ' + state.fewMin + '). Há espaço para vender: passe ao comercial.';
@@ -4681,7 +4700,12 @@ const MANUAL = {
    ['Filtre e ordene', 'Use as pastas, os filtros Vídeos, Imagens e HTML5, e a ordenação por mais recentes ou maior tamanho.'],
    ['Use pastas', '«Nova pasta» cria uma pasta; em cada ficheiro escolha a pasta onde o quer.', 'conteudos.gerir'],
    ['Mude os ecrãs permitidos', '«Ecrãs permitidos» muda os ecrãs onde o ficheiro pode passar. Tem de ficar pelo menos um.', 'conteudos.gerir'],
-   ['Veja onde está a ser usado', 'As etiquetas por baixo do nome mostram as campanhas que usam o ficheiro. O «×» retira-o dessa campanha.']]}],
+   ['Veja onde está a ser usado', 'As etiquetas por baixo do nome mostram as campanhas que usam o ficheiro. O «×» retira-o dessa campanha.']]},
+  {h:'Limpeza automática', steps:[
+   ['Quando um conteúdo é apagado', 'Um conteúdo que não está em nenhuma campanha ativa, agendada ou em pausa (nem é spot da Enif) é apagado 180 dias depois de a última campanha acabar, ou 60 dias depois de carregado se nunca foi usado.'],
+   ['Aviso e «Manter»', '30 dias antes aparece um aviso no Painel e a etiqueta «Sem uso» no ficheiro. «Manter» dá mais 180 dias.', 'conteudos.gerir'],
+   ['Reciclagem', 'Apagado o prazo, o ficheiro vai para a «Reciclagem» durante 30 dias, onde «Restaurar» o devolve à biblioteca. Depois é apagado de vez; os relatórios das campanhas terminadas mantêm-se.', 'conteudos.gerir'],
+   ['Mudar os prazos', 'O administrador altera os dias na barra por cima da biblioteca.', 'admin']]}],
   tips:[['A associação de um conteúdo a uma campanha faz-se na própria campanha, onde define as datas.'], ['Prefira vídeo MP4 (H.264) e confira o espaço do servidor no topo da página.']]},
  relatorios:{t:'Relatórios', intro:'Aqui vê quanto as campanhas passaram e quantas pessoas viram, e exporta o relatório para o cliente.', blocks:[
   {h:'Consultar os números', steps:[
@@ -4740,7 +4764,25 @@ function houseCard() {
   if (miss.length) return '<div class="banner">' + ic('alert') + '<p><b>Spot da Enif:</b> cobre ' + (screens.length - miss.length) + ' de ' + screens.length + ' ecrãs. Sem versão para: ' + miss.map(s=>esc(s.id) + ' (' + esc(resTxt(s)) + ')').join(', ') + '.</p></div>';
   return '<p class="hint" style="margin:0 0 10px">Spot da Enif: ' + hs.length + (hs.length === 1 ? ' conteúdo' : ' conteúdos') + ' (máximo ' + HOUSE_MAX + ' por ecrã), cobre os ' + screens.length + ' ecrãs. Com 2 num ecrã, alternam. Entra 1 vez em cada volta do loop quando há vaga; com o ecrã cheio, passa a cada 5 minutos.</p>';
 }
+function cleanBar() {
+  const cG = can('conteudos.gerir'), v = state.cview;
+  const b = (k, t, n)=>'<button class="seg-b" data-a="cview" data-v="' + k + '" aria-pressed="' + (v === k) + '">' + t + ' <b>' + n + '</b></button>';
+  const cfg = cG && isAdm() ? '<div class="few-ctl"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="30" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="14" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado (e ' + state.clean.bin + ' dias na reciclagem).</span></div>' : '';
+  return '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Biblioteca">' + b('lib', 'Biblioteca', contents.length) + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div></div>' + cfg;
+}
+function binHtml() {
+  const cG = can('conteudos.gerir'), L = binList();
+  const tiles = L.map(function(x) {
+    const n = dayDiff(addDays(parseISO(x.del), state.clean.bin), today);
+    return '<article class="card tile"><div class="thumb" style="--tc:var(--c6)">' + ic(x.type === 'Vídeo' ? 'play' : (x.type === 'Imagem' ? 'image' : 'code')) + '<span class="tag">' + esc((x.name.split('.').pop() || '').toUpperCase()) + '</span></div><div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size + '</span><div class="pills"><span class="pill bad">Apagado definitivamente ' + daysTxt(n) + '</span></div>' + (cG ? '<button class="btn sm" data-a="restore" data-id="' + x.id + '">Restaurar</button>' : '') + '</div></article>';
+  }).join('');
+  return '<p class="hint">Aqui ficam, durante ' + state.clean.bin + ' dias, os conteúdos apagados por falta de uso. Passado esse prazo são apagados definitivamente (os relatórios das campanhas já terminadas mantêm-se).</p>' + (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">A reciclagem está vazia.</div></div>');
+}
 function viewContent() {
+  if (state.cview === 'bin') {head('Conteúdos', 'Reciclagem de conteúdos sem uso', ''); return cleanBar() + binHtml();}
+  return cleanBar() + viewContentBase();
+}
+function viewContentBase() {
   const cG = can('conteudos.gerir');
   head('Conteúdos', 'Biblioteca de imagens, vídeos e páginas HTML5', cG ? '<button class="btn primary" data-a="pick-files">' + ic('upload') + 'Carregar conteúdos</button>' : '');
   const f = state.cfilter, fo = state.folder;
@@ -4752,7 +4794,7 @@ function viewContent() {
   const cur = folderById(fo);
   const newBtn = cG ? '<button class="btn sm" data-a="new-folder">' + ic('plus') + 'Nova pasta</button>' : '';
   const folderBtns = cG && cur ? '<span class="c-fa"><button class="btn sm" data-a="rename-folder" data-id="' + cur.id + '">Renomear</button><button class="btn sm ghost" data-a="del-folder" data-id="' + cur.id + '">Eliminar pasta</button></span>' : '';
-  const shownC = contents.filter(x=>inF(x, fo) && (f === 'todos' || x.type === f));
+  const shownC = contents.filter(x=>inF(x, fo) && (f === 'todos' || x.type === f) && (state.cview !== 'exp' || (leftDays(x) !== null && leftDays(x) <= CLEAN_WARN)));
   if (state.csort === 'size')shownC.sort((a, b)=>sizeBytes(b.size) - sizeBytes(a.size));
   const tiles = shownC.map(function(x) {
     const cs = campsOfFile(x), c = cs[0];
@@ -4764,7 +4806,7 @@ function viewContent() {
     const sel = '';
     const fol = x.folder ? folderById(x.folder) : null;
     const fsel = cG ? '<select data-a-change="mvfolder" data-id="' + x.id + '" aria-label="Pasta"><option value="">Sem pasta</option>' + folders.map(p=>'<option value="' + p.id + '"' + (x.folder === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('') + '</select>' : (fol ? '<span class="muted" style="font-size:13px">Pasta: ' + esc(fol.name) + '</span>' : '');
-    return '<article class="card tile"><div class="thumb" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div><div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + scrLine + sel + fsel + '</div></article>';
+    return '<article class="card tile"><div class="thumb" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div><div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
   }).join('');
   return upBanner() + houseCard() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
     + '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Tipo de conteúdo">' + chips + '</div><div class="tools c-tools-r">' + newBtn + '<label class="field-inline" for="c-folder"><select id="c-folder" data-a-change="folderSel" aria-label="Pasta" style="width:auto">' + fopts + '</select></label>' + folderBtns + '</div></div>'
@@ -5713,6 +5755,7 @@ function applyState(st) {
   state.smtpReady = !!st.smtpReady; state.serverDisk = st.serverDisk || null;
   setArr(auditLog, (st.auditLog || [])); setArr(backups, (st.backups || [])); setArr(emailLog, (st.emailLog || []));
   setArr(folders, st.folders);
+  setArr(bin, st.bin || []); state.clean = st.clean || state.clean;
   setArr(users, st.users.map(function(u) {u.until = u.until ? parseISO(u.until) : null; return u;}));
   const me = st.me; me.until = me.until ? parseISO(me.until) : null;
   state.user = users.find(u=>u.id === me.id) || me;
@@ -5961,6 +6004,23 @@ const actions = {
   'help-go':function() {const b = document.querySelector('#head .head-actions .btn.primary'); closeModal(); if (b)setTimeout(function() {b.click();}, 60);},
   'cont-screens':function(t) {if (guard('conteudos.gerir'))contScreensModal(t.dataset.id);},
   cfilter:function(t) {state.cfilter = t.dataset.f; render();},
+  cview:function(t) {state.cview = t.dataset.v; render();},
+  'clean-see':function() {state.cview = 'exp'; state.view = 'conteudos'; render(); window.scrollTo(0, 0);},
+  keep:function(t) {
+    if (!guard('conteudos.gerir')) return;
+    const x = fileById(t.dataset.id); if (!x) return;
+    api('POST', '/api/contents/keep', {ids:[x.id]}).then(function() {toast('«' + x.name + '» fica na biblioteca por mais ' + state.clean.used + ' dias.'); return poll(true);}).catch(function(e) {toast(e.message);});
+  },
+  'keep-all':function() {
+    if (!guard('conteudos.gerir')) return;
+    const L = expiring();
+    api('POST', '/api/contents/keep', {ids:L.map(x=>x.id)}).then(function(r) {toast(r.n === 1 ? 'Conteúdo mantido.' : r.n + ' conteúdos mantidos.'); return poll(true);}).catch(function(e) {toast(e.message);});
+  },
+  restore:function(t) {
+    if (!guard('conteudos.gerir')) return;
+    const x = bin.find(k=>k.id === t.dataset.id); if (!x) return;
+    api('POST', '/api/contents/restore', {id:x.id}).then(function() {toast('«' + x.name + '» voltou à biblioteca.'); return poll(true);}).catch(function(e) {toast(e.message);});
+  },
   folder:function(t) {state.folder = t.dataset.f; render();},
   'new-folder':function() {if (guard('conteudos.gerir'))folderModal();},
   'rename-folder':function(t) {if (guard('conteudos.gerir'))folderModal(t.dataset.id);},
@@ -6131,6 +6191,11 @@ document.addEventListener('change', function(e) {
     const kw = t.value.trim();
     if (!kw) {toast('Escreva a palavra a procurar.'); render(); return;}
     api('POST', '/api/calendar/keyword', {kw:kw}).then(function(r) {state.cal = r; toast('A ler só eventos com «' + kw + '».'); render();}).catch(function(e) {toast(e.message); render();});
+  }
+  else if (ac === 'clean-cfg') {
+    if (!isAdm()) {toast('Só o administrador pode fazer isto.'); return;}
+    const o = {used:state.clean.used, never:state.clean.never}; o[t.dataset.k] = Math.round(+t.value);
+    api('POST', '/api/clean', o).then(function(r) {state.clean = r; toast('Guardado.'); return poll(true);}).catch(function(e) {toast(e.message); render();});
   }
   else if (ac === 'few-min') {
     if (!guard('ecras.gerir')) return;
