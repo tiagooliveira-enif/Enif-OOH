@@ -47,6 +47,7 @@ npm test                 # loop (e comparação com o protótipo: 22 mil verific
 python3 test/e2e/player.py   # player real num browser: passa conteúdo, arranca sem internet, spot a cada 5 min, comandos (precisa de playwright e ffmpeg)
 python3 test/e2e/comprovativo.py   # comprovativo: a lista só mostra o que serve ao ecrã, o player passa só o escolhido e volta ao normal, nada fica nos relatórios
 python3 test/e2e/avisos.py   # aviso «campanha abaixo do contratado» e «Ocupação por mês» (demora ~2 min: a conta fica guardada 1 minuto)
+python3 test/e2e/recuperacao.py   # ensaio de recuperar uma cópia de segurança numa pasta nova
 python3 test/e2e/limpeza.py   # limpeza de conteúdos sem uso: aviso no painel e «Manter», reciclagem e «Restaurar», prazos
 python3 test/e2e/app.py      # interface real num browser: entrar, páginas, carregar ficheiro, brilho, dois passos, recuperação, telemóvel
 ```
@@ -80,6 +81,14 @@ Para o vídeo semanal de prova: na ficha do ecrã, **Gravar comprovativo** (prec
 ## Aviso «campanha abaixo do contratado»
 
 Só aviso interno (painel «Precisa de atenção» e notificações do tipo «Campanha abaixo do contratado»); **nunca entra nos relatórios**. O servidor compara, hora a hora, as passagens que o loop prevê nas últimas 24 h com as que o player registou. Se uma campanha ativa ficou abaixo de 90 % (e eram previstas pelo menos 20), avisa com a causa principal (ecrã sem sinal, falhas de reprodução ou passagens a menos) e o ecrã mais afetado. «Marcar como resolvido» vale para esse dia. A conta fica guardada 1 minuto no servidor. Constantes `UNDER_PCT` e `UNDER_MIN` em `server.js`.
+
+## Recuperar uma cópia de segurança
+Ensaiado em `test/e2e/recuperacao.py` (cria dados, faz uma cópia, «perde» o servidor e restaura; tudo fica igual, incluindo as chaves dos players). Passos:
+1. Pare o servidor.
+2. Numa pasta de dados nova, copie a cópia que quer (`backups/enif-AAAAMMDD-HHMMSS-….db`) para `enif-data.db` e o conteúdo de `backups/media/` para `media/`.
+3. Arranque o servidor com `DATA_DIR` a apontar para essa pasta. Os players e as sessões continuam a funcionar com as mesmas chaves.
+- **Não vai dentro da cópia:** o `enif-config.json` (guarde-o à parte) e os PDF já enviados ao comercial (pasta `reports/`, que fica sempre no servidor).
+- A cópia da base de dados é de um dia (feita de madrugada): o que mudou desde então perde-se.
 
 ## Limpeza de conteúdos sem uso
 Um conteúdo que não está em nenhuma campanha ativa, agendada ou em pausa (e que não é spot da Enif) caduca **180 dias depois de a última campanha acabar**, ou **60 dias depois de carregado** se nunca foi usado. Os dois prazos são do administrador (barra por cima da biblioteca, `POST /api/clean`, guardados em `settings/clean`).
