@@ -82,6 +82,12 @@ Para o vídeo semanal de prova: na ficha do ecrã, **Gravar comprovativo** (prec
 
 Só aviso interno (painel «Precisa de atenção» e notificações do tipo «Campanha abaixo do contratado»); **nunca entra nos relatórios**. O servidor compara, hora a hora, as passagens que o loop prevê nas últimas 24 h com as que o player registou. Se uma campanha ativa ficou abaixo de 90 % (e eram previstas pelo menos 20), avisa com a causa principal (ecrã sem sinal, falhas de reprodução ou passagens a menos) e o ecrã mais afetado. «Marcar como resolvido» vale para esse dia. A conta fica guardada 1 minuto no servidor. Constantes `UNDER_PCT` e `UNDER_MIN` em `server.js`.
 
+## Avisos importantes por e-mail ao administrador
+Precisa do SMTP configurado (`smtp` no `enif-config.json`). A cada minuto o servidor (`alertMailTick`) vê os avisos em aberto e envia por e-mail só os que não podem esperar: **ecrã sem ligação há 15 minutos ou mais**, **campanha com 10 % ou menos das passagens previstas** (se a causa for o ecrã sem sinal, já há o aviso do ecrã), **disco quase cheio** (ecrã ou servidor) e **cópia de segurança automática falhada**.
+- Um e-mail por problema e outro quando se resolve (se foi marcado como resolvido na app, não há segundo e-mail); no máximo 30 por dia. Fica registado na auditoria e na tabela `alert_mail`.
+- Só vai para administradores. Cada um escolhe em Notificações > Preferências (coluna E-mail de «Ecrã sem ligação ou com falhas» e de «Campanha abaixo do contratado»); vem ligado por defeito e usa o e-mail indicado em «Onde quer receber».
+- Os outros avisos e as mensagens (SMS) continuam sem envio.
+
 ## Recuperar uma cópia de segurança
 Ensaiado em `test/e2e/recuperacao.py` (cria dados, faz uma cópia, «perde» o servidor e restaura; tudo fica igual, incluindo as chaves dos players). Passos:
 1. Pare o servidor.

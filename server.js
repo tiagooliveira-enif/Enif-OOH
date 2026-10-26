@@ -36,6 +36,7 @@ CREATE TRIGGER IF NOT EXISTS audit_no_update BEFORE UPDATE ON audit BEGIN SELECT
 CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT RAISE(ABORT, 'O registo de auditoria só se acrescenta'); END;
 CREATE TABLE IF NOT EXISTS cmds(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS proofs(screen TEXT PRIMARY KEY, files TEXT NOT NULL, t0 INTEGER NOT NULL, secs INTEGER NOT NULL, who TEXT);
+CREATE TABLE IF NOT EXISTS alert_mail(id TEXT PRIMARY KEY, ts INTEGER NOT NULL, title TEXT, screen TEXT, closed INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS proof_log(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, t0 INTEGER NOT NULL, files TEXT NOT NULL, secs INTEGER NOT NULL, who TEXT);
 `);
 for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
@@ -535,6 +536,51 @@ function cleanSweep(today) {
   });
   return { moved, erased };
 }
+/* ---------- avisos importantes por e-mail ao administrador ----------
+   Só o que não pode esperar: ecrã sem ligação há 15 min ou mais, campanha com quase nenhuma passagem, disco quase cheio
+   (ecrã ou servidor) e cópia de segurança falhada. Um e-mail por problema e outro quando se resolve; no máximo 30 por dia.
+   Só vai para administradores; cada um escolhe nas suas notificações (coluna E-mail de «Ecrã sem ligação ou com falhas» e de
+   «Campanha abaixo do contratado»; ligado por defeito). */
+const mailKind = a => /^under-/.test(a.id) ? 'under' : 'alert';
+const wantsMail = (u, kind) => { const t = u.notif && u.notif.types && u.notif.types[kind]; return !t || t.email !== false; };
+const mailTo = u => String((u.notif && u.notif.email) || u.email || '').trim();
+const MAIL_OFF_MIN = 15, MAIL_DAILY_MAX = 30;
+function importantAlerts() {
+  const ln = S.lisbonNow(TZ), out = [];
+  screenViews(false).alerts.forEach(a => {
+    if (/^off-/.test(a.id)) { const m = /(\d+) min/.exec(a.detail || ''); if (m && +m[1] >= MAIL_OFF_MIN) out.push(a); }
+    else if (/^disk-/.test(a.id)) out.push(a);
+    else if (/^under-/.test(a.id)) { const m = /Passou (\d+) %/.exec(a.detail || ''); if (m && +m[1] <= 10 && !/sem sinal/.test(a.detail || '')) out.push(a); }   // se a causa é o ecrã sem sinal, já há o aviso do ecrã
+  });
+  try { const d = fs.statfsSync(DATA); if (Number(d.bavail) / Number(d.blocks) < 0.1 && !q1('SELECT 1 FROM resolved WHERE id=?', 'srvdisk-' + ln.date)) out.push({ id: 'srvdisk-' + ln.date, title: 'Disco do servidor quase cheio', detail: 'Só restam ' + Math.round(Number(d.bavail) * Number(d.bsize) / 1073741824) + ' GB livres no servidor. Apague conteúdos que já não usa ou aumente o disco.' }); } catch (e) { /* sem informação */ }
+  const bf = getDoc('settings', 'backupfail');
+  if (bf && bf.day === ln.date) out.push({ id: 'backup-' + ln.date, title: 'Cópia de segurança falhou', detail: String(bf.msg || 'A cópia automática desta madrugada não foi feita.') });
+  return out;
+}
+async function alertMailTick(send) {
+  const cfg = smtpCfg(); if (!cfg && !send) return { sent: 0 };
+  const admins = docs('users').filter(u => u.admin && u.active !== false && /@/.test(mailTo(u)));
+  if (!admins.length) return { sent: 0 };
+  const go = send || ((addr, subject, text) => MAIL.send(cfg, { to: addr, subject, text }));
+  const now = Date.now(), cur = importantAlerts(), curIds = new Set(cur.map(a => a.id)); let sent = 0;
+  const mail = async (kind, subject, text) => { const to = admins.filter(u => wantsMail(u, kind)).map(mailTo); for (const addr of to) { try { await go(addr, subject, text); } catch (e) { console.error('E-mail de alerta falhou:', e.message); return false; } } return true; };   // sem destinatários também conta como tratado
+  for (const a of cur) {
+    if (q1('SELECT 1 FROM alert_mail WHERE id=?', a.id)) continue;
+    if (q1('SELECT COUNT(*) n FROM alert_mail WHERE ts>?', now - 864e5).n >= MAIL_DAILY_MAX) break;
+    const where = a.screen ? ' (ecrã ' + a.screen + ')' : '';
+    if (await mail(mailKind(a), '[Enif DOOH] ' + a.title + (a.screen ? ': ' + a.screen : ''), a.title + where + '\n\n' + a.detail + '\n\nAbra a plataforma para ver e resolver.\n\nEnif DOOH')) {
+      run('INSERT INTO alert_mail(id,ts,title,screen) VALUES(?,?,?,?)', a.id, now, a.title, a.screen || null); sent++; audit('sistema', 'E-mail de alerta enviado', a.title + (a.screen ? ' · ' + a.screen : ''));
+    }
+  }
+  for (const r of q('SELECT * FROM alert_mail WHERE closed=0')) {
+    if (curIds.has(r.id)) continue;
+    const manual = !!q1('SELECT 1 FROM resolved WHERE id=?', r.id);
+    if (!manual && !/^backup-/.test(r.id) && !(await mail(/^under-/.test(r.id) ? 'under' : 'alert', '[Enif DOOH] Resolvido: ' + r.title + (r.screen ? ': ' + r.screen : ''), 'Este problema deixou de existir: ' + r.title + (r.screen ? ' (ecrã ' + r.screen + ')' : '') + '.\n\nEnif DOOH'))) continue;
+    run('UPDATE alert_mail SET closed=1 WHERE id=?', r.id);
+  }
+  run('DELETE FROM alert_mail WHERE closed=1 AND ts<?', now - 90 * 864e5);
+  return { sent };
+}
 function contentsView() {
   const cfg = cleanCfg(), camps = docs('campaigns'), today = S.lisbonNow(TZ).date;
   return docs('contents', true).map(f => { const e = contentExpiry(f, camps, today, cfg); return e ? Object.assign({}, f, { exp: e }) : f; });
@@ -873,10 +919,11 @@ async function tick(force) {
   try {
     const ln = S.lisbonNow(TZ), today = ln.date;
     if ((ln.h > 3 || (ln.h === 3 && ln.m >= 30)) && !backupList(100).some(b => b.auto && S.lisbonNow(TZ, new Date(b.t)).date === today)) {
-      try { const b = backupNow(true); audit('sistema', 'Cópia de segurança automática', b.mb + ' MB'); } catch (e) { console.error('Cópia de segurança falhou:', e.message); audit('sistema', 'Cópia de segurança automática falhou', e.message); }
+      try { const b = backupNow(true); delDoc('settings', 'backupfail'); audit('sistema', 'Cópia de segurança automática', b.mb + ' MB'); } catch (e) { console.error('Cópia de segurança falhou:', e.message); putDoc('settings', 'backupfail', { day: today, msg: 'A cópia automática desta madrugada falhou: ' + String(e.message).slice(0, 200) }); audit('sistema', 'Cópia de segurança automática falhou', e.message); }
     }
     const cr = getDoc('settings', 'cleanrun');
     if (!cr || cr.day !== today) { cleanSweep(today); putDoc('settings', 'cleanrun', { day: today }); }
+    await alertMailTick();
     await calRefresh(false);
     q('SELECT screen FROM proofs WHERE t0+secs*1000<=?', Date.now()).forEach(x => proofEnd(x.screen, null, false));
     if (!smtpReady()) return;
@@ -1112,4 +1159,4 @@ if (require.main === module) {
   });
 }
 const underReset = () => { underCache = { at: 0, list: [] }; };
-module.exports = { cleanSweep, underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
+module.exports = { alertMailTick, cleanSweep, underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };

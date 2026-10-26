@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'enif-'));
 process.env.DATA_DIR = tmp; process.env.ADMIN_NAME = 'Tiago'; process.env.ADMIN_EMAIL = 'Tiago@Enif.pt'; process.env.ADMIN_PASS = 'segredo1'; process.env.PORT = '0';
-const { server, db, underReset, cleanSweep } = require('../server');
+const { server, db, underReset, cleanSweep, alertMailTick } = require('../server');
 const S = require('../lib/schedule');
 
 let passed = 0;
@@ -291,6 +291,36 @@ async function main() {
     ok('marcar como resolvido tira o aviso', r.s === 200 && (await alertsOf()).length === 0);
     await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CU1' }]);
     db.prepare("DELETE FROM resolved WHERE id LIKE 'under-%'").run();
+  }
+
+  // ---- e-mail de alertas importantes ao administrador
+  {
+    const sent = [], fake = async (to, subject, text) => { sent.push({ to, subject, text }); };
+    const mine = () => sent.filter(m => /ECR-001/.test(m.subject));
+    db.prepare('UPDATE live SET first_seen=?, last_seen=? WHERE screen=?').run(Date.now() - 3 * 3600000, Date.now() - 20 * 60000, 'ECR-001');
+    db.prepare("DELETE FROM alert_mail").run(); db.prepare("DELETE FROM resolved WHERE id LIKE 'off-%'").run();
+    await alertMailTick(fake);
+    ok('ecrã sem ligação há mais de 15 min: um e-mail ao administrador', mine().length === 1 && /sem ligação/.test(mine()[0].subject) && mine()[0].to === 'tiago@enif.pt');
+    await alertMailTick(fake);
+    ok('o mesmo problema não repete o e-mail', mine().length === 1);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now(), 'ECR-001');
+    await alertMailTick(fake);
+    ok('quando o ecrã volta, chega um aviso de resolvido', mine().length === 2 && /Resolvido/.test(mine()[1].subject));
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 5 * 60000, 'ECR-001');
+    await alertMailTick(fake);
+    ok('menos de 15 min offline não avisa', mine().length === 2);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 30 * 60000, 'ECR-001');
+    const st0 = (await call('GET', '/api/state', undefined, adm)).j, al0 = st0.alerts.find(a => a.screen === 'ECR-001' && /^off-/.test(a.id));
+    await sync(adm, [{ op: 'del', coll: 'alerts', id: al0.id }]);
+    await alertMailTick(fake);
+    ok('alerta já resolvido na app não gera e-mail', mine().length === 2);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 50 * 60000, 'ECR-001');
+    await sync(adm, [op('users', st0.me.id, Object.assign({}, st0.me, { notif: { types: { alert: { app: true, email: false, sms: false } } } }), ['notif'])]);
+    await alertMailTick(fake);
+    ok('o administrador pode desligar o e-mail nas notificações', mine().length === 2);
+    await sync(adm, [op('users', st0.me.id, Object.assign({}, st0.me, { notif: { types: { alert: { app: true, email: true, sms: false } } } }), ['notif'])]);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now(), 'ECR-001');
+    await alertMailTick(fake);
   }
 
   // ---- limpeza de conteúdos sem uso

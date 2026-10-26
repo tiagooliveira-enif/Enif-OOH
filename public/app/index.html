@@ -3652,10 +3652,10 @@ const NCH = [['app', 'Computador', 'monitor'], ['email', 'E-mail', 'mail'], ['sm
 const NSEC = 1000 * 60;
 function np(u) {
   if (!u.notif) {
-    const t = {}; NT.forEach(n=>{t[n[0]] = {app:n[3], email:false, sms:false};});
+    const t = {}; NT.forEach(n=>{t[n[0]] = {app:n[3], email:n[0] === 'alert' || n[0] === 'under', sms:false};});
     u.notif = {types:t, email:u.email, phone:'', inbox:[], sent:[], seen:{}};
   }
-  NT.forEach(n=>{if (!u.notif.types[n[0]])u.notif.types[n[0]] = {app:n[3], email:false, sms:false};});   // tipos novos para quem já tinha preferências guardadas
+  NT.forEach(n=>{if (!u.notif.types[n[0]])u.notif.types[n[0]] = {app:n[3], email:n[0] === 'alert' || n[0] === 'under', sms:false};});   // tipos novos para quem já tinha preferências guardadas
   return u.notif;
 }
 const permState = function() {try {return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;} catch (e) {return 'unsupported';}};
@@ -3745,9 +3745,9 @@ function notifModal(tab) {
       + '<p class="nsec">Onde quer receber</p><div class="grid2"><div class="field"><label for="n-email">E-mail</label><input id="n-email" type="email" value="' + esc(n.email || '') + '" data-a-change="notif-contact" data-k="email" placeholder="nome@empresa.pt"></div><div class="field"><label for="n-phone">Telemóvel (mensagem)</label><input id="n-phone" type="tel" value="' + esc(n.phone || '') + '" data-a-change="notif-contact" data-k="phone" placeholder="9XX XXX XXX"></div></div>'
       + '<p class="nsec">O que quer receber</p><table class="nt"><thead><tr><th></th>' + NCH.map(c=>'<th>' + c[1] + '</th>').join('') + '</tr></thead><tbody>'
       + NT.filter(x=>can(x[2])).map(x=>'<tr><td>' + x[1] + '</td>' + NCH.map(c=>'<td><input type="checkbox" aria-label="' + esc(x[1]) + ' · ' + c[1] + '" data-a-change="notif-pref" data-t="' + x[0] + '" data-c="' + c[0] + '"' + (n.types[x[0]][c[0]] ? ' checked' : '') + '></td>').join('') + '</tr>').join('')
-      + '</tbody></table><p class="hint" style="margin-top:12px">As alterações guardam-se sozinhas. Os avisos de datas aparecem 2 dias antes (campanhas e vídeos) e 48 h antes (início sem conteúdos).</p>';
+      + '</tbody></table><p class="hint" style="margin-top:12px">As alterações guardam-se sozinhas. Os avisos de datas aparecem 2 dias antes (campanhas e vídeos) e 48 h antes (início sem conteúdos). O administrador recebe por e-mail só os avisos importantes: ecrã sem ligação há 15 minutos ou mais, campanha quase sem passagens, disco quase cheio e cópia de segurança falhada. Para isso fica marcada a coluna E-mail de «Ecrã sem ligação ou com falhas» e de «Campanha abaixo do contratado».</p>';
   } else {
-    body = '<p class="hint" style="margin-bottom:8px">O envio real de e-mail e mensagens ainda não está ligado: por agora ficam aqui registados os avisos que seriam enviados. Os avisos no computador funcionam com a plataforma aberta.</p>'
+    body = '<p class="hint" style="margin-bottom:8px">Só os avisos importantes ao administrador (ecrã sem ligação, campanha abaixo do contratado, disco, cópia de segurança) são enviados por e-mail, pelo servidor, mesmo com a plataforma fechada. O resto do e-mail e as mensagens ainda não estão ligados: por agora ficam aqui registados os avisos que seriam enviados. Os avisos no computador funcionam com a plataforma aberta.</p>'
       + (n.sent.length ? n.sent.map(e=>'<div class="ni"><span class="ico ia">' + ic(e.ch === 'email' ? 'mail' : 'chat') + '</span><div class="grow"><div class="title">' + esc(e.title) + '</div><div class="muted">' + (e.ch === 'email' ? 'E-mail para ' : 'Mensagem para ') + esc(e.to) + ' · ' + fmtWhen(e.t) + '</div></div></div>').join('') : '<div class="empty">Ainda não foi enviado nada.</div>');
   }
   modal('<div class="modal-h"><h2>Notificações</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">' + tabs + body + '</div>'
@@ -4601,6 +4601,7 @@ const MANUAL = {
    ['Veja os números do topo', 'Ecrãs online, campanhas ativas, alertas abertos e visualizações estimadas de hoje. Se algum número estiver a vermelho, comece por aí.'],
    ['Trate do que precisa de atenção', 'Em «Precisa de atenção» aparecem os alertas: ecrãs sem sinal, disco quase cheio, conflitos na playlist. Carregue em «Ver ecrã» para abrir o ecrã em causa.', 'ecras.ver'],
    ['Perceba o aviso «abaixo do contratado»', 'Quando uma campanha passa menos de 90 % das passagens previstas nas últimas 24 h, aparece um alerta com a causa principal (por exemplo, um ecrã sem sinal). Carregue em «Ver campanha» ou «Ver ecrã». Este aviso é só interno: não aparece nos relatórios.', 'campanhas.ver'],
+   ['Receba os avisos importantes por e-mail', 'O administrador recebe um e-mail quando um ecrã fica sem ligação há 15 minutos ou mais, uma campanha fica quase sem passagens, o disco está quase cheio ou a cópia de segurança falha, e outro quando o problema se resolve. Escolha em «Notificações > Preferências» (coluna E-mail).', 'admin'],
    ['Dê o alerta como resolvido', 'Depois de tratar do problema, carregue em «Marcar como resolvido» para o alerta sair da lista.', 'alertas.resolver'],
    ['Confira o que está no ar', 'Em «A reproduzir agora» vê as campanhas que estão a passar neste momento e em quantos ecrãs.'],
    ['Veja o Calendário', 'O cartão «Calendário» lê só os eventos com a palavra definida (por exemplo «SPOTS DIGITAIS»). Quando faltam 48 horas exatas para um evento aparece «Verificar Evento». Carregue em + para ver os detalhes e em «Lida» para o aviso desaparecer.'],
