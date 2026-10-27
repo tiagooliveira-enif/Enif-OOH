@@ -5,7 +5,7 @@
   "description": "Enif OOH – servidor e player (sem dependências externas, requer Node 22.13+)",
   "scripts": {
     "start": "node --disable-warning=ExperimentalWarning server.js",
-    "test": "node --disable-warning=ExperimentalWarning test/schedule.test.js && node --disable-warning=ExperimentalWarning test/parity.test.js && node --disable-warning=ExperimentalWarning test/api.test.js && node --disable-warning=ExperimentalWarning test/security.test.js && node --disable-warning=ExperimentalWarning test/scale.test.js"
+    "test": "node --disable-warning=ExperimentalWarning test/html.test.js && node --disable-warning=ExperimentalWarning test/schedule.test.js && node --disable-warning=ExperimentalWarning test/parity.test.js && node --disable-warning=ExperimentalWarning test/api.test.js && node --disable-warning=ExperimentalWarning test/security.test.js && node --disable-warning=ExperimentalWarning test/scale.test.js"
   },
   "engines": {
     "node": ">=22.13"
