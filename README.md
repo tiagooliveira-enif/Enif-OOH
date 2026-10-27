@@ -88,6 +88,11 @@ Precisa do SMTP configurado (`smtp` no `enif-config.json`). A cada minuto o serv
 - Só vai para administradores. Cada um escolhe em Notificações > Preferências (coluna E-mail de «Ecrã sem ligação ou com falhas» e de «Campanha abaixo do contratado»); vem ligado por defeito e usa o e-mail indicado em «Onde quer receber».
 - Os outros avisos e as mensagens (SMS) continuam sem envio.
 
+## Instalar num servidor (Ubuntu 24.04)
+
+Num servidor limpo, como root: `curl -fsSL https://raw.githubusercontent.com/tiagooliveira-enif/enif-ooh/versao-real-v62/scripts/instalar-servidor.sh -o instalar.sh && bash instalar.sh o.seu.dominio.pt`.
+Instala Node 22, a aplicação (`/opt/enif-ooh`), os dados (`/var/lib/enif`), a configuração (`/etc/enif/enif-config.json`, só no servidor), arranque automático (systemd), HTTPS automático (Caddy) e firewall. Para atualizar sem mexer em conteúdos nem programação: `enif-atualizar` (guarda antes uma cópia da base de dados).
+
 ## Recuperar uma cópia de segurança
 Ensaiado em `test/e2e/recuperacao.py` (cria dados, faz uma cópia, «perde» o servidor e restaura; tudo fica igual, incluindo as chaves dos players). Passos:
 1. Pare o servidor.
