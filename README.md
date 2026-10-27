@@ -48,6 +48,7 @@ python3 test/e2e/player.py   # player real num browser: passa conteúdo, arranca
 python3 test/e2e/comprovativo.py   # comprovativo: a lista só mostra o que serve ao ecrã, o player passa só o escolhido e volta ao normal, nada fica nos relatórios
 python3 test/e2e/avisos.py   # aviso «campanha abaixo do contratado» e «Ocupação por mês» (demora ~2 min: a conta fica guardada 1 minuto)
 python3 test/e2e/recuperacao.py   # ensaio de recuperar uma cópia de segurança numa pasta nova
+python3 test/e2e/inatividade.py   # a sessão termina por inatividade (aqui 30 s em vez de 15 min)
 python3 test/e2e/limpeza.py   # limpeza de conteúdos sem uso: aviso no painel e «Manter», reciclagem e «Restaurar», prazos
 python3 test/e2e/app.py      # interface real num browser: entrar, páginas, carregar ficheiro, brilho, dois passos, recuperação, telemóvel
 ```
@@ -131,3 +132,7 @@ Uma campanha com «E-mail do comercial» recebe um **aviso 7 dias antes do fim**
 - Controlo do brilho no hardware (depende da marca do controlador de LED).
 - Conversão automática de vídeos para os formatos dos ecrãs.
 - Teste de segurança independente e revisão de RGPD antes de abrir ao exterior.
+
+## Sessão que termina por inatividade
+
+A sessão de cada utilizador termina se ninguém usar a página durante 15 minutos (um aviso aparece 1 minuto antes). Só contam ações de quem está a usar (clicar, escrever, rodar a roda do rato, tocar); a atualização automática da página não conta, e carregar ficheiros também não deixa a sessão expirar. Para mudar o tempo no servidor, acrescentar `IDLE_MIN=20` (minutos) às variáveis do serviço `enif`.

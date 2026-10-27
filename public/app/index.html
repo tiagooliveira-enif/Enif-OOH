@@ -3159,7 +3159,7 @@ const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
 
-const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:14, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:25, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib'};
+const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:14, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:25, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
 
 /* ---------- derived data ---------- */
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
@@ -4701,7 +4701,7 @@ const MANUAL = {
   {h:'A sua conta e a segurança', steps:[
    ['Proteja a sua conta', 'Em «A minha conta de administrador» pode mudar a palavra-passe, o e-mail de recuperação e ligar a verificação em dois passos.'],
    ['Consulte as cópias de segurança e o registo', 'Veja as últimas cópias de segurança e o registo de auditoria (quem fez o quê e quando).']]}],
-  tips:[['Só o administrador cria e altera contas. Cada pessoa só entra com os dados que lhe forem dados.']]}
+  tips:[['Só o administrador cria e altera contas. Cada pessoa só entra com os dados que lhe forem dados.'], ['Por segurança, a sessão termina sozinha se ninguém usar a página durante 15 minutos. Basta voltar a entrar.']]}
 };
 const kb = t=>String(t).replace(/«([^»]+)»/g, '<span class="kbtn">$1</span>');
 function helpBlocks() {
@@ -5590,6 +5590,7 @@ function ApiError(m, st) {this.message = m; this.status = st;}
 ApiError.prototype = Object.create(Error.prototype);
 async function api(method, path, body, raw) {
   const h = {}; if (TOKEN)h.Authorization = 'Bearer ' + TOKEN;
+  if (TOKEN && Date.now() - lastAct < 60000)h['X-Activity'] = '1';   // só prolonga a sessão quem está a usar a página
   let b;
   if (body !== undefined && !raw) {h['Content-Type'] = 'application/json'; b = JSON.stringify(body);} else b = body;
   let r;
@@ -5701,6 +5702,7 @@ const hasPending = ()=>saving || (state.user && diffOps().ops.length > 0);
 
 function applyState(st) {
   tick();
+  state.idleMin = st.idleMin || 0;
   const tk = encodeURIComponent(TOKEN || '');
   setArr(screens, st.screens.map(function(s) {s.order = s.order || []; s.draft = s.draft || null; s.loc = s.loc || {addr:'', lat:null, lng:null, env:'', pop:null}; return s;}));
   setArr(campaigns, st.campaigns.map(function(c) {
@@ -5770,6 +5772,27 @@ function copyText(t) {
   ta.remove();
 }
 
+/* ---------- a sessão termina por inatividade ---------- */
+const IDLE_DEF = 15;
+let lastAct = Date.now(), idleWarned = false, idleBusy = false;
+const idleMin = function() {return +state.idleMin || IDLE_DEF;};
+function markActive() {lastAct = Date.now(); idleWarned = false;}
+['pointerdown', 'keydown', 'wheel', 'touchstart'].forEach(function(ev) {document.addEventListener(ev, markActive, {capture:true, passive:true});});
+function idleCheck() {
+  if (!state.user || idleBusy) return;
+  if (state.up) {lastAct = Date.now(); return;}      // a carregar ficheiros conta como atividade
+  const left = idleMin() * 60000 - (Date.now() - lastAct);
+  if (left <= 0) {idleBusy = true; idleOut();}
+  else if (left <= 60000 && !idleWarned) {idleWarned = true; toast('A sessão termina dentro de 1 minuto por inatividade. Carregue numa tecla ou toque no ecrã para continuar.');}
+}
+setInterval(idleCheck, 5000);
+
+function idleOut() {
+  flushSave().then(function() {
+    api('POST', '/api/logout', {}).catch(function() {});
+    sessionLost('A sessão terminou por inatividade (' + idleMin() + ' minutos). Entre outra vez.'); idleBusy = false; lastAct = Date.now();
+  });
+}
 /* ---------- actions ---------- */
 function guard(p) {if (can(p)) return true; toast('Não tem permissão para esta ação.'); return false;}
 const actions = {

@@ -13,7 +13,7 @@ const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
 const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
-const SESSION_MS = 30 * 864e5;
+const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
 const PLAYER_VERSION = '4';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
@@ -43,6 +43,7 @@ for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER']) { 
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const q1 = (sql, ...a) => db.prepare(sql).get(...a);
 const run = (sql, ...a) => db.prepare(sql).run(...a);
+run('UPDATE sessions SET exp=? WHERE exp>?', Date.now() + IDLE_MS, Date.now() + IDLE_MS);   // sessões criadas antes desta regra
 const uid = (n = 8) => crypto.randomBytes(n).toString('hex');
 /* registo de auditoria: só se acrescenta (a base de dados recusa alterar ou apagar) */
 function audit(who, what, detail, ip) {
@@ -102,6 +103,8 @@ function authUser(req, u) {
   if (!s || s.exp < Date.now()) { if (s) run('DELETE FROM sessions WHERE token=?', tok); return null; }
   const user = getDoc('users', s.user);
   if (!user || accessError(user)) return null;
+  // só prolonga a sessão quem está mesmo a usar a página (a página envia X-Activity); os pedidos automáticos não contam
+  if (req.headers['x-activity'] === '1' && s.exp - Date.now() < IDLE_MS - 5000) run('UPDATE sessions SET exp=? WHERE token=?', Date.now() + IDLE_MS, tok);
   return user;
 }
 function needUser(req, u) { const user = authUser(req, u); if (!user) throw new HttpError(401, 'Sessão expirada. Entre outra vez.'); return user; }
@@ -109,7 +112,7 @@ function need(user, perm) { if (!A.can(user, perm)) throw new HttpError(403, 'N�
 const loginLimit = A.limiter(8, 10 * 60 * 1000);
 function newSession(userId) {
   const token = crypto.randomBytes(32).toString('hex');
-  run('INSERT INTO sessions(token,user,exp) VALUES(?,?,?)', token, userId, Date.now() + SESSION_MS);
+  run('INSERT INTO sessions(token,user,exp) VALUES(?,?,?)', token, userId, Date.now() + IDLE_MS);
   run('DELETE FROM sessions WHERE exp<?', Date.now());
   return token;
 }
@@ -588,7 +591,7 @@ function contentsView() {
 function buildState(user) {
   const sv = screenViews(A.can(user, 'ecras.gerir'));
   const st = {
-    me: publicUser(user), now: S.lisbonNow(TZ), serverTime: Date.now(), tz: TZ,
+    idleMin: IDLE_MS / 60000, me: publicUser(user), now: S.lisbonNow(TZ), serverTime: Date.now(), tz: TZ,
     screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: contentsView(), bin: docs('bin').filter(f => !f.gone), clean: cleanCfg(), folders: docs('folders'),
     users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady()
   };

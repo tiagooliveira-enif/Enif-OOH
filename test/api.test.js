@@ -25,7 +25,23 @@ async function main() {
   ok('criar conta pela internet recusado', (await call('POST', '/api/setup', { name: 'B', email: 'b@x.pt', pass: 'segredo1' })).s === 404);
   let r = await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'segredo1' });
   ok('o administrador inicial entra', r.s === 200 && r.j.token);
-  const adm = r.j.token;
+  let adm = r.j.token;
+  // ---- a sessão termina por inatividade (15 minutos); só quem usa a página a prolonga
+  {
+    const exp = t => db.prepare('SELECT exp FROM sessions WHERE token=?').get(t).exp;
+    const idle = (await call('GET', '/api/state', undefined, adm)).j.idleMin;
+    ok('o servidor indica o limite de inatividade (15 min)', idle === 15);
+    ok('a sessão nova dura 15 minutos', Math.abs(exp(adm) - (Date.now() + 15 * 60000)) < 5000);
+    db.prepare('UPDATE sessions SET exp=? WHERE token=?').run(Date.now() + 60000, adm);
+    await call('GET', '/api/state', undefined, adm);
+    ok('pedidos automáticos não prolongam a sessão', exp(adm) < Date.now() + 61000);
+    await call('GET', '/api/state', undefined, adm, { 'X-Activity': '1' });
+    ok('pedidos de quem está a usar a página prolongam-na', Math.abs(exp(adm) - (Date.now() + 15 * 60000)) < 5000);
+    db.prepare('UPDATE sessions SET exp=? WHERE token=?').run(Date.now() - 1, adm);
+    ok('sessão inativa mais de 15 minutos é recusada', (await call('GET', '/api/state', undefined, adm)).s === 401);
+    r = await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'segredo1' });
+    adm = r.j.token;
+  }
   ok('login errado', (await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'x' })).s === 401);
   r = await call('POST', '/api/login', { email: 'TIAGO@enif.pt', pass: 'segredo1' });
   ok('login certo (e-mail sem maiúsculas)', r.s === 200);
