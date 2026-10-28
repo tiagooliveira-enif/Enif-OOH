@@ -136,3 +136,7 @@ Uma campanha com «E-mail do comercial» recebe um **aviso 7 dias antes do fim**
 ## Sessão que termina por inatividade
 
 A sessão de cada utilizador termina se ninguém usar a página durante 15 minutos (um aviso aparece 1 minuto antes). Só contam ações de quem está a usar (clicar, escrever, rodar a roda do rato, tocar); a atualização automática da página não conta, e carregar ficheiros também não deixa a sessão expirar. Para mudar o tempo no servidor, acrescentar `IDLE_MIN=20` (minutos) às variáveis do serviço `enif`.
+
+## Resumo semanal por e-mail
+
+Às segundas-feiras às 8h (hora de Lisboa) os administradores recebem um resumo da semana: ecrãs (online, com atenção, offline), alertas abertos, campanhas (ativas, agendadas, a começar e a terminar nos próximos 7 dias), conteúdos a caducar, espaço livre no servidor, última cópia de segurança local e externa, e os eventos de spots do calendário. Cada administrador pode desligá-lo em «Notificações > Preferências» (linha «Resumo semanal da plataforma», coluna E-mail). O envio é feito pelo servidor, mesmo com a plataforma fechada, e só uma vez por segunda-feira.

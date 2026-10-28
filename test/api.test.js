@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'enif-'));
 process.env.DATA_DIR = tmp; process.env.ADMIN_NAME = 'Tiago'; process.env.ADMIN_EMAIL = 'Tiago@Enif.pt'; process.env.ADMIN_PASS = 'segredo1'; process.env.PORT = '0';
-const { server, db, underReset, cleanSweep, alertMailTick } = require('../server');
+const { server, db, underReset, cleanSweep, alertMailTick, weeklyMailTick, weeklyText } = require('../server');
 const S = require('../lib/schedule');
 
 let passed = 0;
@@ -384,6 +384,24 @@ async function main() {
     ok('o administrador muda os prazos', r.s === 200 && r.j.used === 90);
     await call('POST', '/api/clean', { used: 180, never: 60 }, adm);
     await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CL1' }, { op: 'del', coll: 'campaigns', id: 'CL2' }]);
+  }
+
+  // ---- resumo semanal por e-mail ao administrador
+  {
+    const got = [], fake = (a, sub, t) => { got.push({ a, sub, t }); };
+    const w = await weeklyMailTick(fake, true);
+    ok('o resumo semanal chega ao administrador', w.sent >= 1 && got[0].a === 'tiago@enif.pt' && /Resumo da semana/.test(got[0].sub));
+    ok('o resumo traz ecrãs, campanhas, disco e cópias', ['ECRÃS:', 'ALERTAS ABERTOS:', 'CAMPANHAS:', 'CONTEÚDOS', 'CÓPIAS DE SEGURANÇA:'].every(k => got[0].t.includes(k)));
+    ok('o resumo não leva palavras-passe nem chaves', !/segredo1|playerKey|palavraPasse/i.test(weeklyText()));
+    got.length = 0;
+    const again = await weeklyMailTick(fake);
+    ok('fora de segunda-feira às 8h não envia', again.sent === 0 && !got.length);
+    const me = JSON.parse(db.prepare("SELECT json FROM docs WHERE coll='users' AND json_extract(json,'$.email')='tiago@enif.pt'").get().json);
+    me.notif = { types: { weekly: { app: false, email: false, sms: false } } };
+    db.prepare("UPDATE docs SET json=? WHERE coll='users' AND id=?").run(JSON.stringify(me), me.id);
+    const off = await weeklyMailTick(fake, true);
+    ok('quem desligou o resumo semanal não o recebe', off.sent === 0 && !got.length);
+    delete me.notif; db.prepare("UPDATE docs SET json=? WHERE coll='users' AND id=?").run(JSON.stringify(me), me.id);
   }
 
   console.log('\n' + passed + ' verificações ok');

@@ -560,6 +560,44 @@ function importantAlerts() {
   if (bf && bf.day === ln.date) out.push({ id: 'backup-' + ln.date, title: 'Cópia de segurança falhou', detail: String(bf.msg || 'A cópia automática desta madrugada não foi feita.') });
   return out;
 }
+/* resumo semanal por e-mail aos administradores: segundas-feiras às 8h (hora de Lisboa) */
+const diaSemana = d => new Date(d + 'T12:00:00Z').getUTCDay();
+function weeklyText() {
+  const ln = S.lisbonNow(TZ), today = ln.date, sv = screenViews(false), L = [];
+  const cnt = k => sv.screens.filter(x => x.status === k).length, weekEnd = S.addDay(today, 7);
+  L.push('Resumo da semana · ' + today, '');
+  L.push('ECRÃS: ' + sv.screens.length + ' no total · ' + cnt('online') + ' online · ' + cnt('atencao') + ' com atenção · ' + cnt('offline') + ' offline · ' + cnt('novo') + ' ainda sem ligação');
+  sv.screens.filter(x => x.status === 'offline' || x.status === 'atencao').slice(0, 10).forEach(x => L.push('  - ' + x.venue + ', ' + x.spot + ': ' + (x.status === 'offline' ? 'sem ligação' : 'com falhas')));
+  L.push('ALERTAS ABERTOS: ' + sv.alerts.length);
+  sv.alerts.slice(0, 8).forEach(a => L.push('  - ' + a.title + (a.screen ? ' (' + a.screen + ')' : '')));
+  const camps = docs('campaigns'), st = c => S.statusOf(c, today);
+  L.push('', 'CAMPANHAS: ' + camps.filter(c => st(c) === 'Ativa').length + ' ativas · ' + camps.filter(c => st(c) === 'Agendada').length + ' agendadas · ' + camps.filter(c => st(c) === 'Pausada').length + ' em pausa');
+  const ini = camps.filter(c => c.start > today && c.start <= weekEnd), fim = camps.filter(c => st(c) !== 'Terminada' && c.end >= today && c.end <= weekEnd);
+  L.push('  A começar nos próximos 7 dias: ' + (ini.length ? ini.map(c => c.name + ' (' + c.start + ')').join('; ') : 'nenhuma'));
+  L.push('  A terminar nos próximos 7 dias: ' + (fim.length ? fim.map(c => c.name + ' (' + c.end + ')').join('; ') : 'nenhuma'));
+  const ex = contentsView().filter(f => f.exp && !f.gone && f.exp <= S.addDay(today, 30)).length;
+  L.push('', 'CONTEÚDOS a caducar nos próximos 30 dias: ' + ex);
+  try { const d = fs.statfsSync(DATA); L.push('DISCO DO SERVIDOR: ' + Math.round(Number(d.bavail) / Number(d.blocks) * 100) + ' % livre'); } catch (e) { /* sem ação */ }
+  const bk = backupList(1)[0];
+  let ext = 'não configurada';
+  try { ext = fs.readFileSync(path.join(DATA, 'ultima-copia-externa'), 'utf8').trim().slice(0, 16).replace('T', ' ') || ext; } catch (e) { /* sem ação */ }
+  L.push('CÓPIAS DE SEGURANÇA: última no servidor ' + (bk ? S.lisbonNow(TZ, new Date(bk.t)).date : 'nenhuma') + ' · última externa ' + ext);
+  const ev = calendarView();
+  if (ev.configured) { const prox = ev.events.filter(e => e.at <= Date.now() + 7 * 864e5); L.push('CALENDÁRIO: ' + prox.length + ' evento(s) de spots nos próximos 7 dias' + prox.slice(0, 5).map(e => '\n  - ' + new Date(e.at).toLocaleString('pt-PT', { timeZone: TZ }) + ' ' + e.title).join('')); }
+  L.push('', 'Abra a plataforma para ver o detalhe.', 'Enif DOOH');
+  return L.join('\n');
+}
+async function weeklyMailTick(send, force) {
+  const ln = S.lisbonNow(TZ), run1 = getDoc('settings', 'weeklyrun');
+  if (!force && (diaSemana(ln.date) !== 1 || ln.h < 8 || (run1 && run1.day === ln.date))) return { sent: 0 };
+  const cfg = smtpCfg(); if (!cfg && !send) return { sent: 0 };
+  const to = docs('users').filter(u => u.admin && u.active !== false && /@/.test(mailTo(u)) && wantsMail(u, 'weekly')).map(mailTo);
+  putDoc('settings', 'weeklyrun', { day: ln.date });
+  const go = send || ((addr, subject, text) => MAIL.send(cfg, { to: addr, subject, text }));
+  let sent = 0, text = weeklyText();
+  for (const addr of to) { try { await go(addr, '[Enif DOOH] Resumo da semana', text); sent++; } catch (e) { console.error('Resumo semanal não enviado:', e.message); } }
+  return { sent };
+}
 async function alertMailTick(send) {
   const cfg = smtpCfg(); if (!cfg && !send) return { sent: 0 };
   const admins = docs('users').filter(u => u.admin && u.active !== false && /@/.test(mailTo(u)));
@@ -927,6 +965,7 @@ async function tick(force) {
     const cr = getDoc('settings', 'cleanrun');
     if (!cr || cr.day !== today) { cleanSweep(today); putDoc('settings', 'cleanrun', { day: today }); }
     await alertMailTick();
+    await weeklyMailTick();
     await calRefresh(false);
     q('SELECT screen FROM proofs WHERE t0+secs*1000<=?', Date.now()).forEach(x => proofEnd(x.screen, null, false));
     if (!smtpReady()) return;
@@ -1162,4 +1201,4 @@ if (require.main === module) {
   });
 }
 const underReset = () => { underCache = { at: 0, list: [] }; };
-module.exports = { alertMailTick, cleanSweep, underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
+module.exports = { weeklyMailTick, weeklyText, alertMailTick, cleanSweep, underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
