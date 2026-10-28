@@ -1,4 +1,4 @@
-<#
+﻿<#
  Instala o player Enif OOH num mini PC Windows.
  Executar no PowerShell, como administrador:
    .\instalar-player-windows.ps1 -Servidor "http://192.168.1.50:8080" -Codigo "ECR-001" -Chave "abcdef123456"
