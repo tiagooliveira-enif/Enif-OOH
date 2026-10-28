@@ -11,17 +11,21 @@ if not shutil.which('rclone'):
     print('A instalar o rclone ...')
     if subprocess.run(['apt-get', 'install', '-y', 'rclone'], stdout=subprocess.DEVNULL).returncode != 0 or not shutil.which('rclone'):
         subprocess.run('curl -fsSL https://rclone.org/install.sh | bash', shell=True, check=True)
-bucket = input('Nome do bucket do Backblaze: ').strip()
-kid = input('keyID da chave de aplicação: ').strip()
-key = getpass.getpass('applicationKey (não aparece nada ao escrever): ').strip()
-p1 = getpass.getpass('Palavra de cifra (guarde-a também fora do servidor!): ')
-p2 = getpass.getpass('Repita a palavra de cifra: ')
-if not (bucket and kid and key and p1):
-    sys.exit('Faltam dados. Corra outra vez.')
-if p1 != p2:
-    sys.exit('As palavras de cifra não são iguais. Corra outra vez.')
-if len(p1) < 12:
-    sys.exit('A palavra de cifra precisa de pelo menos 12 caracteres.')
+def ask(texto, secreto=False):
+    while True:
+        v = (getpass.getpass(texto) if secreto else input(texto)).strip()
+        if v:
+            return v
+        print('   (ficou vazio, escreva outra vez)')
+bucket = ask('Nome do bucket do Backblaze (completo): ')
+kid = ask('keyID da chave de aplicação: ')
+key = ask('applicationKey (não aparece nada ao escrever): ', True)
+while True:
+    p1 = ask('Palavra de cifra, mínimo 12 caracteres (guarde-a também fora do servidor!): ', True)
+    p2 = ask('Repita a palavra de cifra: ', True)
+    if p1 == p2 and len(p1) >= 12:
+        break
+    print('   (as palavras não são iguais ou têm menos de 12 caracteres; escreva outra vez)')
 obs = subprocess.run(['rclone', 'obscure', '-'], input=p1, capture_output=True, text=True, check=True).stdout.strip()
 with open(CONF, 'w') as f:
     f.write('[b2]\ntype = b2\naccount = %s\nkey = %s\n\n[b2crypt]\ntype = crypt\nremote = b2:%s/enif\npassword = %s\nfilename_encryption = standard\ndirectory_name_encryption = true\n' % (kid, key, bucket, obs))
