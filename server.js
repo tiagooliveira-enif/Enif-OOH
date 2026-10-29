@@ -364,8 +364,8 @@ const fmtHM = t => { const d = new Date(t), p = S.lisbonNow(TZ, d); return Strin
 function expectedMinutes(scr, from, to) {
   let t = from, total = 0;
   while (t < to) {
-    const next = Math.min(to, (Math.floor(t / 3600000) + 1) * 3600000);
-    if (S.screenOn({ on_h: scr.on, off_h: scr.off }, S.lisbonNow(TZ, new Date(t)).h)) total += (next - t) / 60000;
+    const next = Math.min(to, (Math.floor(t / 3600000) + 1) * 3600000), p = S.lisbonNow(TZ, new Date(t)), h0 = p.h + p.m / 60;
+    total += S.onOverlap(scr, h0, h0 + (next - t) / 3600000) * 60;               // só os minutos dentro do horário de ligar/desligar
     t = next;
   }
   return total;
@@ -404,8 +404,9 @@ function underList() {
       const a = Math.max(t, from, lv.first_seen), b = Math.min(t + 3600000, now); if (b <= a) continue;
       const ln = S.lisbonNow(TZ, new Date(t + 1800000));
       if (!S.screenOn(sc, ln.h)) continue;
+      const onMin = S.onOverlap(sc, ln.h + (a - t) / 3600000, ln.h + (b - t) / 3600000) * 60; if (onMin <= 0) continue;   // só os minutos em que o ecrã está ligado
       const list = lists[ln.date] || (lists[ln.date] = S.playlistOf(sc, all, ctx, ln.date)), L = S.loopFrom(list, sc.limit || 14, ln.date, ln.h, sc, ctx);
-      L.loop.forEach(c => { if (c.house || !camps.some(x => x.id === c.id)) return; const r = exp[c.id] = exp[c.id] || {}; r[sc.id] = (r[sc.id] || 0) + S.rateOf(c, L) * (b - a) / 60000; });
+      L.loop.forEach(c => { if (c.house || !camps.some(x => x.id === c.id)) return; const r = exp[c.id] = exp[c.id] || {}; r[sc.id] = (r[sc.id] || 0) + S.rateOf(c, L) * onMin; });
     }
   });
   const act = {}; q('SELECT camp, screen, SUM(ok) n FROM plays WHERE ts>=? GROUP BY camp, screen', from).forEach(r => { (act[r.camp] = act[r.camp] || {})[r.screen] = r.n; });

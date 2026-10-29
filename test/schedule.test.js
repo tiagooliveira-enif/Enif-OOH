@@ -91,3 +91,13 @@ console.log('schedule: ok');
   assert2.deepStrictEqual(L2.seq.filter(c => !c.house).map(c => c.id), ['c1', 'c3', 'c2', 'c3']);
   console.log('prioridade Alta e posição partilhada: ok');
 }
+
+{
+  const sc = { on: 7.5, off: 23.5 };
+  assert.equal(S.onOverlap(sc, 9, 10), 1, 'hora inteira dentro do horário');
+  assert.equal(S.onOverlap(sc, 7, 8), 0.5, 'liga às 07:30');
+  assert.equal(S.onOverlap(sc, 23, 24), 0.5, 'desliga às 23:30');
+  assert.equal(S.onOverlap(sc, 23.5, 24), 0, 'depois de desligar: nada');
+  assert.equal(S.onOverlap({ on: 0, off: 24 }, 3, 3.25), 0.25, 'ecrã sempre ligado');
+  console.log('horário de ligar/desligar ao minuto: ok');
+}
