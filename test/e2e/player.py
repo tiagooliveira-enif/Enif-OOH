@@ -70,6 +70,16 @@ try:
         pg.evaluate("window.caches.delete('enif-media-v1')"); ctx.set_offline(True); time.sleep(6)
         st=pg.evaluate('window.__enif.state()'); print('sem cache nem rede',st)
         ok('sem cache nem rede mantém o último quadro ou a marca (nunca preto)', st['children']>=1 or pg.evaluate("getComputedStyle(document.querySelector('#brand')).display")=='grid')
+        # horário de funcionamento: fora dele o ecrã fica preto total (ao minuto) e volta a ligar
+        ctx.set_offline(False); time.sleep(3)
+        nw=datetime.datetime.now(); hh=nw.hour+nw.minute/60
+        off_scr=dict(scr, on=(hh+1.5 if hh<21 else 0), off=(24 if hh<21 else hh-1))
+        call('POST','/api/sync',{'ops':[{'op':'put','coll':'screens','id':'ECR-001','doc':off_scr}]},tok)
+        time.sleep(12)
+        ok('fora do horário o ecrã fica preto total', pg.evaluate("getComputedStyle(document.querySelector('#off')).display")=='block' and pg.evaluate('window.__enif.state()')['children']==0)
+        call('POST','/api/sync',{'ops':[{'op':'put','coll':'screens','id':'ECR-001','doc':scr}]},tok)
+        time.sleep(12)
+        ok('dentro do horário volta a mostrar conteúdo', pg.evaluate("getComputedStyle(document.querySelector('#off')).display")=='none' and pg.evaluate('window.__enif.state()')['children']>=1)
         br.close()
 finally:
     srv.terminate(); print(srv.stdout.read().decode()[-600:])

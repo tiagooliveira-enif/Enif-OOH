@@ -39,6 +39,13 @@ body {
   height: 100%;
   background: #000;
 }
+#off {
+  position: fixed;
+  inset: 0;
+  display: none;
+  background: #000;
+  cursor: none;
+}
 #brand {
   position: fixed;
   inset: 0;
@@ -127,13 +134,14 @@ body {
 <body>
 <div id="stage"></div>
 <div id="brand"><div>ENIF<small id="brand-t"></small></div></div>
+<div id="off"></div>
 <div id="test"></div>
 <div id="dbg"></div>
 <div id="setup"><form id="setup-f"><h2>Configurar ecrã</h2><input name="code" placeholder="Código (ex.: ECR-001)" required><input name="key" placeholder="Chave do ecrã" required><button>Guardar e iniciar</button></form></div>
 <script>
 (function() {
 'use strict';
-var VERSION = '4';
+var VERSION = '5';
 var Q = new URLSearchParams(location.search);
 var ls = function(k, v) {try {if (v === undefined) {var x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 var code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -156,7 +164,7 @@ try {counter = JSON.parse(ls('enif.counter') || '{}');} catch (e) {counter = {};
 /* ---------- hora em Lisboa ---------- */
 function lisbon() {
   var p = {}; new Intl.DateTimeFormat('en-GB', {timeZone:(PL && PL.tz) || 'Europe/Lisbon', hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}).formatToParts(new Date()).forEach(function(x) {p[x.type] = x.value;});
-  return {date:p.year + '-' + p.month + '-' + p.day, h:+p.hour};
+  return {date:p.year + '-' + p.month + '-' + p.day, h:+p.hour, m:+p.minute};
 }
 /* ---------- fila de passagens (sobrevive a quedas de internet e a reinícios) ---------- */
 var queue = []; try {queue = JSON.parse(ls('enif.queue') || '[]');} catch (e) {queue = [];}
@@ -315,6 +323,21 @@ function hourEntry() {
   }
   return {k:now.date + ' ' + now.h, e:e};
 }
+/* fora do horário de funcionamento do ecrã (hora de ligar/desligar, ao minuto): preto total até voltar a ligar */
+function isOff() {
+  if (!PL) return false;
+  var sc = PL.screen || {}, n = lisbon(), hf = n.h + n.m / 60;
+  if (typeof sc.on === 'number' && typeof sc.off === 'number' && (hf < sc.on || hf >= sc.off)) return true;
+  return hourEntry().e === null;
+}
+var offNow = false;
+function guardOff() {
+  var off = isOff();
+  if (off === offNow) return;
+  offNow = off; $('#off').style.display = off ? 'block' : 'none';
+  if (off) {if (cancelFn)cancelFn(); clearAll();}
+}
+setInterval(guardOff, 1000);
 var lastHour = null, idx = 0;
 function pick(en) {                         // ficheiro desta passagem (alterna a cada vez)
   var list = en.spot ? en.files : en.items, k = en.spot ? '__spot' : en.c;
@@ -333,8 +356,8 @@ async function loop() {
       }
       var h = hourEntry(), l = h.e;
       if (h.k !== lastHour) {lastHour = h.k; idx = 0;}
-      if (l === null) {                                                         // ecrã desligado a esta hora (horário definido)
-        clearAll(); await sleep(5000); continue;}
+      if (l === null || isOff()) {                                              // ecrã desligado (horário definido): preto total
+        guardOff(); clearAll(); await sleep(1000); continue;}
       if (!l || !l.seq || !l.seq.length) {showBrand(PL.screen.venue); await sleep(5000); continue;}
       var tried = 0, played = false;
       while (tried < l.seq.length + 1 && !played) {

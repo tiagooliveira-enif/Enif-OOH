@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '4';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '5';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -668,7 +668,7 @@ function playlistFor(scr) {
   }));
   const lv = q1('SELECT reload FROM live WHERE screen=?', scr.id);
   return { playerVersion: PLAYER_VERSION, tz: TZ, generated: Date.now(), reload: lv ? lv.reload : 0, spotGap: S.SPOT_GAP,
-    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', bri: scr.bri || null }, days, files, proof: proof ? { id: proof.t0, files: proof.files.filter(f => files[f]), until: proof.until, serverTime: proof.serverTime } : null };
+    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', bri: scr.bri || null, on: typeof scr.on === 'number' ? scr.on : 0, off: typeof scr.off === 'number' ? scr.off : 24 }, days, files, proof: proof ? { id: proof.t0, files: proof.files.filter(f => files[f]), until: proof.until, serverTime: proof.serverTime } : null };
 }
 function screenAuth(code, key) {
   const s = getDoc('screens', String(code || '')); if (!s) return null;
