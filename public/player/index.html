@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-var VERSION = '6';
+var VERSION = '7';
 var Q = new URLSearchParams(location.search);
 var ls = function(k, v) {try {if (v === undefined) {var x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 var code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -162,8 +162,10 @@ if (Q.get('code') && Q.get('key')) {ls('enif.code', code); ls('enif.key', key);}
 try {counter = JSON.parse(ls('enif.counter') || '{}');} catch (e) {counter = {};}
 
 /* ---------- hora em Lisboa ---------- */
+/* o relógio do PC pode estar errado (corte de luz, sem pilha): a hora de referência é a do servidor */
+var skew = 0;
 function lisbon() {
-  var p = {}; new Intl.DateTimeFormat('en-GB', {timeZone:(PL && PL.tz) || 'Europe/Lisbon', hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}).formatToParts(new Date()).forEach(function(x) {p[x.type] = x.value;});
+  var p = {}; new Intl.DateTimeFormat('en-GB', {timeZone:(PL && PL.tz) || 'Europe/Lisbon', hourCycle:'h23', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit'}).formatToParts(new Date(Date.now() + skew)).forEach(function(x) {p[x.type] = x.value;});
   return {date:p.year + '-' + p.month + '-' + p.day, h:+p.hour, m:+p.minute};
 }
 /* ---------- fila de passagens (sobrevive a quedas de internet e a reinícios) ---------- */
@@ -252,6 +254,7 @@ async function refresh() {
     if (j.playerVersion !== VERSION) {location.reload(); return;}
     var rl = ls('enif.reload'); if (rl !== null && +rl !== j.reload) {ls('enif.reload', String(j.reload)); location.reload(); return;}
     ls('enif.reload', String(j.reload));
+    if (typeof j.generated === 'number')skew = j.generated - Date.now();
     PL = j; ls('enif.playlist', JSON.stringify(j));
   } catch (e) {stats.net = 'sem ligação'; if (!PL) {try {PL = JSON.parse(ls('enif.playlist') || 'null');} catch (x) {PL = null;}}}
   await ensureFiles();
@@ -376,10 +379,10 @@ async function loop() {
 }
 function clearAll() {while (stage.firstChild) {var n = stage.firstChild; if (n.tagName === 'VIDEO') {try {n.pause(); n.removeAttribute('src'); n.load();} catch (e) {/* sem ação */}}stage.removeChild(n);}$('#brand').style.display = 'none'; cur = {c:null, f:null};}
 /* ---------- arranque ---------- */
-function drawDbg() {dbg.textContent = 'Enif DOOH player ' + VERSION + '\necrã ' + code + '\nrede ' + stats.net + '\npassagens ' + stats.plays + ' (falhas ' + stats.fails + ')\npor enviar ' + queue.length + '\nficheiros em cache ' + stats.cached + '\na passar ' + (cur.c || '-') + ' / ' + (cur.f || '-') + (stats.err ? '\n' + stats.err : '');}
+function drawDbg() {dbg.textContent = 'Enif DOOH player ' + VERSION + '\necrã ' + code + '\nrede ' + stats.net + '\npassagens ' + stats.plays + ' (falhas ' + stats.fails + ')\npor enviar ' + queue.length + '\nficheiros em cache ' + stats.cached + '\nhora ' + String(lisbon().h).padStart(2, '0') + ':' + String(lisbon().m).padStart(2, '0') + (Math.abs(skew) > 60000 ? ' (relógio do PC desfasado ' + Math.round(skew / 60000) + ' min, corrigido)' : '') + '\na passar ' + (cur.c || '-') + ' / ' + (cur.f || '-') + (stats.err ? '\n' + stats.err : '');}
 document.addEventListener('keydown', function(e) {if (e.key === 'd' || e.key === 'D') {dbg.style.display = dbg.style.display === 'block' ? 'none' : 'block';} if (e.key === 'r' && e.ctrlKey && e.shiftKey) {ls('enif.code', null); ls('enif.key', null); location.replace(location.pathname);}});
 if (Q.get('debug'))dbg.style.display = 'block';
-window.__enif = {state:function() {return {cur:cur, stats:stats, queue:queue.length, children:stage.children.length};}};
+window.__enif = {state:function() {return {cur:cur, stats:stats, skew:skew, queue:queue.length, children:stage.children.length};}};
 setInterval(drawDbg, 1000);
 (async function() {
   try {if ('serviceWorker' in navigator)navigator.serviceWorker.register('/player/sw.js', {scope:'/player/'});} catch (e) {/* sem ação */}

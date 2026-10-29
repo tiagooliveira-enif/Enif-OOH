@@ -41,6 +41,7 @@ try:
     with sync_playwright() as p:
         br=p.chromium.launch(args=['--autoplay-policy=no-user-gesture-required'])
         ctx=br.new_context(viewport={'width':1280,'height':720},service_workers='allow')
+        ctx.add_init_script('var __d=Date.now.bind(Date);Date.now=function(){return __d()-3*3600*1000;};')   # relógio do PC 3 h atrasado
         pg=ctx.new_page(); errs=[]
         pg.on('pageerror',lambda e:errs.append(str(e)))
         pg.goto(f'{B}/player/?code=ECR-001&key={key}&hb=2&flush=2&refresh=5&spotgap=15')
@@ -48,6 +49,7 @@ try:
         st=pg.evaluate('window.__enif.state()')
         print(st)
         ok('player está a passar conteúdo', st['stats']['plays']>=3 and st['stats']['fails']==0)
+        ok('corrige o relógio do PC com a hora do servidor', abs(st['skew']-3*3600*1000)<120000)
         ok('nunca fica sem elemento no palco', st['children']>=1)
         # offline: arranca de novo sem rede
         ctx.set_offline(True); pg.reload(); time.sleep(20)
