@@ -80,6 +80,15 @@ try:
         call('POST','/api/sync',{'ops':[{'op':'put','coll':'screens','id':'ECR-001','doc':scr}]},tok)
         time.sleep(12)
         ok('dentro do horário volta a mostrar conteúdo', pg.evaluate("getComputedStyle(document.querySelector('#off')).display")=='none' and pg.evaluate('window.__enif.state()')['children']>=1)
+        # hora sem campanhas: o último conteúdo não fica parado no ecrã
+        hr=datetime.datetime.now().hour
+        c0,c1=((hr+1,hr+2) if hr<22 else (0,1))
+        call('POST','/api/sync',{'ops':[{'op':'put','coll':'campaigns','id':'C1','doc':dict(camp,h0=c0,h1=c1)}]},tok)
+        time.sleep(14)
+        ok('hora sem campanhas mostra a marca e não o último conteúdo', pg.evaluate('window.__enif.state()')['children']==0 and pg.evaluate("getComputedStyle(document.querySelector('#brand')).display")=='grid')
+        call('POST','/api/sync',{'ops':[{'op':'put','coll':'campaigns','id':'C1','doc':camp}]},tok)
+        time.sleep(12)
+        ok('com campanha volta a passar conteúdo', pg.evaluate('window.__enif.state()')['children']>=1)
         br.close()
 finally:
     srv.terminate(); print(srv.stdout.read().decode()[-600:])

@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-var VERSION = '5';
+var VERSION = '6';
 var Q = new URLSearchParams(location.search);
 var ls = function(k, v) {try {if (v === undefined) {var x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 var code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -358,7 +358,7 @@ async function loop() {
       if (h.k !== lastHour) {lastHour = h.k; idx = 0;}
       if (l === null || isOff()) {                                              // ecrã desligado (horário definido): preto total
         guardOff(); clearAll(); await sleep(1000); continue;}
-      if (!l || !l.seq || !l.seq.length) {showBrand(PL.screen.venue); await sleep(5000); continue;}
+      if (!l || !l.seq || !l.seq.length) {clearAll(); showBrand(PL.screen.venue); await sleep(5000); continue;}   // hora sem campanhas: não deixa o último conteúdo parado no ecrã
       var tried = 0, played = false;
       while (tried < l.seq.length + 1 && !played) {
         var en;
