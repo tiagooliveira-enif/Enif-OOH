@@ -138,6 +138,13 @@ try:
         # telemóvel
         for w,h in ((390,800),(360,740)):
             ctx,pg=newpage(w,h); pg.goto(B+'/app/'); pg.wait_for_selector('#lg-email'); pg.fill('#lg-email','t@enif.pt'); pg.fill('#lg-pass','outra-palavra-passe-9'); pg.click('form[data-form=login] button[type=submit]'); time.sleep(1.5)
+            el=pg.query_selector('[data-a=nav][data-v=painel]')
+            if el and el.is_visible(): el.click(); time.sleep(.4)
+            pg.click('[data-a=play-view][data-m=screen]'); time.sleep(.4)
+            ok(f'painel «Por ecrã» mostra linhas ({w})', pg.evaluate("document.querySelector('[data-a=play-view][data-m=screen]').getAttribute('aria-pressed')")=='true')
+            ok(f'painel «Por ecrã» sem scroll horizontal ({w})', pg.evaluate('document.documentElement.scrollWidth-window.innerWidth')<=2)
+            pg.click('[data-a=play-view][data-m=camp]'); time.sleep(.4)
+            ok(f'botão «Por campanha» alterna ({w})', pg.evaluate("document.querySelector('[data-a=play-view][data-m=camp]').getAttribute('aria-pressed')")=='true')
             for v_ in ['painel','ecras','campanhas','conteudos','relatorios','utilizadores']:
                 el=pg.query_selector(f'[data-a=nav][data-v={v_}]')
                 if el and el.is_visible(): el.click()

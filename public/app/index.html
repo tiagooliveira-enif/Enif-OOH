@@ -3950,6 +3950,7 @@ function userModal(id) {
 }
 
 /* ---------- painel ---------- */
+let playMode = 'auto';
 function viewDash() {
   const h = now.getHours();
   head(h < 13 ? 'Bom dia' : (h < 20 ? 'Boa tarde' : 'Boa noite'), cap(dLong.format(now)), can('campanhas.gerir') ? newCampBtn : '');
@@ -3982,11 +3983,20 @@ function viewDash() {
   }).join('');
   const al = (plAl + alReal) || '<div class="empty">Sem alertas. Está tudo em ordem.</div>';
   const an = activeNow();
-  const playing = an.length ? an.map(function(c) {
+  const byScr = playMode === 'screen' || (playMode === 'auto' && screens.length >= 6);
+  const playCamp = an.length ? an.map(function(c) {
     const n = screens.filter(s=>playingOn(s).indexOf(c) > -1).length;
     const why = n ? '' : noPlayWhy(c);
     return '<div class="item"><span class="ico ' + (n ? 'ok' : 'warn') + '">' + ic(n ? 'play' : 'alert') + '</span><div class="grow"><div class="title">' + esc(c.name) + '</div><div class="muted">' + esc(c.client) + ' · ' + hrsC(c) + ' · ' + c.dur + ' s · ' + modTxt(c.ppm) + '</div>' + (why ? '<div class="muted"><b>Não está a passar:</b> ' + why + '</div>' : '') + '</div><div style="text-align:right">' + (n ? '<b>' + n + '</b> <span class="muted">' + (n === 1 ? 'ecrã' : 'ecrãs') + '</span>' : '<span class="pill warn">Parada</span>') + '<div>' + prioPill(c.priority) + '</div></div></div>';
   }).join('') : '<div class="empty">Nenhuma campanha em reprodução neste momento.</div>';
+  const stCls = {online:'ok', atencao:'warn', offline:'bad'};
+  const playScr = screens.length ? screens.map(function(s) {
+    const pl = playingOn(s), st = stCls[s.status] || 'warn';
+    const txt = pl.length ? pl.map(c=>'<b>' + esc(c.name) + '</b> <span class="muted">' + esc(c.client) + ' · ' + hrsC(c) + '</span>').join('<br>') : '<span class="muted">' + (s.status === 'offline' ? 'Sem ligação' : (s.status === 'novo' ? 'Por emparelhar' : 'Nada a passar neste momento')) + '</span>';
+    return '<div class="item"><span class="ico ' + (pl.length ? 'ok' : st) + '">' + ic(pl.length ? 'play' : (s.status === 'offline' ? 'off' : 'alert')) + '</span><div class="grow"><div class="title">' + esc(s.venue) + ' <span class="muted" style="font-weight:500">· ' + esc(s.spot) + '</span></div></div><div style="text-align:right">' + txt + '</div></div>';
+  }).join('') : '<div class="empty">Ainda não há ecrãs.</div>';
+  const playing = byScr ? playScr : playCamp;
+  const playTog = '<div class="seg" role="group" aria-label="Ver por"><button type="button" data-a="play-view" data-m="camp" aria-pressed="' + (!byScr) + '">Por campanha</button><button type="button" data-a="play-view" data-m="screen" aria-pressed="' + byScr + '">Por ecrã</button></div>';
   const sg = suggestions(), cRep = can('relatorios.ver');
   const fewCtl = can('ecras.gerir') ? '<div class="few-ctl"><label for="few-min">Avisar ecrãs com menos de</label><input id="few-min" type="number" min="0" max="99" step="1" value="' + state.fewMin + '" data-a-change="few-min"><span>campanhas ativas</span></div>' : '';
   const ai = (sg.length ? sg.slice(0, 6).map(g=>sugHtml(g, cCamp, cSee, cRep)).join('') + (sg.length > 6 ? '<p class="hint">Mais ' + (sg.length - 6) + ' sugestões depois de resolver estas.</p>' : '') : '<div class="empty">Sem sugestões por agora.</div>') + fewCtl;
@@ -3995,7 +4005,7 @@ function viewDash() {
     + '<div class="legend"><span style="--lc:var(--ok)">Online <b>' + screens.filter(s=>s.status === 'online').length + '</b></span><span style="--lc:var(--warn)">Atenção <b>' + att + '</b></span><span style="--lc:var(--bad)">Offline <b>' + off + '</b></span>' + (fresh ? '<span style="--lc:var(--line-strong)">Por emparelhar <b>' + fresh + '</b></span>' : '') + '</div>';
   return kpis + '<div class="cols"><div class="stack">'
     + '<div class="card"><div class="card-h"><h2>Precisa de atenção</h2>' + (cSee ? '<button class="btn sm ghost" data-a="nav" data-v="ecras">Ver todos os ecrãs</button>' : '') + '</div><div class="card-b">' + al + '</div></div>'
-    + '<div class="card"><div class="card-h"><h2>A reproduzir agora</h2></div><div class="card-b">' + playing + '</div></div>'
+    + '<div class="card"><div class="card-h"><h2>A reproduzir agora</h2>' + playTog + '</div><div class="card-b">' + playing + '</div></div>'
     + '</div><div class="stack">'
     + calCard()
     + '<div class="card"><div class="card-h"><h2>' + ic('spark') + 'Sugestões da IA</h2></div><div class="card-b">' + ai + '</div></div>'
@@ -5931,6 +5941,7 @@ const actions = {
     toast(ch.length ? 'Teste enviado por: ' + ch.join(', ') + '.' : 'Teste feito, mas nenhum canal está pronto. Ative o computador ou indique o e-mail.');
     if (state.notifTab === 'out' || state.notifTab === 'pref')notifModal(state.notifTab);
   },
+  'play-view':function(t) {playMode = t.dataset.m; render();},
   'lim-toggle':function(t) {const k = t.dataset.k; if (limOpen.has(k))limOpen.delete(k); else limOpen.add(k); limitRows();},
   'camp-pause':function(t) {
     if (!guard('campanhas.gerir')) return;
