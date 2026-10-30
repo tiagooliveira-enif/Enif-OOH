@@ -904,6 +904,15 @@ button.t-row:hover {
   border-top: 1px solid var(--line);
 }
 
+.lim-h {
+  display: none !important;
+}
+.lim-more {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 2px;
+}
+
 /* calendar */
 .cal-wrap {
   overflow-x: auto;
@@ -3159,7 +3168,7 @@ const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
 
-const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:14, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:25, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
+const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
 
 /* ---------- derived data ---------- */
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
@@ -4085,7 +4094,7 @@ function drawScreenList() {
   }).join('');
   $('#screen-list').innerHTML = '<div class="t-row t-head"><span>Ecrã</span><span class="hm">Tipo</span><span class="hm">Cidade</span><span class="hm">A reproduzir</span><span>Estado</span></div>'
     + (rows || '<div class="empty">' + (screens.length ? 'Nenhum ecrã corresponde à pesquisa.' : 'Ainda não há ecrãs.' + (can('ecras.gerir') ? ' Crie o primeiro em «Novo ecrã».' : '')) + '</div>')
-    + (list.length > shown.length ? '<div class="more"><button class="btn" data-a="more">Mostrar mais (' + (list.length - shown.length) + ')</button></div>' : '');
+    + (list.length > shown.length ? '<div class="more"><button class="btn" data-a="more">Ver tudo</button></div>' : '');
 }
 function logsFor(s) {
   const t = ms=>{const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes());};
@@ -5253,8 +5262,8 @@ function viewReports() {
     const saiu = r.live ? '<span class="pill ok dot">Em curso</span>' : (r.lost ? fmtHM(r.out) + ' <span class="pill bad">Sem sinal</span>' : fmtHM(r.out));
     return '<tr><td>' + esc(dFull.format(r.d)) + '</td><td>' + esc(r.s.venue) + '<div class="muted">' + esc(r.s.city) + '</div></td><td>' + esc(r.s.spot) + '<div class="muted mono">' + r.s.id + '</div></td><td><b>' + esc(r.c.name) + '</b></td><td>' + (r.f ? esc(fname(r.f)) : '<span class="muted">—</span>') + '</td><td class="num">' + fmtHM(r.a) + '</td><td class="num">' + saiu + '</td><td class="num">' + fmt.format(r.plays) + '</td></tr>';
   }).join('');
-  const logCard = '<div class="card"><div class="card-h"><h2>Registo de emissão</h2><span class="hint">' + fmt.format(log.length) + ' registos · um por campanha, vídeo, ecrã e dia</span></div><div class="scroll-x" style="margin-top:8px"><table class="tbl" style="min-width:900px"><thead><tr><th>Data</th><th>Local</th><th>Ecrã</th><th>Campanha</th><th>Vídeo</th><th class="num">Entrou</th><th class="num">Saiu</th><th class="num">Passagens</th></tr></thead><tbody>' + logRows + '</tbody></table></div>'
-    + (log.length > shown.length ? '<div class="more"><button class="btn" data-a="log-more">Mostrar mais (' + fmt.format(log.length - shown.length) + ')</button></div>' : '') + '</div>';
+  const logCard = '<div class="card" data-nolim="1"><div class="card-h"><h2>Registo de emissão</h2><span class="hint">' + fmt.format(log.length) + ' registos · um por campanha, vídeo, ecrã e dia</span></div><div class="scroll-x" style="margin-top:8px"><table class="tbl" style="min-width:900px"><thead><tr><th>Data</th><th>Local</th><th>Ecrã</th><th>Campanha</th><th>Vídeo</th><th class="num">Entrou</th><th class="num">Saiu</th><th class="num">Passagens</th></tr></thead><tbody>' + logRows + '</tbody></table></div>'
+    + (log.length > shown.length ? '<div class="more"><button class="btn" data-a="log-more">Ver tudo</button></div>' : '') + '</div>';
   const mailCard = (state.user && state.user.admin) ? mailSection() : '';
   return tools + kpis + confLine + '<div class="stack">' + chart + '<div class="cols">' + table + rec + '</div>' + fileCard + logCard + mailCard + '</div>';
 }
@@ -5797,7 +5806,7 @@ function idleOut() {
 /* ---------- actions ---------- */
 function guard(p) {if (can(p)) return true; toast('Não tem permissão para esta ação.'); return false;}
 const actions = {
-  nav:function(t) {state.view = t.dataset.v; state.logLimit = 25; closeModal(); render(); window.scrollTo(0, 0);},
+  nav:function(t) {state.view = t.dataset.v; state.logLimit = 10; closeModal(); render(); window.scrollTo(0, 0);},
   close:function() {closeModal();},
   backdrop:function(t, e) {if (e.target === t)closeModal();},
   'open-screen':function(t) {if (guard('ecras.ver'))screenModal(t.dataset.id);},
@@ -5870,8 +5879,8 @@ const actions = {
     audit('Eliminou o ecrã', s.id + ' · ' + s.venue);
     closeModal(); toast('Ecrã ' + s.id + ' eliminado.'); render();
   },
-  filter:function(t) {state.filter = t.dataset.f; state.limit = 14; render();},
-  more:function() {state.limit += 20; drawScreenList();},
+  filter:function(t) {state.filter = t.dataset.f; state.limit = 10; render();},
+  more:function() {state.limit = 1e9; drawScreenList();},
   'new-screen':function() {if (guard('ecras.gerir'))newScreenModal();},
   'new-camp':function() {if (guard('campanhas.gerir'))campModal();},
   'edit-camp':function(t) {campModal(t.dataset.id);},
@@ -5921,6 +5930,7 @@ const actions = {
     toast(ch.length ? 'Teste enviado por: ' + ch.join(', ') + '.' : 'Teste feito, mas nenhum canal está pronto. Ative o computador ou indique o e-mail.');
     if (state.notifTab === 'out' || state.notifTab === 'pref')notifModal(state.notifTab);
   },
+  'lim-toggle':function(t) {const k = t.dataset.k; if (limOpen.has(k))limOpen.delete(k); else limOpen.add(k); limitRows();},
   'camp-pause':function(t) {
     if (!guard('campanhas.gerir')) return;
     const c = campById(t.dataset.id); if (!c) return;
@@ -5940,7 +5950,7 @@ const actions = {
   },
   'final-report':function(t) {
     const c = campById(t.dataset.id); if (!c) return;
-    state.repCamp = c.id; state.repFile = 'all'; state.repScreens = null; state.logLimit = 25;
+    state.repCamp = c.id; state.repFile = 'all'; state.repScreens = null; state.logLimit = 10;
     state.custom = {from:c.start, to:c.end > today ? today : c.end};
     state.finalDone[c.id] = true; state.view = 'relatorios'; render(); window.scrollTo(0, 0);
     toast('Relatório de «' + c.name + '» pronto. Exporte em PDF quando quiser.');
@@ -6029,15 +6039,15 @@ const actions = {
     toast('«' + x.name + '» retirado de «' + c.name + '».'); render();
   },
   'edit-place':function(t) {if (guard('ecras.gerir'))placeModal(t.dataset.id);},
-  period:function(t) {state.period = +t.dataset.n; state.custom = null; state.logLimit = 25; render();},
-  'period-custom':function() {state.custom = {from:addDays(today, -13), to:today}; state.logLimit = 25; render();},
+  period:function(t) {state.period = +t.dataset.n; state.custom = null; state.logLimit = 10; render();},
+  'period-custom':function() {state.custom = {from:addDays(today, -13), to:today}; state.logLimit = 10; render();},
   'edit-bri':function(t) {if (guard('ecras.gerir'))briModal(t.dataset.id);},
   'edit-res':function(t) {if (guard('ecras.gerir'))resModal(t.dataset.id);},
   'pick-screens':function() {screensModal();},
   'rs-all':function() {document.querySelectorAll('#modal-root input[type="checkbox"]').forEach(function(i) {i.checked = true;});},
   'rs-none':function() {document.querySelectorAll('#modal-root input[type="checkbox"]').forEach(function(i) {i.checked = false;});},
   export:function() {if (guard('relatorios.exportar'))exportModal();},
-  'log-more':function() {state.logLimit += 50; render();},
+  'log-more':function() {state.logLimit = 1e9; render();},
   'pl-move':function(t) {
     if (!guard('playlist.gerir')) return;
     const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
@@ -6123,7 +6133,7 @@ document.addEventListener('click', function(e) {
 });
 document.addEventListener('input', function(e) {
   const id = e.target.id;
-  if (id === 'q') {state.q = e.target.value; state.limit = 14; drawScreenList();}
+  if (id === 'q') {state.q = e.target.value; state.limit = 10; drawScreenList();}
   else if (id === 'cq') {state.cq = e.target.value; const r = $('#camp-rows'), n = $('#cq-n'); if (r)r.innerHTML = campRows(); if (n)n.textContent = campHint();}
   else if (id === 'c-ppm' || id === 'c-dur') {const h = $('#ppm-hint'), p = $('#c-ppm'), d = $('#c-dur'); if (h && p && d)h.textContent = ppmHint(parseFloat(p.value), parseFloat(d.value));}
   else if (id === 'rs-q') {
@@ -6141,15 +6151,15 @@ document.addEventListener('input', function(e) {
 document.addEventListener('change', function(e) {
   const t = e.target, ac = t.dataset && t.dataset.aChange;
   if (ac === 'av') {const A = state.av, k = {'av-d':'d', 'av-v':'v', 'av-f':'f', 'av-t':'t'}[t.id]; if (k)A[k] = t.value || A[k]; else if (t.id === 'av-h0')A.h0 = +t.value; else if (t.id === 'av-h1')A.h1 = +t.value; render();}
-  else if (t.id === 'rep-camp') {state.repCamp = t.value; state.repFile = 'all'; state.repScreens = null; state.logLimit = 25; render();}
-  else if (t.id === 'rep-file') {state.repFile = t.value; state.logLimit = 25; render();}
+  else if (t.id === 'rep-camp') {state.repCamp = t.value; state.repFile = 'all'; state.repScreens = null; state.logLimit = 10; render();}
+  else if (t.id === 'rep-file') {state.repFile = t.value; state.logLimit = 10; render();}
   else if (t.id === 'mail-f-camp' || t.id === 'mail-f-st' || t.id === 'mail-f-from' || t.id === 'mail-f-to') {
     const k = {'mail-f-camp':'camp', 'mail-f-st':'st', 'mail-f-from':'from', 'mail-f-to':'to'}[t.id]; state.mailF[k] = t.value; render();}
   else if (t.id === 'inc-img') {const bx = $('#img-opts'); if (bx)bx.style.display = t.checked ? 'flex' : 'none';}
   else if (t.id === 'rep-from' || t.id === 'rep-to') {
     const k = t.id === 'rep-from' ? 'from' : 'to';
     state.custom = state.custom || {from:null, to:null};
-    state.custom[k] = t.value ? parseISO(t.value) : null; state.logLimit = 25; render();
+    state.custom[k] = t.value ? parseISO(t.value) : null; state.logLimit = 10; render();
   }
   else if (ac === 'proof-pick') {
     const f = t.closest('form'), n = f.querySelectorAll('input[name=file]:checked').length;
@@ -6405,7 +6415,7 @@ document.addEventListener('submit', function(e) {
     const sel = fd.getAll('scr'), scope = repScope();
     if (!sel.length) {err.textContent = 'Escolha pelo menos um ecrã.'; return;}
     state.repScreens = sel.length === scope.length ? null : new Set(sel);
-    state.logLimit = 25; closeModal(); render(); return;
+    state.logLimit = 10; closeModal(); render(); return;
   }
   if (kind === 'export') {
     if (!guard('relatorios.exportar')) return;
@@ -6450,6 +6460,39 @@ document.addEventListener('submit', function(e) {
   if (state.view !== 'campanhas' && !f.dataset.id) {state.view = 'campanhas';}
   render();
 });
+
+/* ---------- listas compridas: 10 linhas e o botão «Ver tudo» ---------- */
+const LIM = 10, LIM_ROWS = ['item', 'crow', 'ni', 'log'], limOpen = new Set();
+function limitRows() {
+  const groups = [];
+  document.querySelectorAll('tbody').forEach(function(tb) {
+    if (tb.closest('.nt, [data-nolim]')) return;
+    groups.push({box:tb, rows:Array.prototype.filter.call(tb.children, r=>r.tagName === 'TR'), after:tb.closest('.scroll-x') || tb.closest('table')});
+  });
+  document.querySelectorAll('body *').forEach(function(p) {
+    if (p.tagName === 'TBODY') return;
+    const by = {};
+    Array.prototype.forEach.call(p.children, function(c) {
+      const k = typeof c.className === 'string' ? c.className.split(' ')[0] : '';
+      if (LIM_ROWS.indexOf(k) > -1)(by[c.tagName + '.' + k] = by[c.tagName + '.' + k] || []).push(c);
+    });
+    Object.keys(by).forEach(function(k) {if (by[k].length > 0)groups.push({box:p, rows:by[k], after:by[k][by[k].length - 1], kind:k});});
+  });
+  groups.forEach(function(g) {
+    const rows = g.rows, n = rows.length; if (!n || !g.after) return;
+    const nx = g.after.nextElementSibling, old = nx && nx.classList.contains('lim-more') ? nx : null;
+    if (n <= LIM) {rows.forEach(function(r) {r.classList.remove('lim-h');}); if (old)old.remove(); return;}
+    const card = g.box.closest('.card, .modal'), h = card && card.querySelector('h2, h3'), key = (h ? h.textContent.trim() : '') + '|' + (g.kind || 'tabela'), open = limOpen.has(key), mark = n + ':' + open;
+    if (rows[0].dataset.lim === mark && old) return;
+    rows[0].dataset.lim = mark;
+    rows.forEach(function(r, i) {r.classList.toggle('lim-h', !open && i >= LIM);});
+    const box = old || document.createElement('div'), b = old ? old.firstChild : document.createElement('button');
+    box.className = 'lim-more'; b.className = 'btn'; b.dataset.a = 'lim-toggle'; b.dataset.k = key; b.textContent = open ? 'Mostrar só ' + LIM : 'Ver tudo';
+    if (!old) {box.appendChild(b); g.after.insertAdjacentElement('afterend', box);}
+  });
+}
+let limTm = null;
+new MutationObserver(function() {clearTimeout(limTm); limTm = setTimeout(limitRows, 60);}).observe(document.body, {childList:true, subtree:true});
 
 try {const sv = localStorage.getItem('enif-theme'); if (sv === 'light' || sv === 'dark')applyTheme(sv);} catch (e) {/* sem ação */}
 ['click', 'change', 'submit'].forEach(function(ev) {document.addEventListener(ev, function() {queueSave();});});
