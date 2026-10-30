@@ -5136,12 +5136,6 @@ function repRange() {
   return {from:addDays(today, -(state.period - 1)), to:today, N:state.period, custom:false};
 }
 const periodTxt = d=>d.custom ? dYear.format(d.from) + ' a ' + dYear.format(d.to) + ' (' + d.N + (d.N === 1 ? ' dia' : ' dias') + ')' : 'Últimos ' + d.N + ' dias';
-function repVideoTxt() {
-  if (state.repCamp === 'all') return '';
-  const c = campById(state.repCamp); if (!c || !c.items.length) return '';
-  const f = state.repFile === 'all' ? null : fileById(state.repFile);
-  return f ? f.name : 'Todos os vídeos';
-}
 const fname = id=>id ? (fileById(id) ? fileById(id).name : id) : '—';
 /* impressões de cada linha: a audiência do ecrã nessa hora reparte-se pelo tempo que cada vídeo esteve no ar */
 function weighRows(rows) {
@@ -5172,24 +5166,49 @@ function dashImpr() {
   const rows = getRows('dash', today, today); if (!rows) return null;
   return Math.round(weighRows(rows).reduce((a, x)=>a + x.impr, 0));
 }
+function repSelFromState() {
+  return {camps:state.repCamp === 'all' ? null : new Map([[state.repCamp, state.repFile === 'all' ? null : new Set([state.repFile])]]), screens:state.repScreens};
+}
+function selScope(sel) {
+  if (!sel.camps) return screens.slice();
+  const seen = new Set(), out = [];
+  sel.camps.forEach(function(v, id) {const c = campById(id); if (c)screensOf(c).forEach(function(x) {if (!seen.has(x.id)) {seen.add(x.id); out.push(x);}});});
+  return out;
+}
+function selTexts(sel) {
+  if (!sel.camps) return {camp:'Todas as campanhas', vid:''};
+  const ids = Array.from(sel.camps.keys()), names = ids.map(function(id) {const c = campById(id); return c ? c.name : id;});
+  const camp = names.length > 4 ? names.length + ' campanhas' : names.join(', ');
+  const part = ids.filter(id=>sel.camps.get(id));
+  let vid = '';
+  if (part.length) {
+    const fs = new Set(); part.forEach(id=>sel.camps.get(id).forEach(f=>fs.add(f)));
+    vid = (ids.length === 1 && fs.size <= 3) ? Array.from(fs).map(fname).join(', ') : 'Conteúdos escolhidos';
+  } else if (ids.length === 1) {const c = campById(ids[0]); vid = c && c.items.length ? 'Todos os vídeos' : '';}
+  return {camp:camp, vid:vid};
+}
 function repData() {
   const R = repRange(); if (R.err) return {err:R.err};
-  const scope = repScope(), chosen = repSelected(scope);
+  const sel = repSelFromState(), scope = selScope(sel), chosen = sel.screens ? scope.filter(x=>sel.screens.has(x.id)) : scope;
   if (!can('relatorios.ver')) return {err:'Não tem permissão para ver relatórios.'};
   const rows = getRows('rep', R.from, R.to);
   if (!rows) {
     const c = state.rows.rep;
     if (c && c.err) return {err:'Não foi possível carregar o relatório: ' + c.err};
-    return {loading:true, scope:scope, chosen:chosen};
+    return {loading:true, scope:scope, chosen:chosen, sel:sel};
   }
-  const ids = new Set(chosen.map(s=>s.id));
-  const fid = (state.repCamp === 'all' || state.repFile === 'all') ? null : state.repFile;
-  const map = {};
+  return repCore(sel, rows, R);
+}
+function repCore(sel, rows, R) {
+  const scope = selScope(sel), chosen = sel.screens ? scope.filter(x=>sel.screens.has(x.id)) : scope;
+  const ids = new Set(chosen.map(x=>x.id)), map = {};
   weighRows(rows).forEach(function(w) {
     const r = w.r;
     if (!ids.has(r.s) || !r.n) return;
-    if (state.repCamp !== 'all' && r.c !== state.repCamp) return;
-    if (fid && r.f !== fid) return;
+    if (sel.camps) {
+      if (!sel.camps.has(r.c)) return;
+      const fs = sel.camps.get(r.c); if (fs && !(r.f && fs.has(r.f))) return;
+    }
     const c = campById(r.c), s = screens.find(x=>x.id === r.s); if (!c || !s) return;
     const k = r.c + '|' + r.s, rec = map[k] || (map[k] = {c:c, s:s, days:0, dates:[], per:{}, impr:0, plays:0, byFile:{}, seen:{}});
     const dt = parseISO(r.d), t = dt.getTime();
@@ -5203,7 +5222,8 @@ function repData() {
     r.dates.sort((a, b)=>a - b); r.days = r.dates.length; r.impr = Math.round(r.impr);
     Object.keys(r.byFile).forEach(function(k) {r.byFile[k].impr = Math.round(r.byFile[k].impr);});
   });
-  return {N:R.N, from:R.from, to:R.to, custom:R.custom, scope:scope, chosen:chosen, recs:recs, fid:fid};
+  const tx = selTexts(sel), single = sel.camps && sel.camps.size === 1 ? sel.camps.values().next().value : null;
+  return {N:R.N, from:R.from, to:R.to, custom:R.custom, scope:scope, chosen:chosen, recs:recs, fid:single && single.size === 1 ? Array.from(single)[0] : null, multi:!sel.camps || sel.camps.size !== 1, partial:!!sel.camps && Array.from(sel.camps.values()).some(Boolean), campTxt:tx.camp, vidTxt:tx.vid, sel:sel};
 }
 function aggByFile(recs) {
   const bf = {};
@@ -5214,13 +5234,13 @@ function aggByFile(recs) {
 function hourlyOf(d) {
   const h = curve.map(()=>0);
   d.recs.forEach(function(r) {
-    const div = state.repCamp === 'all' ? d.N : r.days;
+    const div = d.multi ? d.N : r.days;
     Object.keys(r.per).forEach(function(t) {r.per[t].forEach(function(x) {h[Math.floor(x.a)] += x.impr / div;});});
   });
   return h;
 }
 function repLabel(d) {
-  return (!state.repScreens || d.chosen.length === d.scope.length) ? 'Todos os ecrãs (' + d.scope.length + ')' : (d.chosen.length === 1 ? d.chosen[0].venue + ' · ' + d.chosen[0].spot : d.chosen.length + ' de ' + d.scope.length + ' ecrãs');
+  return (!d.sel.screens || d.chosen.length === d.scope.length) ? 'Todos os ecrãs (' + d.scope.length + ')' : (d.chosen.length === 1 ? d.chosen[0].venue + ' · ' + d.chosen[0].spot : d.chosen.length + ' de ' + d.scope.length + ' ecrãs');
 }
 /* uma linha por campanha, vídeo, ecrã e dia: quando entrou, quando saiu, quantas passagens */
 function airLog(recs) {
@@ -5407,30 +5427,10 @@ const montUse = function(doc, w) {
   } catch (e) {doc.setFont('helvetica', w === 'Italic' ? 'italic' : (w === 'Bold' || w === 'SemiBold' ? 'bold' : 'normal'));}
 };
 const MF = function(doc, w) {montUse(doc, w); return 'Montserrat-' + w;};
-function imgPicker() {
-  const row = function(f, on) {return '<label class="row-check"><input type="checkbox" name="img-file" value="' + f.id + '"' + (on ? ' checked' : '') + '><span class="grow">' + esc(f.name) + '</span><small class="muted">' + esc(f.type) + (f.res ? ' · ' + esc(f.res) : '') + '</small></label>';};
-  const cands = imgCands(), only = cands.length === 1, on = function(f) {return only || f.id === state.repFile;};
-  if (state.repCamp !== 'all') return cands.length ? cands.map(f=>row(f, on(f))).join('') : '<span class="muted">Esta campanha não tem vídeos nem imagens.</span>';
-  const seen = new Set(), out = [];
-  campaigns.forEach(function(c) {
-    const fs = c.items.map(function(i) {return fileById(i.f);}).filter(function(f) {return f && cands.indexOf(f) > -1;});
-    if (!fs.length) return;
-    out.push('<details class="img-grp"><summary><span class="grow">' + esc(c.name) + '</span><small class="muted img-cnt" data-n="' + fs.length + '">' + fs.length + (fs.length === 1 ? ' conteúdo' : ' conteúdos') + '</small></summary>' + fs.map(f=>{seen.add(f.id); return row(f, false);}).join('') + '</details>');
-  });
-  const rest = cands.filter(f=>!seen.has(f.id));
-  if (rest.length) out.push('<details class="img-grp"><summary><span class="grow">Sem campanha</span><small class="muted img-cnt" data-n="' + rest.length + '">' + rest.length + (rest.length === 1 ? ' conteúdo' : ' conteúdos') + '</small></summary>' + rest.map(f=>row(f, false)).join('') + '</details>');
-  return out.join('') || '<span class="muted">Não há vídeos nem imagens.</span>';
-}
-function imgCands() {
-  let list;
-  if (state.repCamp !== 'all') {const c = campById(state.repCamp); list = c ? c.items.map(function(i) {return fileById(i.f);}).filter(Boolean) : [];}
-  else list = contents;
-  return list.filter(function(f) {return f.type === 'Vídeo' || f.type === 'Imagem';});
-}
 const SHOT_COL = ['#f4b800', '#e8590c', '#2b8a3e', '#7048e8', '#c2255c', '#1971c2'];
-async function captureShot(f, sec) {
+async function captureShot(f, sec, campId) {
   const out = {name:f.name, type:f.type, res:f.res, dur:f.dur, sec:sec};
-  const cs = campsOfFile(f), camp = (state.repCamp !== 'all' ? campById(state.repCamp) : cs[0]);
+  const cs = campsOfFile(f), camp = (campId ? campById(campId) : cs[0]);
   out.camp = camp ? camp.name : '';
   const cv = document.createElement('canvas'), g = cv.getContext('2d');
   let src = null, vw = 0, vh = 0;
@@ -5467,23 +5467,62 @@ async function captureShot(f, sec) {
   out.data = cv.toDataURL('image/jpeg', .88); out.w = cv.width; out.h = cv.height;
   return out;
 }
+const expCnt = function(k, n) {return k ? k + ' de ' + n + ' selecionado' + (k === 1 ? '' : 's') : n + (n === 1 ? ' conteúdo' : ' conteúdos');};
+function expSync(g) {
+  if (!g) return;
+  const h = g.querySelector('input[name=ec]'), fs = g.querySelectorAll('input[name=ef]'), cnt = g.querySelector('.img-cnt'); if (!fs.length) return;
+  const k = g.querySelectorAll('input[name=ef]:checked').length;
+  if (h) {h.checked = k === fs.length; h.indeterminate = k > 0 && k < fs.length;}
+  if (cnt) cnt.textContent = expCnt(k, fs.length);
+}
+function selFiles(sel) {
+  const out = [], seen = new Set();
+  (sel.camps ? Array.from(sel.camps.keys()) : campaigns.map(c=>c.id)).forEach(function(cid) {
+    const c = campById(cid); if (!c) return;
+    const fs = sel.camps ? sel.camps.get(cid) : null;
+    c.items.forEach(function(i) {
+      const f = fileById(i.f);
+      if (!f || seen.has(f.id) || (fs && !fs.has(f.id)) || (f.type !== 'Vídeo' && f.type !== 'Imagem')) return;
+      seen.add(f.id); out.push({f:f, c:cid});
+    });
+  });
+  return out;
+}
 function exportModal() {
-  const d = repData(); if (d.err) {toast(d.err); return;}
-  if (d.loading) {toast('O relatório ainda está a carregar.'); return;}
-  const n = airLog(d.recs).length;
-  const camp = state.repCamp === 'all' ? 'Todas as campanhas' : campById(state.repCamp).name;
-  const vid = repVideoTxt();
+  if (!can('relatorios.ver')) {toast('Não tem permissão para ver relatórios.'); return;}
+  const sel = repSelFromState(), single = !!sel.camps && sel.camps.size === 1;
+  const on = function(cid, fid) {return !sel.camps || (sel.camps.has(cid) && (!sel.camps.get(cid) || sel.camps.get(cid).has(fid)));};
+  const camps = campaigns.map(function(c) {
+    const fs = c.items.map(i=>fileById(i.f)).filter(Boolean), chk = !sel.camps || sel.camps.has(c.id);
+    if (!fs.length) return '<div class="img-grp exp-camp"><label class="row-check" style="padding:9px 0;font-weight:600"><input type="checkbox" name="ec" value="' + c.id + '"' + (chk ? ' checked' : '') + '><span class="grow">' + esc(c.name) + '</span><small class="muted">Sem conteúdos</small></label></div>';
+    return '<details class="img-grp exp-camp"' + (single && chk ? ' open' : '') + '><summary><input type="checkbox" name="ec" value="' + c.id + '" data-a-change="exp-camp" aria-label="Escolher todos os conteúdos de ' + esc(c.name) + '"><span class="grow">' + esc(c.name) + '</span><small class="muted img-cnt"></small></summary>'
+      + fs.map(f=>'<label class="row-check"><input type="checkbox" name="ef" value="' + c.id + '|' + f.id + '" data-a-change="exp-file"' + (on(c.id, f.id) ? ' checked' : '') + '><span class="grow">' + esc(f.name) + '</span><small class="muted">' + esc(f.type) + (f.res ? ' · ' + esc(f.res) : '') + '</small></label>').join('') + '</details>';
+  }).join('');
+  const by = {};
+  screens.forEach(function(x) {(by[x.venue] = by[x.venue] || []).push(x);});
+  const sOn = x=>!sel.screens || sel.screens.has(x.id), nOn = screens.filter(sOn).length;
+  const scr = Object.keys(by).map(function(v) {
+    const l = by[v];
+    return '<div class="vgroup" data-venue="' + esc(v) + '"><label class="vhead"><input type="checkbox" data-a-change="vtoggle"' + (l.every(sOn) ? ' checked' : '') + '><b>' + esc(v) + '</b><span class="muted">' + l.length + (l.length === 1 ? ' ecrã' : ' ecrãs') + '</span></label>'
+      + l.map(x=>'<label class="srow"><input type="checkbox" name="scr" value="' + x.id + '"' + (sOn(x) ? ' checked' : '') + '><span>' + esc(x.spot) + '</span></label>').join('') + '</div>';
+  }).join('');
+  const per = state.custom ? 'custom' : String(state.period), cu = state.custom || {from:addDays(today, -13), to:today};
+  const pOpt = (v, t)=>'<option value="' + v + '"' + (per === v ? ' selected' : '') + '>' + t + '</option>';
   modal('<form data-form="export" novalidate><div class="modal-h"><h2>Exportar relatório em PDF</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
-    + '<dl class="facts"><div><dt>Campanha</dt><dd>' + esc(camp) + '</dd></div>' + (vid ? '<div><dt>Vídeo</dt><dd>' + esc(vid) + '</dd></div>' : '') + '<div><dt>Ecrãs</dt><dd>' + esc(repLabel(d)) + '</dd></div><div><dt>Período</dt><dd>' + esc(periodTxt(d)) + '</dd></div></dl>'
-    + '<span class="lab">O que incluir</span><div class="perms" style="margin-top:6px;grid-template-columns:1fr">'
-    + '<label class="row-check"><input type="checkbox" name="inc-sum" checked>Resumo e tabela por ' + (state.repCamp === 'all' ? 'campanha' : 'ecrã') + '</label>'
+    + '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span class="lab grow">Campanhas e conteúdos</span><button type="button" class="btn sm ghost" data-a="exp-all">Selecionar tudo</button><button type="button" class="btn sm ghost" data-a="exp-none">Limpar</button></div>'
+    + '<div style="margin-top:6px">' + camps + '</div>'
+    + '<span class="lab" style="display:block;margin-top:14px">Ecrãs</span><details class="img-grp" style="margin-top:6px"><summary><span class="grow">Escolher ecrãs</span><small class="muted" id="exp-scr-cnt">' + (nOn === screens.length ? 'Todos (' + screens.length + ')' : nOn + ' de ' + screens.length) + '</small></summary><div class="picker">' + scr + '</div></details>'
+    + '<span class="lab" style="display:block;margin-top:14px">Período</span><div class="field-inline" style="margin-top:6px;flex-wrap:wrap"><select name="ep" id="exp-per" data-a-change="exp-per" aria-label="Período">' + pOpt('7', 'Últimos 7 dias') + pOpt('30', 'Últimos 30 dias') + ((per !== '7' && per !== '30' && per !== 'custom') ? pOpt(per, 'Últimos ' + per + ' dias') : '') + pOpt('custom', 'Personalizado') + '</select>'
+    + '<span id="exp-dates" class="field-inline" style="display:' + (per === 'custom' ? 'flex' : 'none') + ';gap:8px;flex-wrap:wrap"><label for="exp-from">De</label><input id="exp-from" name="exp-from" type="date" max="' + iso(today) + '" value="' + (cu.from ? iso(cu.from) : '') + '"><label for="exp-to">Até</label><input id="exp-to" name="exp-to" type="date" max="' + iso(today) + '" value="' + (cu.to ? iso(cu.to) : '') + '"></span></div>'
+    + '<span class="lab" style="display:block;margin-top:14px">O que incluir</span><div class="perms" style="margin-top:6px;grid-template-columns:1fr">'
+    + '<label class="row-check"><input type="checkbox" name="inc-sum" checked>Resumo e tabelas</label>'
     + '<label class="row-check"><input type="checkbox" name="inc-chart" checked>Gráfico de visualizações por hora</label>'
-    + '<label class="row-check"><input type="checkbox" name="inc-log" checked>Registo de emissão (' + fmt.format(n) + ' registos: data, local, vídeo, entrada, saída e passagens)</label></div>'
-    + '<label class="row-check" style="margin-top:10px"><input type="checkbox" name="inc-img" id="inc-img">Imagem do conteúdo (um print do vídeo ou da imagem)</label>'
-    + '<div id="img-opts" style="display:none;margin:8px 0 0 28px">' + imgPicker() + '<div class="field-inline" style="margin-top:8px"><label for="img-sec">Segundo do vídeo</label><input id="img-sec" name="img-sec" type="number" min="0" max="3600" step="1" value="5" style="width:78px;border-radius:999px"></div></div>'
-    + (n > PDF_MAX ? '<p class="hint" style="margin-top:10px">O registo tem mais de ' + fmt.format(PDF_MAX) + ' linhas. O PDF inclui as ' + fmt.format(PDF_MAX) + ' mais recentes. Reduza o período ou os ecrãs para ver tudo.</p>' : '')
+    + '<label class="row-check"><input type="checkbox" name="inc-log" checked>Registo de emissão (data, local, vídeo, entrada, saída e passagens)</label></div>'
+    + '<label class="row-check" style="margin-top:10px"><input type="checkbox" name="inc-img" id="inc-img">Imagem de cada conteúdo escolhido (um print do vídeo ou da imagem, até 12)</label>'
+    + '<div id="img-opts" style="display:none;margin:8px 0 0 28px"><div class="field-inline"><label for="img-sec">Segundo do vídeo</label><input id="img-sec" name="img-sec" type="number" min="0" max="3600" step="1" value="5" style="width:78px;border-radius:999px"></div></div>'
     + '<p class="err" id="form-err" role="alert"></p></div>'
     + '<div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">' + ic('download') + 'Exportar PDF</button></div></form>');
+  document.querySelectorAll('#modal-root .exp-camp').forEach(expSync);
 }
 const pdfTxt = s=>String(s).replace(/[  ]/g, ' ');
 function buildPdf(d, o) {
@@ -5510,9 +5549,9 @@ function buildPdf(d, o) {
   montUse(doc, 'Medium');
   doc.text(s1, PW - M - w2, M + 62, {align:'right'});
   montUse(doc, 'Light'); doc.setFontSize(10); doc.setTextColor(mut[0], mut[1], mut[2]);
-  const camp = state.repCamp === 'all' ? 'Todas as campanhas' : campById(state.repCamp).name;
+  const camp = d.campTxt;
   const stamp = new Intl.DateTimeFormat('pt-PT', {dateStyle:'short', timeStyle:'short'}).format(new Date());
-  [['Campanha: ' + camp]].concat(repVideoTxt() ? [['Vídeo: ' + repVideoTxt()]] : []).concat([['Ecrãs: ' + repLabel(d)], ['Período: ' + periodTxt(d)], ['Gerado em ' + stamp + (state.user ? ' por ' + state.user.name : '')]]).forEach(function(l) {
+  [['Campanha: ' + camp]].concat(d.vidTxt ? [['Vídeo: ' + d.vidTxt]] : []).concat([['Ecrãs: ' + repLabel(d)], ['Período: ' + periodTxt(d)], ['Gerado em ' + stamp + (state.user ? ' por ' + state.user.name : '')]]).forEach(function(l) {
     doc.splitTextToSize(pdfTxt(l[0]), PW - 2 * M).forEach(function(ln) {doc.text(ln, M, y); y += 13;});
   });
   y += 8;
@@ -5546,9 +5585,9 @@ function buildPdf(d, o) {
     y = yb + 30;
   }
   if (recs.length && o.sum) {
-    title(state.repCamp === 'all' ? 'Por campanha' : 'Por ecrã'); y += 6;
+    title(d.multi ? 'Por campanha' : 'Por ecrã'); y += 6;
     let head, body;
-    if (state.repCamp === 'all') {
+    if (d.multi) {
       const m = {};
       recs.forEach(function(r) {const x = m[r.c.id] || (m[r.c.id] = {c:r.c, scr:0, plays:0, impr:0}); x.scr++; x.plays += r.plays; x.impr += r.impr;});
       head = [['Campanha', 'Cliente', 'Modalidade', 'Ecrãs', 'Passagens', 'Visualizações']];
@@ -5560,7 +5599,7 @@ function buildPdf(d, o) {
     doc.autoTable({startY:y, margin:{left:M, right:M, bottom:34}, head:head, body:body, styles:{font:MF(doc, 'Regular'), fontStyle:'normal', fontSize:9, cellPadding:5}, alternateRowStyles:{fillColor:[255, 251, 232]}, headStyles:{font:MF(doc, 'SemiBold'), fontStyle:'normal', fillColor:acc, textColor:ink}, columnStyles:{2:{halign:'right'}, 4:{halign:'right'}, 5:{halign:'right'}}});
     y = doc.lastAutoTable.finalY + 22;
   }
-  if (recs.length && o.sum && state.repCamp !== 'all') {
+  if (recs.length && o.sum && (!d.multi || d.partial)) {
     const ag = aggByFile(recs);
     if (!d.fid && ag.keys.length > 1) {
       if (y > PH - 140) {doc.addPage(); y = M;}
@@ -5608,14 +5647,14 @@ function buildPdf(d, o) {
   }
   return doc;
 }
-async function doExport(o) {
-  const d = repData();
-  if (d.err) {toast(d.err); return;}
-  if (d.loading) {toast('O relatório ainda está a carregar.'); return;}
+async function doExport(o, sel, R) {
+  let rows;
+  try {rows = (await api('GET', '/api/plays?from=' + iso(R.from) + '&to=' + iso(R.to))).rows;} catch (e) {toast('Não foi possível carregar o relatório: ' + e.message); return;}
+  const d = repCore(sel, rows || [], R);
   let buf;
   if (o.img) {
     o.shots = [];
-    for (const fid of o.img.fs) {try {const sd = await captureShot(fileById(fid), o.img.sec); if (sd)o.shots.push(sd);} catch (e) {/* sem ação */}}
+    for (const it of selFiles(sel).slice(0, 12)) {try {const sd = await captureShot(it.f, o.img.sec, it.c); if (sd)o.shots.push(sd);} catch (e) {/* sem ação */}}
   }
   try {buf = buildPdf(d, o).output('arraybuffer');}
   catch (e) {toast(e && e.message === 'sem-jspdf' ? 'O gerador de PDF não carregou. Atualize a página e tente de novo.' : 'Não foi possível gerar o PDF.'); return;}
@@ -6001,6 +6040,8 @@ const actions = {
     if (state.notifTab === 'out' || state.notifTab === 'pref')notifModal(state.notifTab);
   },
   'play-view':function(t) {playMode = t.dataset.m; render();},
+  'exp-all':function() {document.querySelectorAll('#modal-root .exp-camp input[name=ef], #modal-root .exp-camp input[name=ec]').forEach(function(i) {i.checked = true;}); document.querySelectorAll('#modal-root .exp-camp').forEach(expSync);},
+  'exp-none':function() {document.querySelectorAll('#modal-root .exp-camp input[name=ef], #modal-root .exp-camp input[name=ec]').forEach(function(i) {i.checked = false; i.indeterminate = false;}); document.querySelectorAll('#modal-root .exp-camp').forEach(expSync);},
   'lim-toggle':function(t) {const k = t.dataset.k; if (limOpen.has(k))limOpen.delete(k); else limOpen.add(k); limitRows();},
   'camp-pause':function(t) {
     if (!guard('campanhas.gerir')) return;
@@ -6227,10 +6268,9 @@ document.addEventListener('change', function(e) {
   else if (t.id === 'rep-file') {state.repFile = t.value; state.logLimit = 10; render();}
   else if (t.id === 'mail-f-camp' || t.id === 'mail-f-st' || t.id === 'mail-f-from' || t.id === 'mail-f-to') {
     const k = {'mail-f-camp':'camp', 'mail-f-st':'st', 'mail-f-from':'from', 'mail-f-to':'to'}[t.id]; state.mailF[k] = t.value; render();}
-  else if (t.name === 'img-file') {
-    const g = t.closest('.img-grp'), cnt = g && g.querySelector('.img-cnt');
-    if (cnt) {const k = g.querySelectorAll('input[name=img-file]:checked').length, n = +cnt.dataset.n; cnt.textContent = k ? k + ' de ' + n + ' selecionado' + (k === 1 ? '' : 's') : n + (n === 1 ? ' conteúdo' : ' conteúdos');}
-  }
+  else if (ac === 'exp-camp') {const g = t.closest('.img-grp'); if (g) {g.querySelectorAll('input[name=ef]').forEach(function(i) {i.checked = t.checked;}); expSync(g);}}
+  else if (ac === 'exp-file') {expSync(t.closest('.img-grp'));}
+  else if (ac === 'exp-per') {const b = $('#exp-dates'); if (b)b.style.display = t.value === 'custom' ? 'flex' : 'none';}
   else if (t.id === 'inc-img') {const bx = $('#img-opts'); if (bx)bx.style.display = t.checked ? 'block' : 'none';}
   else if (t.id === 'rep-from' || t.id === 'rep-to') {
     const k = t.id === 'rep-from' ? 'from' : 'to';
@@ -6496,12 +6536,33 @@ document.addEventListener('submit', function(e) {
   if (kind === 'export') {
     if (!guard('relatorios.exportar')) return;
     const o = {sum:!isNil(fd.get('inc-sum')), chart:!isNil(fd.get('inc-chart')), log:!isNil(fd.get('inc-log')), img:null};
+    const camps = new Map(), ecs = fd.getAll('ec'), efs = fd.getAll('ef');
+    campaigns.forEach(function(c) {
+      const fs = c.items.map(i=>fileById(i.f)).filter(Boolean);
+      if (!fs.length) {if (ecs.indexOf(c.id) > -1)camps.set(c.id, null); return;}
+      const chk = efs.filter(v=>v.split('|')[0] === c.id).map(v=>v.split('|')[1]);
+      if (!chk.length) return;
+      camps.set(c.id, chk.length === fs.length ? null : new Set(chk));
+    });
+    if (!camps.size) {err.textContent = 'Escolha pelo menos uma campanha ou conteúdo.'; return;}
+    const sc = fd.getAll('scr'); if (!sc.length) {err.textContent = 'Escolha pelo menos um ecrã.'; return;}
+    let R; const pv = String(fd.get('ep') || '7');
+    if (pv === 'custom') {
+      const f = String(fd.get('exp-from') || ''), t0 = String(fd.get('exp-to') || '');
+      if (!f || !t0) {err.textContent = 'Escolha a data inicial e a final.'; return;}
+      const fr = parseISO(f); let to = parseISO(t0); if (to > today)to = today;
+      if (to < fr) {err.textContent = 'A data final tem de ser igual ou posterior à inicial.'; return;}
+      if (dayDiff(to, fr) > 365) {err.textContent = 'O período máximo é de 366 dias.'; return;}
+      R = {from:fr, to:to, N:dayDiff(to, fr) + 1, custom:true};
+    } else {const n = Math.max(1, +pv || 7); R = {from:addDays(today, -(n - 1)), to:today, N:n, custom:false};}
+    const full = camps.size === campaigns.length && Array.from(camps.values()).every(v=>!v);
+    const sel = {camps:full ? null : camps, screens:sc.length === screens.length ? null : new Set(sc)};
     if (!isNil(fd.get('inc-img'))) {
-      const ffs = fd.getAll('img-file').filter(function(x) {return fileById(x);}); if (!ffs.length) {err.textContent = 'Escolha pelo menos um conteúdo para a imagem.'; return;}
-      o.img = {fs:ffs, sec:Math.max(0, Math.round(+fd.get('img-sec') || 0))};
+      if (!selFiles(sel).length) {err.textContent = 'Os conteúdos escolhidos não têm vídeos nem imagens para o print.'; return;}
+      o.img = {sec:Math.max(0, Math.round(+fd.get('img-sec') || 0))};
     }
     if (!o.sum && !o.chart && !o.log && !o.img) {err.textContent = 'Escolha pelo menos uma parte do relatório.'; return;}
-    closeModal(); toast('A gerar o PDF…'); doExport(o); return;
+    closeModal(); toast('A gerar o PDF…'); doExport(o, sel, R); return;
   }
   if (!guard('campanhas.gerir')) return;
   const name = String(fd.get('name') || '').trim(), client = String(fd.get('client') || '').trim();
@@ -6567,6 +6628,11 @@ function limitRows() {
     if (!old) {box.appendChild(b); g.after.insertAdjacentElement('afterend', box);}
   });
 }
+document.addEventListener('change', function(e) {
+  const f = e.target.closest && e.target.closest('form[data-form=export]'), c = $('#exp-scr-cnt'); if (!f || !c) return;
+  const a = f.querySelectorAll('input[name=scr]').length, k = f.querySelectorAll('input[name=scr]:checked').length;
+  c.textContent = k === a ? 'Todos (' + a + ')' : k + ' de ' + a;
+});
 let limTm = null;
 new MutationObserver(function() {clearTimeout(limTm); limTm = setTimeout(limitRows, 60);}).observe(document.body, {childList:true, subtree:true});
 
