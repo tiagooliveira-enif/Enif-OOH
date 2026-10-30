@@ -5367,6 +5367,20 @@ const montUse = function(doc, w) {
   } catch (e) {doc.setFont('helvetica', w === 'Italic' ? 'italic' : (w === 'Bold' || w === 'SemiBold' ? 'bold' : 'normal'));}
 };
 const MF = function(doc, w) {montUse(doc, w); return 'Montserrat-' + w;};
+function imgPicker() {
+  const row = function(f, on) {return '<label class="row-check"><input type="checkbox" name="img-file" value="' + f.id + '"' + (on ? ' checked' : '') + '><span class="grow">' + esc(f.name) + '</span><small class="muted">' + esc(f.type) + (f.res ? ' · ' + esc(f.res) : '') + '</small></label>';};
+  const cands = imgCands(), only = cands.length === 1, on = function(f) {return only || f.id === state.repFile;};
+  if (state.repCamp !== 'all') return cands.length ? cands.map(f=>row(f, on(f))).join('') : '<span class="muted">Esta campanha não tem vídeos nem imagens.</span>';
+  const seen = new Set(), out = [];
+  campaigns.forEach(function(c) {
+    const fs = c.items.map(function(i) {return fileById(i.f);}).filter(function(f) {return f && cands.indexOf(f) > -1;});
+    if (!fs.length) return;
+    out.push('<div class="muted" style="margin:8px 0 2px;font-weight:600">' + esc(c.name) + '</div>' + fs.map(f=>{seen.add(f.id); return row(f, false);}).join(''));
+  });
+  const rest = cands.filter(f=>!seen.has(f.id));
+  if (rest.length) out.push('<div class="muted" style="margin:8px 0 2px;font-weight:600">Sem campanha</div>' + rest.map(f=>row(f, false)).join(''));
+  return out.join('') || '<span class="muted">Não há vídeos nem imagens.</span>';
+}
 function imgCands() {
   let list;
   if (state.repCamp !== 'all') {const c = campById(state.repCamp); list = c ? c.items.map(function(i) {return fileById(i.f);}).filter(Boolean) : [];}
@@ -5426,7 +5440,7 @@ function exportModal() {
     + '<label class="row-check"><input type="checkbox" name="inc-chart" checked>Gráfico de visualizações por hora</label>'
     + '<label class="row-check"><input type="checkbox" name="inc-log" checked>Registo de emissão (' + fmt.format(n) + ' registos: data, local, vídeo, entrada, saída e passagens)</label></div>'
     + '<label class="row-check" style="margin-top:10px"><input type="checkbox" name="inc-img" id="inc-img">Imagem do conteúdo (um print do vídeo ou da imagem)</label>'
-    + '<div id="img-opts" class="field-inline" style="display:none;margin:8px 0 0 28px;flex-wrap:wrap"><label for="img-file">Conteúdo</label><select id="img-file" name="img-file">' + imgCands().map(function(f) {return '<option value="' + f.id + '"' + (f.id === state.repFile ? ' selected' : '') + '>' + esc(f.name) + '</option>';}).join('') + '</select><label for="img-sec">Segundo</label><input id="img-sec" name="img-sec" type="number" min="0" max="3600" step="1" value="5" style="width:78px;border-radius:999px"></div>'
+    + '<div id="img-opts" style="display:none;margin:8px 0 0 28px">' + imgPicker() + '<div class="field-inline" style="margin-top:8px"><label for="img-sec">Segundo do vídeo</label><input id="img-sec" name="img-sec" type="number" min="0" max="3600" step="1" value="5" style="width:78px;border-radius:999px"></div></div>'
     + (n > PDF_MAX ? '<p class="hint" style="margin-top:10px">O registo tem mais de ' + fmt.format(PDF_MAX) + ' linhas. O PDF inclui as ' + fmt.format(PDF_MAX) + ' mais recentes. Reduza o período ou os ecrãs para ver tudo.</p>' : '')
     + '<p class="err" id="form-err" role="alert"></p></div>'
     + '<div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">' + ic('download') + 'Exportar PDF</button></div></form>');
@@ -5515,10 +5529,11 @@ function buildPdf(d, o) {
       y = doc.lastAutoTable.finalY + 22;
     }
   }
-  if (o.shotData) {
-    const sh = o.shotData, iw = sh.w >= sh.h ? 230 : 100, ih = iw * sh.h / sh.w;
+  if (o.shots && o.shots.length) {
+    o.shots.forEach(function(sh, k) {
+    const iw = sh.w >= sh.h ? 230 : 100, ih = iw * sh.h / sh.w;
     if (y > PH - 110 - ih + 40) {doc.addPage(); y = M;}
-    title('Imagem do conteúdo'); y += 6;
+    if (k === 0) {title(o.shots.length > 1 ? 'Imagens dos conteúdos' : 'Imagem do conteúdo'); y += 6;}
     try {doc.addImage(sh.data, 'JPEG', M, y, iw, ih);} catch (e) {/* sem ação */}
     doc.setDrawColor(210, 214, 221); doc.rect(M, y, iw, ih, 'S');
     const tx = M + iw + 20; let ty = y + 14;
@@ -5532,6 +5547,7 @@ function buildPdf(d, o) {
     if (sh.sample)ln2.push('Não foi possível obter a imagem deste conteúdo; esta é uma imagem ilustrativa.');
     ln2.forEach(function(t) {doc.splitTextToSize(pdfTxt(t), PW - M - tx).forEach(function(l) {doc.text(l, tx, ty); ty += 14;});});
     y += ih + 24;
+    });
   }
   if (recs.length && o.log) {
     const log = airLog(recs), cut = log.slice(0, PDF_MAX);
@@ -5557,7 +5573,10 @@ async function doExport(o) {
   if (d.err) {toast(d.err); return;}
   if (d.loading) {toast('O relatório ainda está a carregar.'); return;}
   let buf;
-  if (o.img) {try {o.shotData = await captureShot(fileById(o.img.f), o.img.sec);} catch (e) {o.shotData = null;}}
+  if (o.img) {
+    o.shots = [];
+    for (const fid of o.img.fs) {try {const sd = await captureShot(fileById(fid), o.img.sec); if (sd)o.shots.push(sd);} catch (e) {/* sem ação */}}
+  }
   try {buf = buildPdf(d, o).output('arraybuffer');}
   catch (e) {toast(e && e.message === 'sem-jspdf' ? 'O gerador de PDF não carregou. Atualize a página e tente de novo.' : 'Não foi possível gerar o PDF.'); return;}
   try {
@@ -6168,7 +6187,7 @@ document.addEventListener('change', function(e) {
   else if (t.id === 'rep-file') {state.repFile = t.value; state.logLimit = 10; render();}
   else if (t.id === 'mail-f-camp' || t.id === 'mail-f-st' || t.id === 'mail-f-from' || t.id === 'mail-f-to') {
     const k = {'mail-f-camp':'camp', 'mail-f-st':'st', 'mail-f-from':'from', 'mail-f-to':'to'}[t.id]; state.mailF[k] = t.value; render();}
-  else if (t.id === 'inc-img') {const bx = $('#img-opts'); if (bx)bx.style.display = t.checked ? 'flex' : 'none';}
+  else if (t.id === 'inc-img') {const bx = $('#img-opts'); if (bx)bx.style.display = t.checked ? 'block' : 'none';}
   else if (t.id === 'rep-from' || t.id === 'rep-to') {
     const k = t.id === 'rep-from' ? 'from' : 'to';
     state.custom = state.custom || {from:null, to:null};
@@ -6434,8 +6453,8 @@ document.addEventListener('submit', function(e) {
     if (!guard('relatorios.exportar')) return;
     const o = {sum:!isNil(fd.get('inc-sum')), chart:!isNil(fd.get('inc-chart')), log:!isNil(fd.get('inc-log')), img:null};
     if (!isNil(fd.get('inc-img'))) {
-      const ff = fd.get('img-file'); if (!ff || !fileById(ff)) {err.textContent = 'Escolha o conteúdo para a imagem.'; return;}
-      o.img = {f:ff, sec:Math.max(0, Math.round(+fd.get('img-sec') || 0))};
+      const ffs = fd.getAll('img-file').filter(function(x) {return fileById(x);}); if (!ffs.length) {err.textContent = 'Escolha pelo menos um conteúdo para a imagem.'; return;}
+      o.img = {fs:ffs, sec:Math.max(0, Math.round(+fd.get('img-sec') || 0))};
     }
     if (!o.sum && !o.chart && !o.log && !o.img) {err.textContent = 'Escolha pelo menos uma parte do relatório.'; return;}
     closeModal(); toast('A gerar o PDF…'); doExport(o); return;
