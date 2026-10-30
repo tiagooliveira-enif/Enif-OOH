@@ -5584,35 +5584,13 @@ function buildPdf(d, o) {
     });
     y = yb + 30;
   }
-  if (recs.length && o.sum) {
-    title(d.multi ? 'Por campanha' : 'Por ecrã'); y += 6;
-    let head, body;
-    if (d.multi) {
-      const m = {};
-      recs.forEach(function(r) {const x = m[r.c.id] || (m[r.c.id] = {c:r.c, scr:0, plays:0, impr:0}); x.scr++; x.plays += r.plays; x.impr += r.impr;});
-      head = [['Campanha', 'Cliente', 'Modalidade', 'Ecrãs', 'Passagens', 'Visualizações']];
-      body = Object.keys(m).map(k=>m[k]).sort((a, b)=>b.impr - a.impr).map(r=>[r.c.name, r.c.client, pdfTxt(modTxt(r.c.ppm)), String(r.scr), pdfTxt(fmt.format(r.plays)), pdfTxt(fmt.format(r.impr))]);
-    } else {
-      head = [['Ecrã', 'Local', 'Cidade', 'Estado', 'Passagens', 'Visualizações']];
-      body = recs.slice().sort((a, b)=>b.impr - a.impr).map(r=>[r.s.id + ' · ' + r.s.spot, r.s.venue, r.s.city, ({online:'Online', atencao:'Atenção', offline:'Offline', novo:'Por emparelhar'})[r.s.status], pdfTxt(fmt.format(r.plays)), pdfTxt(fmt.format(r.impr))]);
-    }
-    doc.autoTable({startY:y, margin:{left:M, right:M, bottom:34}, head:head, body:body, styles:{font:MF(doc, 'Regular'), fontStyle:'normal', fontSize:9, cellPadding:5}, alternateRowStyles:{fillColor:[255, 251, 232]}, headStyles:{font:MF(doc, 'SemiBold'), fontStyle:'normal', fillColor:acc, textColor:ink}, columnStyles:{2:{halign:'right'}, 4:{halign:'right'}, 5:{halign:'right'}}});
+  const tbl = function(head, body, extra) {
+    doc.autoTable(Object.assign({startY:y, margin:{left:M, right:M, bottom:34}, head:head, body:body, styles:{font:MF(doc, 'Regular'), fontStyle:'normal', fontSize:9, cellPadding:5}, alternateRowStyles:{fillColor:[255, 251, 232]}, headStyles:{font:MF(doc, 'SemiBold'), fontStyle:'normal', fillColor:acc, textColor:ink}}, extra || {}));
     y = doc.lastAutoTable.finalY + 22;
-  }
-  if (recs.length && o.sum && (!d.multi || d.partial)) {
-    const ag = aggByFile(recs);
-    if (!d.fid && ag.keys.length > 1) {
-      if (y > PH - 140) {doc.addPage(); y = M;}
-      title('Por vídeo'); y += 6;
-      doc.autoTable({startY:y, margin:{left:M, right:M, bottom:34}, head:[['Vídeo', 'Passagens', 'Visualizações']], body:ag.keys.map(k=>[ag.name(k), pdfTxt(fmt.format(ag.bf[k].plays)), pdfTxt(fmt.format(ag.bf[k].impr))]), styles:{font:MF(doc, 'Regular'), fontStyle:'normal', fontSize:9, cellPadding:5}, alternateRowStyles:{fillColor:[255, 251, 232]}, headStyles:{font:MF(doc, 'SemiBold'), fontStyle:'normal', fillColor:acc, textColor:ink}, columnStyles:{1:{halign:'right'}, 2:{halign:'right'}}});
-      y = doc.lastAutoTable.finalY + 22;
-    }
-  }
-  if (o.shots && o.shots.length) {
-    o.shots.forEach(function(sh, k) {
+  };
+  const drawShot = function(sh) {
     const iw = sh.w >= sh.h ? 230 : 100, ih = iw * sh.h / sh.w;
     if (y > PH - 110 - ih + 40) {doc.addPage(); y = M;}
-    if (k === 0) {title(o.shots.length > 1 ? 'Imagens dos conteúdos' : 'Imagem do conteúdo'); y += 6;}
     try {doc.addImage(sh.data, 'JPEG', M, y, iw, ih);} catch (e) {/* sem ação */}
     doc.setDrawColor(210, 214, 221); doc.rect(M, y, iw, ih, 'S');
     const tx = M + iw + 20; let ty = y + 14;
@@ -5626,7 +5604,38 @@ function buildPdf(d, o) {
     if (sh.sample)ln2.push('Não foi possível obter a imagem deste conteúdo; esta é uma imagem ilustrativa.');
     ln2.forEach(function(t) {doc.splitTextToSize(pdfTxt(t), PW - M - tx).forEach(function(l) {doc.text(l, tx, ty); ty += 14;});});
     y += ih + 24;
+  };
+  const shots = (o.shots || []).slice(), used = new Set();
+  if (recs.length && o.sum) {
+    const byC = {};
+    recs.forEach(function(r) {(byC[r.c.id] = byC[r.c.id] || {c:r.c, recs:[], plays:0, impr:0}); const x = byC[r.c.id]; x.recs.push(r); x.plays += r.plays; x.impr += r.impr;});
+    const blocks = Object.keys(byC).map(k=>byC[k]).sort((a, b)=>b.impr - a.impr);
+    if (blocks.length > 1) {
+      title('Resumo por campanha'); y += 6;
+      tbl([['Campanha', 'Cliente', 'Modalidade', 'Ecrãs', 'Passagens', 'Visualizações']], blocks.map(b=>[b.c.name, b.c.client, pdfTxt(modTxt(b.c.ppm)), String(b.recs.length), pdfTxt(fmt.format(b.plays)), pdfTxt(fmt.format(b.impr))]), {columnStyles:{3:{halign:'right'}, 4:{halign:'right'}, 5:{halign:'right'}}});
+    }
+    blocks.forEach(function(b) {
+      if (y > PH - 170) {doc.addPage(); y = M;}
+      title('Campanha: ' + b.c.name); y += 6;
+      montUse(doc, 'Light'); doc.setFontSize(10); doc.setTextColor(mut[0], mut[1], mut[2]);
+      doc.splitTextToSize(pdfTxt((b.c.client ? b.c.client + ' · ' : '') + pdfTxt(modTxt(b.c.ppm)) + ' · ' + b.recs.length + (b.recs.length === 1 ? ' ecrã' : ' ecrãs') + ' · ' + fmt.format(b.plays) + ' passagens · ' + fmt.format(b.impr) + ' visualizações estimadas'), PW - 2 * M).forEach(function(ln) {doc.text(ln, M, y); y += 13;});
+      y += 6;
+      const ag = aggByFile(b.recs);
+      tbl([['Conteúdo', 'Tipo', 'Passagens', 'Visualizações']], ag.keys.map(function(k) {const f = k === '—' ? null : fileById(k); return [ag.name(k), f ? f.type : '—', pdfTxt(fmt.format(ag.bf[k].plays)), pdfTxt(fmt.format(ag.bf[k].impr))];}), {columnStyles:{2:{halign:'right'}, 3:{halign:'right'}}});
+      tbl([['Ecrã', 'Local', 'Cidade', 'Estado', 'Passagens', 'Visualizações']], b.recs.slice().sort((p, q)=>q.impr - p.impr).map(r=>[r.s.id + ' · ' + r.s.spot, r.s.venue, r.s.city, ({online:'Online', atencao:'Atenção', offline:'Offline', novo:'Por emparelhar'})[r.s.status], pdfTxt(fmt.format(r.plays)), pdfTxt(fmt.format(r.impr))]), {columnStyles:{4:{halign:'right'}, 5:{halign:'right'}}});
+      const mine = shots.filter(sh=>sh.camp === b.c.name);
+      if (mine.length) {
+        if (y > PH - 150) {doc.addPage(); y = M;}
+        title(mine.length > 1 ? 'Imagens dos conteúdos' : 'Imagem do conteúdo'); y += 6;
+        mine.forEach(function(sh) {used.add(sh); drawShot(sh);});
+      }
     });
+  }
+  const rest = shots.filter(sh=>!used.has(sh));
+  if (rest.length) {
+    if (y > PH - 150) {doc.addPage(); y = M;}
+    title(rest.length > 1 ? 'Imagens dos conteúdos' : 'Imagem do conteúdo'); y += 6;
+    rest.forEach(drawShot);
   }
   if (recs.length && o.log) {
     const log = airLog(recs), cut = log.slice(0, PDF_MAX);

@@ -61,11 +61,20 @@ try:
             return r
         tick = lambda sel: pg.locator(sel).evaluate('e=>e.click()')
         run('tudo', lambda: pg.click('[data-a=exp-all]'), 9 + 15 + 6)
-        run('só Camp Um', lambda: tick('input[name=ec][value=C1]'), 24, lambda r: ok('cabeçalho com a campanha', 'Campanha: Camp Um' in r['texts']))
+        def um(r):
+            ok('cabeçalho com a campanha', 'Campanha: Camp Um' in r['texts'])
+            tc = [t for t in r['tables'] if t['head'][0][0] == 'Conteúdo']
+            ok('tabela por conteúdo com os 2 conteúdos (9 e 15)', len(tc) == 1 and sorted(int(row[2]) for row in tc[0]['body']) == [9, 15])
+            ok('tabela por ecrã', any(t['head'][0][0] == 'Ecrã' and len(t['body']) == 1 for t in r['tables']))
+            lg = [t for t in r['tables'] if t['head'][0][0] == 'Data']
+            ok('registo de emissão com as 2 linhas (uma por conteúdo, horas seguidas juntas)', len(lg) == 1 and len(lg[0]['body']) == 2)
+        run('só Camp Um', lambda: tick('input[name=ec][value=C1]'), 24, um)
         run('só conteúdo A', lambda: tick('input[name=ef][value="C1|%s"]' % fa['id']), 9, lambda r: ok('cabeçalho com o vídeo A', any(t.startswith('Vídeo: A_video') for t in r['texts'])))
         run('só conteúdo B', lambda: tick('input[name=ef][value="C1|%s"]' % fb['id']), 15)
         run('A e C (de campanhas diferentes)', lambda: (tick('input[name=ef][value="C1|%s"]' % fa['id']), tick('input[name=ef][value="C2|%s"]' % fc['id'])), 9 + 6,
-            lambda r: ok('tabela por campanha tem as duas', any(t['head'][0][0] == 'Campanha' and len(t['body']) == 2 for t in r['tables'])))
+            lambda r: (ok('tabela por campanha tem as duas', any(t['head'][0][0] == 'Campanha' and len(t['body']) == 2 for t in r['tables'])),
+                       ok('um bloco por campanha com tabela por conteúdo', len([t for t in r['tables'] if t['head'][0][0] == 'Conteúdo']) == 2),
+                       ok('registo só com os 2 conteúdos escolhidos', [len(t['body']) for t in r['tables'] if t['head'][0][0] == 'Data'] == [2])))
         run('Camp Um + Camp Dois', lambda: (tick('input[name=ec][value=C1]'), tick('input[name=ec][value=C2]')), 30)
         run('só o ecrã sem passagens', lambda: (pg.click('[data-a=exp-all]'), pg.evaluate("document.querySelectorAll('#modal-root input[name=scr]').forEach(i=>{if(i.value==='ECR-001')i.click()})")), 0,
             lambda r: ok('diz que não há reproduções', 'Sem reproduções neste período para a seleção.' in r['texts']))
