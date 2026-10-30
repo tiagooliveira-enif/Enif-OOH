@@ -3646,7 +3646,7 @@ const NT = [
   ['mail', 'Envio do relatório final ao comercial', 'relatorios.ver', true],
   ['weekly', 'Resumo semanal da plataforma (segundas, 8h)', 'admin', false]
 ];
-const NCH = [['app', 'Computador', 'monitor'], ['email', 'E-mail', 'mail'], ['sms', 'Mensagem', 'chat']];
+const NCH = [['app', 'Computador', 'monitor'], ['email', 'E-mail', 'mail']];
 const NSEC = 1000 * 60;
 function np(u) {
   if (!u.notif) {
@@ -3740,7 +3740,7 @@ function notifModal(tab) {
       + (ps === 'default' ? '<button class="btn sm primary" data-a="notif-enable">Ativar</button>' : '')
       + '<button class="btn sm" data-a="notif-test">Enviar teste</button></div>'
       + (ps === 'denied' || ps === 'unsupported' ? '<p class="hint" style="margin-top:8px">Sem esta permissão, os avisos «Computador» ficam só no sino. Pode ativá-la nas definições do site no browser.</p>' : '')
-      + '<p class="nsec">Onde quer receber</p><div class="grid2"><div class="field"><label for="n-email">E-mail</label><input id="n-email" type="email" value="' + esc(n.email || '') + '" data-a-change="notif-contact" data-k="email" placeholder="nome@empresa.pt"></div><div class="field"><label for="n-phone">Telemóvel (mensagem)</label><input id="n-phone" type="tel" value="' + esc(n.phone || '') + '" data-a-change="notif-contact" data-k="phone" placeholder="9XX XXX XXX"></div></div>'
+      + '<p class="nsec">Onde quer receber</p><div class="grid2"><div class="field"><label for="n-email">E-mail</label><input id="n-email" type="email" value="' + esc(n.email || '') + '" data-a-change="notif-contact" data-k="email" placeholder="nome@empresa.pt"></div></div>'
       + '<p class="nsec">O que quer receber</p><table class="nt"><thead><tr><th></th>' + NCH.map(c=>'<th>' + c[1] + '</th>').join('') + '</tr></thead><tbody>'
       + NT.filter(x=>can(x[2])).map(x=>'<tr><td>' + x[1] + '</td>' + NCH.map(c=>'<td><input type="checkbox" aria-label="' + esc(x[1]) + ' · ' + c[1] + '" data-a-change="notif-pref" data-t="' + x[0] + '" data-c="' + c[0] + '"' + (n.types[x[0]][c[0]] ? ' checked' : '') + '></td>').join('') + '</tr>').join('')
       + '</tbody></table><p class="hint" style="margin-top:12px">As alterações guardam-se sozinhas. Os avisos de datas aparecem 2 dias antes (campanhas e vídeos) e 48 h antes (início sem conteúdos). O administrador recebe por e-mail só os avisos importantes: ecrã sem ligação há 15 minutos ou mais, campanha quase sem passagens, disco quase cheio e cópia de segurança falhada. Recebe ainda, às segundas-feiras às 8h, um resumo da semana. Para isso fica marcada a coluna E-mail de «Ecrã sem ligação ou com falhas» e de «Campanha abaixo do contratado».</p>';
@@ -5910,13 +5910,15 @@ const actions = {
       if (r && r.then)r.then(function() {notifModal('pref');}, function() {notifModal('pref');});
     } catch (e) {notifModal('pref');}
   },
-  'notif-test':function() {
+  'notif-test':async function() {
     const n = np(state.user), now = Date.now(), ch = [];
     const d = deskNotify('Enif DOOH', 'Notificação de teste. Está tudo a funcionar.', 'teste');
     if (d)ch.push('computador');
-    if (n.email) {n.sent.unshift({ch:'email', to:n.email, title:'Notificação de teste', t:now}); ch.push('e-mail');}
-    if (n.phone) {n.sent.unshift({ch:'sms', to:n.phone, title:'Notificação de teste', t:now}); ch.push('mensagem');}
-    toast(ch.length ? 'Teste enviado por: ' + ch.join(', ') + '.' : 'Teste feito, mas nenhum canal está pronto. Ative o computador ou indique e-mail/telemóvel.');
+    if (n.email || state.user.email) {
+      try {await api('POST', '/api/notif/test', {}); n.sent.unshift({ch:'email', to:n.email || state.user.email, title:'Notificação de teste', t:now}); ch.push('e-mail');}
+      catch (e) {toast('O e-mail de teste falhou: ' + e.message);}
+    }
+    toast(ch.length ? 'Teste enviado por: ' + ch.join(', ') + '.' : 'Teste feito, mas nenhum canal está pronto. Ative o computador ou indique o e-mail.');
     if (state.notifTab === 'out' || state.notifTab === 'pref')notifModal(state.notifTab);
   },
   'camp-pause':function(t) {

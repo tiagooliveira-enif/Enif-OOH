@@ -386,6 +386,14 @@ async function main() {
     await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CL1' }, { op: 'del', coll: 'campaigns', id: 'CL2' }]);
   }
 
+  // ---- «Enviar teste» das notificações: e-mail verdadeiro (sem o servidor de e-mail configurado, diz-o com clareza)
+  {
+    let r = await call('POST', '/api/notif/test', {});
+    ok('o teste de notificações exige sessão', r.s === 401);
+    r = await call('POST', '/api/notif/test', {}, adm);
+    ok('sem e-mail configurado no servidor o teste diz-o (e não finge que enviou)', r.s === 503 && /ainda não está configurado/.test(r.j.error));
+  }
+
   // ---- resumo semanal por e-mail ao administrador
   {
     const got = [], fake = (a, sub, t) => { got.push({ a, sub, t }); };

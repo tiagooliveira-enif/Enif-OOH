@@ -549,6 +549,7 @@ const mailKind = a => /^under-/.test(a.id) ? 'under' : 'alert';
 const wantsMail = (u, kind) => { const t = u.notif && u.notif.types && u.notif.types[kind]; return !t || t.email !== false; };
 const mailTo = u => String((u.notif && u.notif.email) || u.email || '').trim();
 const MAIL_OFF_MIN = 15, MAIL_DAILY_MAX = 30;
+const testMailAt = new Map();
 function importantAlerts() {
   const ln = S.lisbonNow(TZ), out = [];
   screenViews(false).alerts.forEach(a => {
@@ -1120,6 +1121,15 @@ const router = async (req, res) => {
     return send(res, 200, { ok: true });
   }
   if (p === '/api/state' && m === 'GET') return send(res, 200, buildState(needUser(req, u)));
+  if (p === '/api/notif/test' && m === 'POST') {                                  // «Enviar teste» das notificações: e-mail verdadeiro para o próprio utilizador
+    const user = needUser(req, u), to = mailTo(user), cfg = smtpCfg();
+    if (!cfg) throw new HttpError(503, 'O envio de e-mail ainda não está configurado no servidor.');
+    if (!/@/.test(to)) throw new HttpError(400, 'Indique primeiro o seu e-mail nas preferências.');
+    const last = testMailAt.get(user.id) || 0; if (Date.now() - last < 15000) throw new HttpError(429, 'Espere uns segundos antes de enviar outro teste.');
+    testMailAt.set(user.id, Date.now());
+    try { await MAIL.send(cfg, { to, subject: 'Teste de notificações – Enif DOOH', text: 'Olá,\n\nEste é um e-mail de teste da plataforma Enif DOOH. Se o recebeu, os avisos por e-mail estão a funcionar.\n\nEnif DOOH' }); } catch (e) { throw new HttpError(502, 'Não foi possível enviar o e-mail: ' + e.message); }
+    return send(res, 200, { ok: true, to });
+  }
   if (p === '/api/poi' && m === 'POST') {
     const user = needUser(req, u); need(user, 'ecras.gerir'); const b = await readJson(req);
     const lat = num(b.lat, -90, 90, 'Latitude'), lng = num(b.lng, -180, 180, 'Longitude');
