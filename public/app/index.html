@@ -4633,11 +4633,21 @@ const DISK_TOTAL = 80 * 1073741824;   // espaço do servidor (plano contratado)
 const sizeBytes = function(t) {const m = /([\d.,]+)\s*(KB|MB|GB)/i.exec(t || ''); if (!m) return 0; return parseFloat(m[1].replace(',', '.')) * ({KB:1024, MB:1048576, GB:1073741824}[m[2].toUpperCase()]);};
 const fmtBytes = b=>b >= 1073741824 ? (b / 1073741824).toFixed(1).replace('.', ',') + ' GB' : (b >= 1048576 ? Math.round(b / 1048576) + ' MB' : Math.max(1, Math.round(b / 1024)) + ' KB');
 function diskInfo() {const d = state.serverDisk; if (d && d.total > 0) {const used = Math.max(0, d.total - d.free); return {used:used, free:d.free, pct:Math.min(100, used / d.total * 100)};} const used = contents.reduce((a, f)=>a + sizeBytes(f.size), 0); return {used:used, free:Math.max(0, DISK_TOTAL - used), pct:Math.min(100, used / DISK_TOTAL * 100)};}
+const bkDisk = function() {return state.backupDisk || null;};
+function diskBar(d, warn, label) {
+  const c = warn ? 'var(--bad)' : 'var(--accent)';
+  return '<div class="netbar" role="img" aria-label="' + label + '"><i style="width:' + d.pct.toFixed(2) + '%;background:' + c + '"></i></div>'
+    + '<div class="legend"><span style="--lc:' + c + '">Usado <b>' + fmtBytes(d.used) + '</b></span><span style="--lc:var(--line-strong)">Livre <b>' + fmtBytes(d.free) + '</b></span><span>Total <b>' + fmtBytes(d.total) + '</b></span></div>';
+}
 function diskCard() {
-  const d = diskInfo(), warn = d.pct >= 80;
-  return '<div class="' + (warn ? 'banner' : '') + '" style="' + (warn ? '' : '') + '">' + (warn ? ic('alert') + '<p><b>Armazenamento quase cheio:</b> ' + d.pct.toFixed(0) + ' % usado. Apague conteúdos que já não usa ou aumente o espaço do servidor.</p>' : '') + '</div>'
-    + '<div class="netbar" role="img" aria-label="Armazenamento usado"><i style="width:' + d.pct.toFixed(2) + '%;background:' + (warn ? 'var(--bad)' : 'var(--accent)') + '"></i></div>'
-    + '<div class="legend"><span style="--lc:' + (warn ? 'var(--bad)' : 'var(--accent)') + '">Usado <b>' + fmtBytes(d.used) + '</b></span><span style="--lc:var(--line-strong)">Livre <b>' + fmtBytes(d.free) + '</b></span><span>Total <b>' + fmtBytes(DISK_TOTAL) + '</b></span></div>';
+  const d = diskInfo(), warn = d.pct >= 80, b = bkDisk();
+  d.total = d.used + d.free;
+  const bi = b && b.total > 0 ? {used:Math.max(0, b.total - b.free), free:b.free, total:b.total, pct:Math.min(100, Math.max(0, b.total - b.free) / b.total * 100)} : null;
+  return (warn ? '<div class="banner">' + ic('alert') + '<p><b>Armazenamento quase cheio:</b> ' + d.pct.toFixed(0) + ' % usado. Apague conteúdos que já não usa ou aumente o espaço do servidor.</p></div>' : '')
+    + '<div class="muted" style="font-weight:600;margin-bottom:6px">Conteúdos e aplicação</div>'
+    + diskBar(d, warn, 'Armazenamento usado')
+    + '<p class="hint" style="margin-top:8px">Aqui ficam os vídeos e imagens que carrega. Tem ' + fmtBytes(d.free) + ' livres para novos conteúdos.</p>'
+    + (bi ? '<div class="muted" style="font-weight:600;margin:16px 0 6px">Cópias de segurança</div>' + diskBar(bi, bi.pct >= 80, 'Espaço das cópias de segurança usado') : '');
 }
 const diskLow = s=>!!s.disk && s.disk.free / s.disk.total < 0.1;
 
@@ -5782,7 +5792,7 @@ function applyState(st) {
     return c;
   }));
   setArr(contents, st.contents.map(function(f) {if (f.type === 'Imagem')f.url = '/media/' + f.id + '?t=' + tk; else if (f.type === 'Vídeo')f.src = '/media/' + f.id + '?t=' + tk; return f;}));
-  state.smtpReady = !!st.smtpReady; state.serverDisk = st.serverDisk || null;
+  state.smtpReady = !!st.smtpReady; state.serverDisk = st.serverDisk || null; state.backupDisk = st.backupDisk || null;
   setArr(auditLog, (st.auditLog || [])); setArr(backups, (st.backups || [])); setArr(emailLog, (st.emailLog || []));
   setArr(folders, st.folders);
   setArr(bin, st.bin || []); state.clean = st.clean || state.clean;

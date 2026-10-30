@@ -640,6 +640,9 @@ function buildState(user) {
     st.backups = backupList(10); st.emailLog = emailList();
   }
   try { const d = fs.statfsSync(DATA); st.serverDisk = { free: Number(d.bavail) * Number(d.bsize), total: Number(d.blocks) * Number(d.bsize) }; } catch (e) { /* sem informação */ }
+  try {
+    if (fs.statSync(DATA).dev !== fs.statSync(BACKUPS).dev) { const b = fs.statfsSync(BACKUPS); st.backupDisk = { free: Number(b.bavail) * Number(b.bsize), total: Number(b.blocks) * Number(b.bsize) }; }
+  } catch (e) { /* sem informação */ }
   return st;
 }
 
