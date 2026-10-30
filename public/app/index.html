@@ -467,6 +467,37 @@ svg.i {
   font-weight: 600;
   color: var(--muted);
 }
+.img-grp {
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  margin: 6px 0;
+  padding: 0 10px;
+}
+.img-grp summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  cursor: pointer;
+  font-weight: 600;
+  list-style: none;
+}
+.img-grp summary::-webkit-details-marker {
+  display: none;
+}
+.img-grp summary::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+  flex: none;
+}
+.img-grp[open] summary::before {
+  transform: rotate(45deg);
+}
 .seg button[aria-pressed="true"] {
   background: var(--surface-strong);
   color: var(--accent);
@@ -5375,10 +5406,10 @@ function imgPicker() {
   campaigns.forEach(function(c) {
     const fs = c.items.map(function(i) {return fileById(i.f);}).filter(function(f) {return f && cands.indexOf(f) > -1;});
     if (!fs.length) return;
-    out.push('<div class="muted" style="margin:8px 0 2px;font-weight:600">' + esc(c.name) + '</div>' + fs.map(f=>{seen.add(f.id); return row(f, false);}).join(''));
+    out.push('<details class="img-grp"><summary><span class="grow">' + esc(c.name) + '</span><small class="muted img-cnt" data-n="' + fs.length + '">' + fs.length + (fs.length === 1 ? ' conteúdo' : ' conteúdos') + '</small></summary>' + fs.map(f=>{seen.add(f.id); return row(f, false);}).join('') + '</details>');
   });
   const rest = cands.filter(f=>!seen.has(f.id));
-  if (rest.length) out.push('<div class="muted" style="margin:8px 0 2px;font-weight:600">Sem campanha</div>' + rest.map(f=>row(f, false)).join(''));
+  if (rest.length) out.push('<details class="img-grp"><summary><span class="grow">Sem campanha</span><small class="muted img-cnt" data-n="' + rest.length + '">' + rest.length + (rest.length === 1 ? ' conteúdo' : ' conteúdos') + '</small></summary>' + rest.map(f=>row(f, false)).join('') + '</details>');
   return out.join('') || '<span class="muted">Não há vídeos nem imagens.</span>';
 }
 function imgCands() {
@@ -6187,6 +6218,10 @@ document.addEventListener('change', function(e) {
   else if (t.id === 'rep-file') {state.repFile = t.value; state.logLimit = 10; render();}
   else if (t.id === 'mail-f-camp' || t.id === 'mail-f-st' || t.id === 'mail-f-from' || t.id === 'mail-f-to') {
     const k = {'mail-f-camp':'camp', 'mail-f-st':'st', 'mail-f-from':'from', 'mail-f-to':'to'}[t.id]; state.mailF[k] = t.value; render();}
+  else if (t.name === 'img-file') {
+    const g = t.closest('.img-grp'), cnt = g && g.querySelector('.img-cnt');
+    if (cnt) {const k = g.querySelectorAll('input[name=img-file]:checked').length, n = +cnt.dataset.n; cnt.textContent = k ? k + ' de ' + n + ' selecionado' + (k === 1 ? '' : 's') : n + (n === 1 ? ' conteúdo' : ' conteúdos');}
+  }
   else if (t.id === 'inc-img') {const bx = $('#img-opts'); if (bx)bx.style.display = t.checked ? 'block' : 'none';}
   else if (t.id === 'rep-from' || t.id === 'rep-to') {
     const k = t.id === 'rep-from' ? 'from' : 'to';
