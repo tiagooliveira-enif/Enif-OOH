@@ -4094,7 +4094,7 @@ function drawScreenList() {
   }).join('');
   $('#screen-list').innerHTML = '<div class="t-row t-head"><span>Ecrã</span><span class="hm">Tipo</span><span class="hm">Cidade</span><span class="hm">A reproduzir</span><span>Estado</span></div>'
     + (rows || '<div class="empty">' + (screens.length ? 'Nenhum ecrã corresponde à pesquisa.' : 'Ainda não há ecrãs.' + (can('ecras.gerir') ? ' Crie o primeiro em «Novo ecrã».' : '')) + '</div>')
-    + (list.length > shown.length ? '<div class="more"><button class="btn" data-a="more">Ver tudo</button></div>' : '');
+    + (list.length > shown.length ? '<div class="more"><button class="btn" data-a="more">Ver tudo</button></div>' : (list.length > 10 ? '<div class="more"><button class="btn" data-a="less">Mostrar só 10</button></div>' : ''));
 }
 function logsFor(s) {
   const t = ms=>{const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes());};
@@ -5263,7 +5263,7 @@ function viewReports() {
     return '<tr><td>' + esc(dFull.format(r.d)) + '</td><td>' + esc(r.s.venue) + '<div class="muted">' + esc(r.s.city) + '</div></td><td>' + esc(r.s.spot) + '<div class="muted mono">' + r.s.id + '</div></td><td><b>' + esc(r.c.name) + '</b></td><td>' + (r.f ? esc(fname(r.f)) : '<span class="muted">—</span>') + '</td><td class="num">' + fmtHM(r.a) + '</td><td class="num">' + saiu + '</td><td class="num">' + fmt.format(r.plays) + '</td></tr>';
   }).join('');
   const logCard = '<div class="card" data-nolim="1"><div class="card-h"><h2>Registo de emissão</h2><span class="hint">' + fmt.format(log.length) + ' registos · um por campanha, vídeo, ecrã e dia</span></div><div class="scroll-x" style="margin-top:8px"><table class="tbl" style="min-width:900px"><thead><tr><th>Data</th><th>Local</th><th>Ecrã</th><th>Campanha</th><th>Vídeo</th><th class="num">Entrou</th><th class="num">Saiu</th><th class="num">Passagens</th></tr></thead><tbody>' + logRows + '</tbody></table></div>'
-    + (log.length > shown.length ? '<div class="more"><button class="btn" data-a="log-more">Ver tudo</button></div>' : '') + '</div>';
+    + (log.length > shown.length ? '<div class="more"><button class="btn" data-a="log-more">Ver tudo</button></div>' : (log.length > 10 ? '<div class="more"><button class="btn" data-a="log-less">Mostrar só 10</button></div>' : '')) + '</div>';
   const mailCard = (state.user && state.user.admin) ? mailSection() : '';
   return tools + kpis + confLine + '<div class="stack">' + chart + '<div class="cols">' + table + rec + '</div>' + fileCard + logCard + mailCard + '</div>';
 }
@@ -5881,6 +5881,7 @@ const actions = {
   },
   filter:function(t) {state.filter = t.dataset.f; state.limit = 10; render();},
   more:function() {state.limit = 1e9; drawScreenList();},
+  less:function() {state.limit = 10; drawScreenList();},
   'new-screen':function() {if (guard('ecras.gerir'))newScreenModal();},
   'new-camp':function() {if (guard('campanhas.gerir'))campModal();},
   'edit-camp':function(t) {campModal(t.dataset.id);},
@@ -6048,6 +6049,7 @@ const actions = {
   'rs-none':function() {document.querySelectorAll('#modal-root input[type="checkbox"]').forEach(function(i) {i.checked = false;});},
   export:function() {if (guard('relatorios.exportar'))exportModal();},
   'log-more':function() {state.logLimit = 1e9; render();},
+  'log-less':function() {state.logLimit = 10; render();},
   'pl-move':function(t) {
     if (!guard('playlist.gerir')) return;
     const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
