@@ -4660,12 +4660,12 @@ const MANUAL = {
    ['Perceba o aviso «abaixo do contratado»', 'Quando uma campanha passa menos de 90 % das passagens previstas nas últimas 24 h, aparece um alerta com a causa principal (por exemplo, um ecrã sem sinal). Carregue em «Ver campanha» ou «Ver ecrã». Este aviso é só interno: não aparece nos relatórios.', 'campanhas.ver'],
    ['Receba os avisos importantes por e-mail', 'O administrador recebe um e-mail quando um ecrã fica sem ligação há 15 minutos ou mais, uma campanha fica quase sem passagens, o disco está quase cheio ou a cópia de segurança falha, e outro quando o problema se resolve. Às segundas-feiras às 8h recebe também um resumo da semana (ecrãs, alertas, campanhas, disco e cópias). Escolha em «Notificações > Preferências» (coluna E-mail).', 'admin'],
    ['Dê o alerta como resolvido', 'Depois de tratar do problema, carregue em «Marcar como resolvido» para o alerta sair da lista.', 'alertas.resolver'],
-   ['Confira o que está no ar', 'Em «A reproduzir agora» vê as campanhas que estão a passar neste momento e em quantos ecrãs.'],
+   ['Confira o que está no ar', 'Em «A reproduzir agora» vê o que passa neste momento. «Por campanha» mostra cada campanha e em quantos ecrãs passa; «Por ecrã» mostra cada ecrã com a campanha que lhe cabe agora. Com 6 ou mais ecrãs abre sozinho em «Por ecrã», e pode mudar quando quiser.'],
    ['Veja o Calendário', 'O cartão «Calendário» lê só os eventos com a palavra definida (por exemplo «SPOTS DIGITAIS»). Quando faltam 48 horas exatas para um evento aparece «Verificar Evento». Carregue em + para ver os detalhes e em «Lida» para o aviso desaparecer.'],
    ['Mude a palavra do Calendário', 'No cartão, o campo «Palavra» define que eventos são lidos. Só quem gere ecrãs a vê.', 'ecras.gerir'],
    ['Leia as sugestões da IA', 'A plataforma sugere o que fazer a seguir, por exemplo uma campanha que está a terminar. Carregue no botão da sugestão para agir logo.'],
-   ['Veja a rede e o armazenamento', '«Estado da rede» mostra quantos ecrãs estão online, em atenção e offline. «Armazenamento» mostra o espaço usado no servidor: quando passar dos 80 %, apague conteúdos que já não usa.', 'conteudos.ver']]}],
-  tips:[['Para criar uma campanha sem sair do painel, use o botão «Nova campanha» no topo.', 'campanhas.gerir'], ['As visualizações são estimativas, não contagens exatas.']]},
+   ['Veja a rede e o armazenamento', '«Estado da rede» mostra quantos ecrãs estão online, em atenção e offline. «Armazenamento» tem duas barras: «Conteúdos» mostra o espaço do servidor onde ficam os vídeos e imagens (o «Livre» é o que ainda pode carregar; quando passar dos 80 %, apague conteúdos que já não usa) e «Cópias de segurança» mostra o espaço do disco das cópias.', 'conteudos.ver']]}],
+  tips:[['Para criar uma campanha sem sair do painel, use o botão «Nova campanha» no topo.', 'campanhas.gerir'], ['As visualizações são estimativas, não contagens exatas.'], ['Quando uma lista tem mais de 10 linhas, só vê as 10 primeiras: «Ver tudo» abre as restantes e «Mostrar só 10» volta a recolher.']]},
  ecras:{t:'Ecrãs', intro:'Aqui vê todos os ecrãs da rede, o estado de cada um e o que estão a passar.', blocks:[
   {h:'Encontrar e ver um ecrã', steps:[
    ['Procure ou filtre', 'Escreva o local, a cidade ou o código na pesquisa, ou use os filtros Online, Atenção, Offline, Conflitos e Por enviar.'],
@@ -4680,7 +4680,7 @@ const MANUAL = {
   {h:'Juntar um ecrã novo', need:'ecras.gerir', go:1, steps:[
    ['Carregue em «Novo ecrã»', 'No topo da página.'],
    ['Preencha os dados', 'Local, posição no local, cidade, tipo de ecrã, máximo de campanhas em simultâneo e resolução. Se não souber a resolução, deixe «detetar automaticamente».'],
-   ['Guarde e anote o código', 'Depois de guardar recebe um código. No mini PC do ecrã, abra o player da Enif e introduza esse código.'],
+   ['Guarde e anote o código', 'Depois de guardar, a ficha do ecrã mostra o código e a chave do player, na secção «Player». «Copiar comando de instalação» dá o comando para instalar o player no mini PC (o manual de instalação explica o passo a passo). A chave é secreta.'],
    ['Espere pela ligação', 'Quando o player se ligar, o estado passa a Online.']]},
   {h:'Estimar o movimento à volta do ecrã', need:'ecras.gerir', steps:[
    ['Indique as coordenadas', 'Em «Alterar» na localização, preencha as coordenadas do ecrã.'],
@@ -4696,13 +4696,13 @@ const MANUAL = {
    ['Reiniciar o player e Teste no ecrã', '«Reiniciar player» reinicia o programa do ecrã. «Teste no ecrã» mostra durante 30 segundos uma imagem de teste, para confirmar a posição e a resolução.'],
    ['Alterar dados', 'Ao lado da resolução, do horário e da localização há o botão «Alterar».'],
    ['Eliminar ecrã', 'Só quando o ecrã já não existir. Pede confirmação.']]}],
-  tips:[['O estado «Por emparelhar» significa que o código ainda não foi introduzido no player.'], ['O brilho de cada ecrã segue um horário (mais de dia, menos à noite). Na ficha do ecrã, em «Brilho» e «Alterar», pode fixá-lo à mão em «Manual» e voltar ao «Automático» quando quiser.', 'ecras.gerir']]},
+  tips:[['O estado «Por emparelhar» significa que o código ainda não foi introduzido no player.'], ['Fora do horário de funcionamento (ligar e desligar), a imagem do ecrã fica totalmente preta, mesmo que o painel continue ligado.'], ['O brilho de cada ecrã fica guardado na ficha, em «Brilho» e «Alterar» (Automático por horário ou Manual). Por agora a plataforma ainda não o aplica ao painel: ajuste-o na NovaLCT.', 'ecras.gerir']]},
  campanhas:{t:'Campanhas', intro:'Uma campanha diz o que passa, onde, quando e com que frequência.', blocks:[
   {h:'Criar uma campanha', need:'campanhas.gerir', go:1, steps:[
    ['Carregue em «Nova campanha»', 'No topo da página.'],
    ['Dê o nome e o cliente', 'Por exemplo “Verão Algarve” e “Sol Tours”.'],
    ['Escolha o tipo de negócio (opcional)', 'Campanhas do mesmo tipo, como duas imobiliárias, não passam seguidas no ecrã. Se o tipo não estiver na lista, escolha «Outro» e escreva-o.'],
-   ['Escreva o e-mail do comercial (opcional)', 'Essa pessoa recebe um aviso uma semana antes de a campanha acabar e, no fim, o relatório com as imagens para mostrar ao cliente.'],
+   ['Escreva o e-mail do comercial (opcional)', 'Essa pessoa recebe um aviso uma semana antes de a campanha acabar e, no fim, o relatório completo em PDF: totais, gráfico por hora, tabelas por conteúdo, por ecrã e por dia, imagens dos conteúdos e registo de emissão.'],
    ['Marque onde passa', 'Escolha os locais. A campanha passa em todos os ecrãs desses locais onde houver um conteúdo compatível.'],
    ['Defina as datas e as horas', 'Início e Fim, e a janela «Das» e «Até às». Se quiser ajuda, «Sugerir horário com IA» propõe a janela com mais passagem de pessoas.'],
    ['Escolha a duração e a modalidade', 'Duração do vídeo em segundos e modalidade de passagem: 2× por minuto, 1× por minuto ou 1× a cada 5 minutos (ou «Outra…»). Escolha também a prioridade: Alta garante as passagens por minuto, Normal passa uma vez por volta.'],
@@ -4744,13 +4744,16 @@ const MANUAL = {
    ['Leia os números', 'Visualizações estimadas, passagens, ecrãs com reprodução e média por ecrã.'],
    ['Veja os detalhes', 'O gráfico mostra as horas com mais visualizações, a tabela «Por ecrã» compara os ecrãs e o «Registo de emissão» lista o que passou.']]},
   {h:'Exportar o relatório', need:'relatorios.exportar', go:1, steps:[
-   ['Carregue em «Exportar PDF»', 'No topo da página. Exporta a seleção que tem no ecrã.'],
-   ['Escolha o que levar', 'Pode juntar uma imagem de um conteúdo, num segundo à sua escolha.'],
-   ['Descarregue e envie', 'O PDF fica pronto para mostrar ao cliente.']]},
+   ['Carregue em «Exportar PDF»', 'No topo da página. Abre a janela onde escolhe o que vai no relatório.'],
+   ['Escolha as campanhas e os conteúdos', 'Cada campanha tem uma seta: abra-a para marcar só os vídeos ou imagens que quer. A caixa da campanha marca todos os conteúdos dela. «Selecionar tudo» e «Limpar» marcam ou desmarcam tudo.'],
+   ['Escolha os ecrãs e o período', 'Na mesma janela: os ecrãs que contam e 7 dias, 30 dias ou datas à escolha. O relatório só conta o que escolher.'],
+   ['Escolha o que incluir', 'Resumo e tabelas, gráfico por hora, registo de emissão e, se quiser, uma imagem de cada conteúdo escolhido (até 12), num segundo à sua escolha.'],
+   ['Descarregue e envie', 'O PDF traz o resumo geral, um bloco por campanha (conteúdos, ecrãs e imagens) e, no fim, o registo de emissão completo. Fica pronto para o cliente.']]},
   {h:'Envios ao comercial', need:'admin', steps:[
+   ['O que o comercial recebe', 'O relatório final é automático, na manhã a seguir ao fim da campanha, e traz a campanha inteira: totais, gráfico por hora, tabelas por conteúdo, por ecrã e por dia, imagens dos conteúdos e registo de emissão.'],
    ['Veja os envios', 'No fim da página, «Envios ao comercial» mostra o aviso de fim de campanha e o relatório final, com a data, a hora e o estado de cada e-mail.'],
    ['Abra o comprovativo', '«Comprovativo» mostra o histórico do envio e pode ser descarregado. Se um envio falhou, use «Tentar de novo».']]}],
-  tips:[['As visualizações são estimativas, não contagens exatas.']]},
+  tips:[['As visualizações são estimativas, não contagens exatas.'], ['No «Registo de emissão», horas seguidas do mesmo conteúdo aparecem numa só linha, com as passagens somadas.'], ['As listas compridas mostram 10 linhas: use «Ver tudo» para abrir o resto.']]},
  utilizadores:{t:'Utilizadores', intro:'Aqui, o administrador decide quem entra na plataforma e o que cada pessoa pode fazer.', blocks:[
   {h:'Criar e alterar contas', go:1, steps:[
    ['Carregue em «Novo utilizador»', 'No topo da página.'],
