@@ -4644,10 +4644,9 @@ function diskCard() {
   d.total = d.used + d.free;
   const bi = b && b.total > 0 ? {used:Math.max(0, b.total - b.free), free:b.free, total:b.total, pct:Math.min(100, Math.max(0, b.total - b.free) / b.total * 100)} : null;
   return (warn ? '<div class="banner">' + ic('alert') + '<p><b>Armazenamento quase cheio:</b> ' + d.pct.toFixed(0) + ' % usado. Apague conteúdos que já não usa ou aumente o espaço do servidor.</p></div>' : '')
-    + '<div class="muted" style="font-weight:600;margin-bottom:6px">Conteúdos e aplicação</div>'
+    + '<div class="muted" style="font-weight:600;margin-bottom:6px">Conteúdos</div>'
     + diskBar(d, warn, 'Armazenamento usado')
-    + '<p class="hint" style="margin-top:8px">Aqui ficam os vídeos e imagens que carrega. Tem ' + fmtBytes(d.free) + ' livres para novos conteúdos.</p>'
-    + (bi ? '<div class="muted" style="font-weight:600;margin:16px 0 6px">Cópias de segurança</div>' + diskBar(bi, bi.pct >= 80, 'Espaço das cópias de segurança usado') : '');
+    + (bi ? '<div class="muted" style="font-weight:600;margin:20px 0 6px">Cópias de segurança</div>' + diskBar(bi, bi.pct >= 80, 'Espaço das cópias de segurança usado') : '');
 }
 const diskLow = s=>!!s.disk && s.disk.free / s.disk.total < 0.1;
 
