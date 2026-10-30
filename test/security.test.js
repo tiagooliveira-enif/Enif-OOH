@@ -39,7 +39,7 @@ async function main() {
   Object.assign(process.env, { DATA_DIR: tmp, ADMIN_NAME: 'Tiago', ADMIN_EMAIL: 'tiago@enif.pt', ADMIN_PASS: 'segredo-inicial', PORT: '0', CONFIG_FILE: path.join(tmp, 'sem.json'),
     SMTP_HOST: '127.0.0.1', SMTP_PORT: String(smtp.address().port), SMTP_PLAIN: '1', SMTP_USER: 'utilizador', SMTP_PASS: 'segredo-smtp', SMTP_FROM: 'Enif DOOH <relatorios@enif.pt>' });
   fs.writeFileSync(process.env.CONFIG_FILE, JSON.stringify({ emailRecuperacao: 'recupera@enif.pt' }));
-  const { server, db, tick, backupNow } = require('../server');
+  const { server, db, tick } = require('../server');
   const S = require('../lib/schedule');
   await new Promise(r => server.listen(0, r));
   const base = 'http://127.0.0.1:' + server.address().port;

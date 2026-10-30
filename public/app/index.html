@@ -5119,9 +5119,6 @@ function repScope() {
   const c = state.repCamp === 'all' ? null : campById(state.repCamp);
   return c ? screensOf(c) : screens.slice();
 }
-function repSelected(scope) {
-  return state.repScreens ? scope.filter(s=>state.repScreens.has(s.id)) : scope;
-}
 /* hora a que o vídeo deixa de passar num dado dia e ecrã (hoje conta só até agora e até ao último sinal) */
 const dYear = new Intl.DateTimeFormat('pt-PT', {day:'numeric', month:'short', year:'numeric'});
 function repRange() {

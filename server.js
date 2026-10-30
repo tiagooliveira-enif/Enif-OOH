@@ -906,7 +906,7 @@ async function finalReportPdf(c) {
       const f = contentAny(id); if (!f || f.gone) continue;
       const out = path.join(tmp, id + '.jpg'); let jpg = null;
       try { if (await M.jpegStill(path.join(MEDIA, path.basename(id)), f.type, out, 2)) jpg = fs.readFileSync(out); } catch (e) { /* sem ação */ }
-      files[id] = { name: f.name, jpg };
+      files[id] = { name: f.name, type: f.type, jpg };
     }
     return REPORT.buildReport(c, rows, scrs, files, Date.now());
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); }

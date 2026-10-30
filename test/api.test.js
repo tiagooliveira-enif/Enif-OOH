@@ -88,7 +88,7 @@ async function main() {
   ok('chave do player escondida de quem não gere ecrãs', !(await call('GET', '/api/state', undefined, tvw3)).j.screens[0].playerKey);
   ok('limite inválido recusado', (await sync(top, [scr('ECR-009', { limit: 0 })])).s === 400);
   ok('só consulta não muda o horário', (await sync(tvw3, [op('screens', 'ECR-001', { off: 20 }, ['off'])])).s === 403);
-  const tpl = await tok('vw@x.pt');
+  await tok('vw@x.pt');
   await sync(adm, [op('users', 'uvw', { perms: ['ecras.ver', 'playlist.gerir'] }, ['perms'])]);
   const tpl2 = await tok('vw@x.pt');
   ok('playlist.gerir muda a ordem mas não o horário', (await sync(tpl2, [op('screens', 'ECR-001', { order: ['C1'], limit: 3 }, ['order', 'limit'])])).s === 200 && (await sync(tpl2, [op('screens', 'ECR-001', { off: 20 }, ['off'])])).s === 403);
