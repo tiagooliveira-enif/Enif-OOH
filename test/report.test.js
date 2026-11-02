@@ -20,11 +20,13 @@ assert.equal(buf.slice(0, 4).toString(), '%PDF');
 const f = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'rep-')), 'r.pdf'); fs.writeFileSync(f, buf);
 const txt = execFileSync('pdftotext', ['-layout', f, '-'], { encoding: 'utf8' });
 const has = s => assert.ok(txt.includes(s), 'falta no PDF: ' + s);
-['Relatório final da campanha', 'Campanha Teste', 'Visualizações por hora do dia', 'Por conteúdo', 'Video_A.mp4', 'Cartaz_B.jpg', 'Por ecrã', 'Por dia', 'Registo de emissão (4 registos)', 'Em curso'.slice(0, 0)].forEach(has);
+['Relatório de Insights', 'Enif DOOH - Visibilidade com Inteligência', 'Campanha: Campanha Teste', 'Visualizações por hora do dia', 'Conteúdo', 'Video_A.mp4', 'Cartaz_B.jpg', 'Ecrã', 'Cidade', 'Ecrãs com reprodução', 'Média por ecrã', 'Registo de emissão (4 registos)', 'Em curso'.slice(0, 0)].forEach(has);
 assert.ok(!txt.includes('FX'), 'a outra campanha não entra');
 const tot = 3 * 3 + 5 * 2 + 4;     // 23 passagens
-assert.ok(new RegExp('Passagens\\s+Visualiza').test(txt) && txt.includes(String(tot)), 'total de passagens ' + tot);
+assert.ok(txt.includes('Passagens') && new RegExp('\\b' + tot + '\\b').test(txt), 'total de passagens ' + tot);
 assert.equal((txt.match(/Entrou/g) || []).length >= 1, true);
+// formato igual ao do PDF manual: horizontal (A4 em paisagem)
+assert.ok(/\/MediaBox \[0 0 841\.89 595\.28\]/.test(buf.toString('latin1')), 'página horizontal');
 // o registo tem 4 linhas: A(1/10 9h-12h), B(1/10 9h), B(1/10 12h), A(2/10 10h)
 const log = txt.slice(txt.indexOf('Registo de emissão'));
 assert.equal((log.match(/Video_A\.mp4/g) || []).length, 2, 'vídeo A em 2 linhas do registo');
