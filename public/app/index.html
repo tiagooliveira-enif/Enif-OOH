@@ -3532,7 +3532,7 @@ function adjOf(L) {
   for (let i = 0; i < n; i++) {const c = q[i]; if (q[(i + 1) % n] === c && out.indexOf(c) < 0)out.push(c);}
   return out;
 }
-function screenIssues(s, draft) {
+function screenIssues(s, draft, all) {
   if (s.status === 'novo') return [];
   const cf = cfgOf(s, draft), list = playlistOf(s, draft), lim = cf.limit;
   if (!list.length) return [];
@@ -3557,7 +3557,12 @@ function screenIssues(s, draft) {
     if (last && last.kind === r.kind && last.h1 === r.h && last.key === key) {last.h1 = r.h + 1; return;}
     out.push({kind:r.kind, h0:r.h, h1:r.h + 1, key:key, ids:r.ids, L:r.L, limit:lim, sev:(r.kind === 'full' || r.kind === 'adj') ? 'info' : 'warn'});
   });
-  return out;
+  out.forEach(function(i) {
+    i.ik = 'iss-' + s.id + '-' + i.kind + '-' + i.h0 + '-' + i.h1 + '-' + i.ids.slice().sort().join('+');
+    i.canIgn = i.kind === 'ppm' || i.kind === 'adj' || i.kind === 'full';
+    i.ign = i.canIgn && !!state.dismissed[i.ik];
+  });
+  return all ? out : out.filter(i=>!i.ign);
 }
 function issueText(i) {
   const when = 'Entre as ' + i.h0 + 'h e as ' + i.h1 + 'h';
@@ -4089,10 +4094,11 @@ function playlistHtml(s) {
   const stepper = edit ? '<span class="stepper" role="group" aria-label="Máximo de campanhas em simultâneo"><button class="btn sm" data-a="limit" data-id="' + s.id + '" data-d="-1" aria-label="Menos uma campanha">−</button><input class="lim-in" type="number" min="1" max="' + LIM_MAX + '" step="1" value="' + lim + '" data-a-change="limit-input" data-id="' + s.id + '" aria-label="Número máximo de campanhas em simultâneo"><button class="btn sm" data-a="limit" data-id="' + s.id + '" data-d="1" aria-label="Mais uma campanha">+</button></span>' : '<b>' + lim + '</b>';
   const draftBar = s.draft ? '<div class="pl-draft">' + ic('alert') + '<p>Alterações por enviar. O ecrã continua a mostrar a versão anterior.</p><button class="btn sm" data-a="preview" data-id="' + s.id + '">' + ic('eye') + 'Pré-visualizar</button>' + (edit ? '<button class="btn sm primary" data-a="pl-send" data-id="' + s.id + '">' + ic('upload') + 'Enviar para o ecrã</button><button class="btn sm ghost" data-a="pl-discard" data-id="' + s.id + '">Descartar</button>' : '') + '</div>' : '';
   const strip = '<div class="pl-strip"><span>' + (!screenOn(s, h) ? 'Ecrã desligado agora (' + schedTxt(s) + '). Ele ' + untilTxt(s) + '.' : (L.loop.length ? 'Às ' + h + 'h: <b>' + L.loop.length + (L.loop.length === 1 ? ' campanha' : ' campanhas') + '</b> em loop · <b>' + L.cycle + ' s</b> ' + (L.per > 1 ? 'por ronda de ' + L.per + ' voltas (as campanhas que partilham a posição passam à vez)' : 'por volta') + ' · passam <b>' + rateTxt(L) + '</b> por minuto' + (L.spot ? ' · mais o spot da Enif, 1× por volta (' + L.spot.dur + ' s já incluídos)' : (L.spot5 ? ' · ecrã cheio: o spot da Enif passa 1× a cada 5 min (' + L.spot5.dur + ' s)' : '')) : 'Sem campanhas em loop às ' + h + 'h.' + (houseFor(s).length ? ' Passa o spot da Enif.' : ' O ecrã mostra o fundo de espera.'))) + '</span>' + (s.draft ? '' : '<button class="btn sm" data-a="preview" data-id="' + s.id + '" style="margin-left:auto">' + ic('eye') + 'Pré-visualizar o ecrã</button>') + '</div>';
-  const warns = screenIssues(s, true).map(function(i) {
+  const allW = screenIssues(s, true, true), nIgn = allW.filter(i=>i.ign).length;
+  const warns = allW.filter(i=>!i.ign).map(function(i) {
     const fix = edit ? limitFix(i) : 0;
-    return '<div class="pl-warn' + (i.sev === 'info' ? ' info' : '') + '">' + ic(i.sev === 'info' && i.kind !== 'adj' ? 'check' : 'alert') + '<span>' + (i.kind === 'adj' ? '<b>Aviso. </b>' : (i.sev === 'info' ? '' : '<b>Conflito. </b>')) + issueText(i) + '</span>' + (fix ? '<button class="btn sm" data-a="limit-set" data-id="' + s.id + '" data-n="' + fix + '">Subir limite para ' + fix + '</button>' : '') + '</div>';
-  }).join('');
+    return '<div class="pl-warn' + (i.sev === 'info' ? ' info' : '') + '">' + ic(i.sev === 'info' && i.kind !== 'adj' ? 'check' : 'alert') + '<span>' + (i.kind === 'adj' ? '<b>Aviso. </b>' : (i.sev === 'info' ? '' : '<b>Conflito. </b>')) + issueText(i) + '</span>' + (fix ? '<button class="btn sm" data-a="limit-set" data-id="' + s.id + '" data-n="' + fix + '">Subir limite para ' + fix + '</button>' : '') + (edit && i.canIgn ? '<button class="btn sm ghost" data-a="ign-issue" data-id="' + s.id + '" data-k="' + esc(i.ik) + '">Ignorar</button>' : '') + '</div>';
+  }).join('') + (nIgn ? '<p class="hint">' + (nIgn === 1 ? '1 aviso ignorado.' : nIgn + ' avisos ignorados.') + ' <button class="btn sm ghost" data-a="ign-reset" data-id="' + s.id + '">Voltar a mostrar</button></p>' : '');
   let items = '';
   const blocks = plBlocks(list);
   const mv = function(bi) {return edit ? '<span class="pl-btns"><button class="btn sm ghost" data-a="pl-move" data-id="' + s.id + '" data-i="' + bi + '" data-d="-1" aria-label="Subir na playlist"' + (bi === 0 ? ' disabled' : '') + '>' + ic('up') + '</button><button class="btn sm ghost" data-a="pl-move" data-id="' + s.id + '" data-i="' + bi + '" data-d="1" aria-label="Descer na playlist"' + (bi === blocks.length - 1 ? ' disabled' : '') + '>' + ic('down') + '</button></span>' : '';};
@@ -4713,6 +4719,7 @@ const MANUAL = {
    ['Veja o calendário', 'Mostra a semana, com todas as campanhas. Use as setas para mudar de semana e «Hoje» para voltar.'],
    ['Procure uma campanha', 'Escreva o nome, o cliente, o local ou o estado em «Procurar campanha».'],
    ['Abra uma campanha', 'Carregue nela para ver os detalhes ou, se tiver permissão, para a editar.'],
+   ['Ignore avisos que não importam', 'Na ficha do ecrã, em «Playlist», os avisos de passagens por minuto e os avisos informativos têm o botão «Ignorar». O aviso desaparece e fica guardado na sua conta; se mudar as campanhas ou as horas, volta a aparecer. «Voltar a mostrar» traz de novo os ignorados. Os conflitos graves, como campanhas que ficam de fora por falta de vagas, não se ignoram.', 'campanhas.gerir'],
    ['Pause ou retome', 'Dentro da campanha, «Pausar campanha» tira-a de todos os ecrãs até carregar em «Retomar campanha». Os dias anteriores não mudam nos relatórios.', 'campanhas.gerir']]},
   {h:'Ver a disponibilidade', steps:[
    ['Abra o separador «Disponibilidade»', 'Fica por cima do calendário.'],
@@ -6028,6 +6035,15 @@ const actions = {
   'cal-open':function(t) {state.calOpen[t.dataset.id] = !state.calOpen[t.dataset.id]; render();},
   'cal-read':function(t) {api('POST', '/api/calendar/read', {id:t.dataset.id}).then(function(r) {state.cal = r; render();}).catch(function(e) {toast(e.message);});},
   dismiss:function(t) {if (!guard('campanhas.gerir')) return; state.dismissed[t.dataset.id] = true; render();},
+  'ign-issue':function(t) {
+    if (!guard('campanhas.gerir')) return;
+    state.dismissed[t.dataset.k] = true; reopenScreen(t.dataset.id); render();
+  },
+  'ign-reset':function(t) {
+    if (!guard('campanhas.gerir')) return;
+    Object.keys(state.dismissed).forEach(function(k) {if (k.indexOf('iss-' + t.dataset.id + '-') === 0) delete state.dismissed[k];});
+    reopenScreen(t.dataset.id); render();
+  },
   notifs:function() {notifModal('in');},
   'notif-tab':function(t) {notifModal(t.dataset.t);},
   'notif-clear':function() {np(state.user).inbox = []; notifModal('in'); render();},
