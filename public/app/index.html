@@ -5738,7 +5738,7 @@ function setArr(a, b) {a.length = 0; b.forEach(function(x) {a.push(x);});}
 const sleep = ms=>new Promise(function(r) {setTimeout(r, ms);});
 
 const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'bri'];
-const CMP_KEYS = ['name', 'client', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ppm', 'dur', 'priority', 'manual', 'color', 'items', 'pauses'];
+const CMP_KEYS = ['name', 'client', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'manual', 'color', 'items', 'pauses'];
 const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'photo', 'notif', 'ui'];
 const emptyBase = ()=>({screens:{}, campaigns:{}, folders:{}, contents:{}, users:{}});
 let base = emptyBase();
