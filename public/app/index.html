@@ -3158,7 +3158,7 @@ const venues = [];
 const screens = [], campaigns = [], contents = [], folders = [], users = [];
 let alerts = [];
 /* ---------- compatibilidade conteúdo-ecrã: mesma proporção; se a resolução não for igual, ajusta-se (diferença máxima de 10 px) ---------- */
-const FIT_PX = 10;
+const FIT_PX = 10, FIT_MS = 24 * 3600000;   /* os avisos «Ajuste automático» saem 24 h depois de aparecerem */
 const dimsOf = function(res) {const m = /(\d+)\s*[×x]\s*(\d+)/.exec(res || ''); return m && +m[1] > 0 && +m[2] > 0 ? {w:+m[1], h:+m[2]} : null;};
 function fitOf(f, s) {
   const a = f && f.type !== 'HTML5' ? dimsOf(f.res) : null, b = dimsOf(s.res);
@@ -3199,7 +3199,7 @@ const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
 
-const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
+const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fitSeen:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
 
 /* ---------- derived data ---------- */
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
@@ -4082,7 +4082,12 @@ function screenNotes(s) {
   campaigns.filter(c=>statusOf(c) !== 'Terminada' && c.venues.indexOf(s.venue) > -1 && c.items.length).forEach(function(c) {
     const fs = c.items.map(i=>fileById(i.f)).filter(Boolean), ok = fs.filter(f=>okFor(f, s));
     if (!ok.length) {out.push('<div class="pl-warn">' + ic('alert') + '<span><b>«' + esc(c.name) + '» não passa neste ecrã.</b> Nenhum dos conteúdos está associado a este ecrã com a proporção certa (' + esc(resTxt(s)) + '). Acrescente uma versão adequada em Conteúdos.</span></div>'); return;}
-    ok.forEach(function(f) {const n = fitNote(f, s); if (n)out.push('<div class="pl-warn info">' + ic('check') + '<span><b>Ajuste automático.</b> «' + esc(f.name) + '» (' + esc(c.name) + ') foi ' + n + '.</span></div>');});
+    ok.forEach(function(f) {
+      const n = fitNote(f, s); if (!n) return;
+      const k = s.id + '-' + f.id + '-' + c.id, seen = state.fitSeen[k] || (state.fitSeen[k] = Date.now());
+      if (Date.now() - seen > FIT_MS) return;
+      out.push('<div class="pl-warn info">' + ic('check') + '<span><b>Ajuste automático.</b> «' + esc(f.name) + '» (' + esc(c.name) + ') foi ' + n + '.</span></div>');
+    });
   });
   return out.join('');
 }
@@ -4719,6 +4724,7 @@ const MANUAL = {
    ['Veja o calendário', 'Mostra a semana, com todas as campanhas. Use as setas para mudar de semana e «Hoje» para voltar.'],
    ['Procure uma campanha', 'Escreva o nome, o cliente, o local ou o estado em «Procurar campanha».'],
    ['Abra uma campanha', 'Carregue nela para ver os detalhes ou, se tiver permissão, para a editar.'],
+   ['Avisos de ajuste automático', 'Quando um conteúdo é redimensionado para o ecrã (mesma proporção), a playlist mostra o aviso «Ajuste automático». Sai sozinho 24 horas depois de aparecer.'],
    ['Ignore avisos que não importam', 'Na ficha do ecrã, em «Playlist», os avisos de passagens por minuto e os avisos informativos têm o botão «Ignorar». O aviso desaparece e fica guardado na sua conta; se mudar as campanhas ou as horas, volta a aparecer. «Voltar a mostrar» traz de novo os ignorados. Os conflitos graves, como campanhas que ficam de fora por falta de vagas, não se ignoram.', 'campanhas.gerir'],
    ['Pause ou retome', 'Dentro da campanha, «Pausar campanha» tira-a de todos os ecrãs até carregar em «Retomar campanha». Os dias anteriores não mudam nos relatórios.', 'campanhas.gerir']]},
   {h:'Ver a disponibilidade', steps:[
@@ -5781,7 +5787,7 @@ const clone = o=>JSON.parse(JSON.stringify(o));
 function snapshot() {base = clone(collect());}
 let extraOps = [];
 function diffOps() {
-  if (state.user)state.user.ui = {dismissed:state.dismissed, finalSeen:state.finalSeen, finalDone:state.finalDone, fewMin:state.fewMin};
+  if (state.user)state.user.ui = {dismissed:state.dismissed, finalSeen:state.finalSeen, finalDone:state.finalDone, fitSeen:state.fitSeen, fewMin:state.fewMin};
   const cur = collect(), ops = [], canPl = can('playlist.gerir'), adm = !!(state.user && state.user.admin);
   ['screens', 'campaigns', 'folders', 'contents', 'users'].forEach(function(coll) {
     const c = cur[coll], b = base[coll];
@@ -5860,7 +5866,7 @@ function applyState(st) {
 }
 function loadUi() {
   const u = (state.user && state.user.ui) || {};
-  state.dismissed = u.dismissed || {}; state.finalSeen = u.finalSeen || {}; state.finalDone = u.finalDone || {};
+  state.dismissed = u.dismissed || {}; state.finalSeen = u.finalSeen || {}; state.finalDone = u.finalDone || {}; state.fitSeen = u.fitSeen || {};
   state.fewMin = isNil(u.fewMin) ? 3 : u.fewMin;
 }
 const sigOf = st=>JSON.stringify(Object.assign({}, st, {serverTime:0, now:0}));
