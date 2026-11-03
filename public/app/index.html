@@ -4092,8 +4092,8 @@ function screenNotes(s) {
       fitOut.push('<div class="pl-warn info">' + ic('check') + '<span><b>Ajuste automático.</b> «' + esc(f.name) + '» (' + esc(c.name) + ') foi ' + n + '.</span></div>');
     });
   });
-  if (fitOut.length)out.push(fitOut.join('') + '<p style="margin:8px 0 0"><button class="btn sm" data-a="fit-hide" data-id="' + s.id + '">Ocultar avisos de ajuste</button></p>');
-  if (hideFit && nFit)out.push('<p class="hint">' + (nFit === 1 ? '1 aviso de ajuste oculto.' : nFit + ' avisos de ajuste ocultos.') + ' <button class="btn sm" data-a="fit-show" data-id="' + s.id + '">Mostrar</button></p>');
+  if (fitOut.length)out.push(fitOut.join('') + '<p class="hint"><button class="btn sm ghost" data-a="fit-hide" data-id="' + s.id + '">Ocultar avisos de ajuste</button></p>');
+  if (hideFit && nFit)out.push('<p class="hint">' + (nFit === 1 ? '1 aviso de ajuste oculto.' : nFit + ' avisos de ajuste ocultos.') + ' <button class="btn sm ghost" data-a="fit-show" data-id="' + s.id + '">Mostrar</button></p>');
   return out.join('');
 }
 function playlistHtml(s) {
@@ -4107,8 +4107,8 @@ function playlistHtml(s) {
   const allW = screenIssues(s, true, true), nIgn = allW.filter(i=>i.ign).length;
   const warns = allW.filter(i=>!i.ign).map(function(i) {
     const fix = edit ? limitFix(i) : 0;
-    return '<div class="pl-warn' + (i.sev === 'info' ? ' info' : '') + '">' + ic(i.sev === 'info' && i.kind !== 'adj' ? 'check' : 'alert') + '<span>' + (i.kind === 'adj' ? '<b>Aviso. </b>' : (i.sev === 'info' ? '' : '<b>Conflito. </b>')) + issueText(i) + '</span>' + (fix ? '<button class="btn sm" data-a="limit-set" data-id="' + s.id + '" data-n="' + fix + '">Subir limite para ' + fix + '</button>' : '') + (edit && i.canIgn ? '<button class="btn sm" data-a="ign-issue" data-id="' + s.id + '" data-k="' + esc(i.ik) + '">Ignorar</button>' : '') + '</div>';
-  }).join('') + (nIgn ? '<p class="hint">' + (nIgn === 1 ? '1 aviso ignorado.' : nIgn + ' avisos ignorados.') + ' <button class="btn sm" data-a="ign-reset" data-id="' + s.id + '">Voltar a mostrar</button></p>' : '');
+    return '<div class="pl-warn' + (i.sev === 'info' ? ' info' : '') + '">' + ic(i.sev === 'info' && i.kind !== 'adj' ? 'check' : 'alert') + '<span>' + (i.kind === 'adj' ? '<b>Aviso. </b>' : (i.sev === 'info' ? '' : '<b>Conflito. </b>')) + issueText(i) + '</span>' + (fix ? '<button class="btn sm" data-a="limit-set" data-id="' + s.id + '" data-n="' + fix + '">Subir limite para ' + fix + '</button>' : '') + (edit && i.canIgn ? '<button class="btn sm ghost" data-a="ign-issue" data-id="' + s.id + '" data-k="' + esc(i.ik) + '">Ignorar</button>' : '') + '</div>';
+  }).join('') + (nIgn ? '<p class="hint">' + (nIgn === 1 ? '1 aviso ignorado.' : nIgn + ' avisos ignorados.') + ' <button class="btn sm ghost" data-a="ign-reset" data-id="' + s.id + '">Voltar a mostrar</button></p>' : '');
   let items = '';
   const blocks = plBlocks(list);
   const mv = function(bi) {return edit ? '<span class="pl-btns"><button class="btn sm ghost" data-a="pl-move" data-id="' + s.id + '" data-i="' + bi + '" data-d="-1" aria-label="Subir na playlist"' + (bi === 0 ? ' disabled' : '') + '>' + ic('up') + '</button><button class="btn sm ghost" data-a="pl-move" data-id="' + s.id + '" data-i="' + bi + '" data-d="1" aria-label="Descer na playlist"' + (bi === blocks.length - 1 ? ' disabled' : '') + '>' + ic('down') + '</button></span>' : '';};
