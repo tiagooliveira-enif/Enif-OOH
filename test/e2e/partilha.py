@@ -60,6 +60,11 @@ try:
         pl = call('GET', '/api/state', tok=tok)
         pg.locator('[data-a=edit-camp][data-id=C2]').first.click(); time.sleep(.5)
         ok('depois de recarregar, a ficha mostra o grupo', 'Neste grupo' in pg.inner_text('#modal-root'))
+        pg.locator('[data-a=edit-camp][data-id=C1]').first.click(); time.sleep(.5)
+        pg.select_option('#c-share', ''); time.sleep(.2)
+        pg.click('form[data-form=campaign] button[type=submit]'); time.sleep(1.5)
+        cs2 = {c['id']: c.get('share') for c in call('GET', '/api/state', tok=tok)['campaigns']}
+        ok('«Não partilha» também fica guardado no servidor (o grupo desfaz-se)', not cs2['C1'] and not cs2['C2'])
         ok('zero erros na consola', not errs)
         br.close()
     pl = None

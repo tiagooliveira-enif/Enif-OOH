@@ -4613,7 +4613,7 @@ function campModal(id) {
     + shareField(c) + itemsField(c) + '<div id="asp-hint"></div>'
     + (ro ? '' : '<div class="ai-box"><button type="button" class="btn sm" data-a="ai-window">' + ic('spark') + 'Sugerir horário com IA</button><span class="hint" id="ai-msg">A IA escolhe a janela com mais passagem de pessoas, mantendo a mesma duração.</span></div>')
     + '<p class="err" id="form-err" role="alert"></p></div></fieldset>'
-    + '<div class="modal-f">' + (ro ? '<button type="button" class="btn primary" data-a="close">Fechar</button>' : (ex && statusOf(ex) !== 'Terminada' ? '<button type="button" class="btn" data-a="camp-pause" data-id="' + ex.id + '" style="margin-right:auto">' + ic(statusOf(ex) === 'Pausada' ? 'play' : 'pause') + (statusOf(ex) === 'Pausada' ? 'Retomar campanha' : 'Pausar campanha') + '</button>' : '') + '<button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">' + (ex ? 'Guardar alterações' : 'Criar campanha') + '</button>') + '</div></form>');
+    + '<div class="modal-f">' + (ro ? '<button type="button" class="btn primary" data-a="close">Fechar</button>' : (ex && can('campanhas.gerir') ? '<button type="button" class="btn" data-a="del-camp" data-id="' + ex.id + '" style="color:var(--bad)' + (statusOf(ex) === 'Terminada' ? ';margin-right:auto' : '') + '">Eliminar</button>' : '') + (ex && statusOf(ex) !== 'Terminada' ? '<button type="button" class="btn" data-a="camp-pause" data-id="' + ex.id + '" style="margin-right:auto">' + ic(statusOf(ex) === 'Pausada' ? 'play' : 'pause') + (statusOf(ex) === 'Pausada' ? 'Retomar campanha' : 'Pausar campanha') + '</button>' : '') + '<button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">' + (ex ? 'Guardar alterações' : 'Criar campanha') + '</button>') + '</div></form>');
   const i = $('#c-name'); if (i && !ro)i.focus();
   aspectHint();
 }
@@ -4726,6 +4726,7 @@ const MANUAL = {
    ['Abra uma campanha', 'Carregue nela para ver os detalhes ou, se tiver permissão, para a editar.'],
    ['Avisos de ajuste automático', 'Quando um conteúdo é redimensionado para o ecrã (mesma proporção), a playlist mostra o aviso «Ajuste automático». Sai sozinho 24 horas depois de aparecer.'],
    ['Ignore avisos que não importam', 'Na ficha do ecrã, em «Playlist», os avisos de passagens por minuto e os avisos informativos têm o botão «Ignorar». O aviso desaparece e fica guardado na sua conta; se mudar as campanhas ou as horas, volta a aparecer. «Voltar a mostrar» traz de novo os ignorados. Os conflitos graves, como campanhas que ficam de fora por falta de vagas, não se ignoram.', 'campanhas.gerir'],
+   ['Eliminar uma campanha', 'Abra a campanha e carregue em «Eliminar», à esquerda. Pede confirmação, diz o que acontece (sai dos ecrãs, do calendário e dos relatórios) e não dá para desfazer. Para parar só por uns dias, use «Pausar campanha». Se enganou nos dados, pode eliminar e criar de novo.', 'campanhas.gerir'],
    ['Pause ou retome', 'Dentro da campanha, «Pausar campanha» tira-a de todos os ecrãs até carregar em «Retomar campanha». Os dias anteriores não mudam nos relatórios.', 'campanhas.gerir']]},
   {h:'Ver a disponibilidade', steps:[
    ['Abra o separador «Disponibilidade»', 'Fica por cima do calendário.'],
@@ -5993,6 +5994,23 @@ const actions = {
     let n = 30; pvStop();
     pvTimer = setInterval(function() {const e = $('#tst-n'); if (!e) {pvStop(); return;}n--; if (n <= 0) {pvStop(); closeModal(); toast('Teste terminado. O ecrã voltou às campanhas.'); return;}e.textContent = n;}, 1000);
     toast('Teste enviado a ' + s.id + '. Aparece no ecrã em menos de um minuto.');
+  },
+  'del-camp':function(t) {
+    if (!guard('campanhas.gerir')) return;
+    const c = campById(t.dataset.id); if (!c) return;
+    modal('<div class="modal-h"><h2>Eliminar campanha</h2><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b"><p>Eliminar a campanha <b>' + esc(c.name) + '</b> (' + esc(c.client) + ')?</p><p class="muted" style="margin-top:6px">Deixa de passar em todos os ecrãs e sai do calendário e dos relatórios, incluindo as passagens já registadas. O relatório final ao comercial deixa de ser enviado. Os conteúdos não são apagados. Não dá para desfazer. Se só quer parar por uns dias, use «Pausar campanha».</p></div><div class="modal-f"><button class="btn" data-a="close">Cancelar</button><button class="btn primary" data-a="del-camp-ok" data-id="' + c.id + '" style="background:var(--bad);border-color:var(--bad)">Eliminar campanha</button></div>');
+  },
+  'del-camp-ok':function(t) {
+    if (!guard('campanhas.gerir')) return;
+    const i = campaigns.findIndex(x=>x.id === t.dataset.id); if (i < 0) return;
+    const c = campaigns[i]; campaigns.splice(i, 1);
+    campaigns.forEach(function(k) {if (k.share && campaigns.filter(z=>z.share === k.share).length < 2)k.share = null;});
+    screens.forEach(function(s) {
+      if (s.order)s.order = s.order.filter(id=>id !== c.id);
+      if (s.draft && s.draft.order)s.draft.order = s.draft.order.filter(id=>id !== c.id);
+    });
+    audit('Eliminou a campanha', c.name);
+    closeModal(); toast('Campanha «' + c.name + '» eliminada.'); render();
   },
   'del-screen':function(t) {
     if (!guard('ecras.gerir')) return;

@@ -257,7 +257,8 @@ function checkContentScreens(cand, screenIds) {
 
 /* ---------- sincronização (alterações vindas da interface) ---------- */
 const PL_FIELDS = ['order', 'limit', 'draft'];
-const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(n[k], old[k]));
+/* campos que mudaram; «share» é opcional e some do documento quando a campanha deixa de partilhar a posição */
+const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(n[k], old[k])).concat(!('share' in n) && !isNil(old.share) ? ['share'] : []);
 function applyOp(user, op) {
   if (!op || typeof op !== 'object') throw bad('Pedido inválido.');
   const { coll, id } = op;
