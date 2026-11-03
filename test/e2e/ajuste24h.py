@@ -1,4 +1,4 @@
-"""Os avisos «Ajuste automático» da playlist aparecem ao início e saem 24 h depois. Corre: python3 test/e2e/ajuste24h.py"""
+"""Os avisos «Ajuste automático» da playlist aparecem ao início e saem 24 h depois. Também se podem ocultar com um botão. Corre: python3 test/e2e/ajuste24h.py"""
 import subprocess, os, json, time, urllib.request, tempfile, threading, http.server, datetime
 from playwright.sync_api import sync_playwright
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -60,6 +60,14 @@ try:
         ok('a hora do primeiro aviso fica guardada na conta', len(fs) == 1)
         entrar()
         ok('continua a aparecer nas primeiras 24 h', 'Ajuste automático' in pg.inner_text('body'))
+        pg.click('[data-a=fit-hide]'); time.sleep(.6)
+        ok('«Ocultar avisos de ajuste» esconde-os e deixa a nota «oculto»', 'Ajuste automático' not in pg.inner_text('body') and 'oculto' in pg.inner_text('body'))
+        time.sleep(1.5); entrar()
+        ok('continuam ocultos depois de recarregar', 'Ajuste automático' not in pg.inner_text('body') and 'oculto' in pg.inner_text('body'))
+        pg.click('[data-a=fit-show]'); time.sleep(.6)
+        ok('«Mostrar» traz-os de volta', 'Ajuste automático' in pg.inner_text('body'))
+        time.sleep(1.5)
+        me = [u for u in call('GET', '/api/state', tok=tok)['users'] if u.get('admin')][0]
         ui = dict(me.get('ui') or {}); ui['fitSeen'] = {k: int(time.time() * 1000) - 25 * 3600 * 1000 for k in fs}
         doc = dict(me); doc['ui'] = ui
         call('POST', '/api/sync', {'ops': [{'op': 'put', 'coll': 'users', 'id': me['id'], 'doc': doc, 'keys': ['ui']}]}, tok)

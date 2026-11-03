@@ -4079,6 +4079,8 @@ function trimDraft(s) {
 }
 function screenNotes(s) {
   const out = [];
+  const fitOut = [], hideFit = !!state.dismissed['fitoff-' + s.id];
+  let nFit = 0;
   campaigns.filter(c=>statusOf(c) !== 'Terminada' && c.venues.indexOf(s.venue) > -1 && c.items.length).forEach(function(c) {
     const fs = c.items.map(i=>fileById(i.f)).filter(Boolean), ok = fs.filter(f=>okFor(f, s));
     if (!ok.length) {out.push('<div class="pl-warn">' + ic('alert') + '<span><b>«' + esc(c.name) + '» não passa neste ecrã.</b> Nenhum dos conteúdos está associado a este ecrã com a proporção certa (' + esc(resTxt(s)) + '). Acrescente uma versão adequada em Conteúdos.</span></div>'); return;}
@@ -4086,9 +4088,12 @@ function screenNotes(s) {
       const n = fitNote(f, s); if (!n) return;
       const k = s.id + '-' + f.id + '-' + c.id, seen = state.fitSeen[k] || (state.fitSeen[k] = Date.now());
       if (Date.now() - seen > FIT_MS) return;
-      out.push('<div class="pl-warn info">' + ic('check') + '<span><b>Ajuste automático.</b> «' + esc(f.name) + '» (' + esc(c.name) + ') foi ' + n + '.</span></div>');
+      if (hideFit) {nFit++; return;}
+      fitOut.push('<div class="pl-warn info">' + ic('check') + '<span><b>Ajuste automático.</b> «' + esc(f.name) + '» (' + esc(c.name) + ') foi ' + n + '.</span></div>');
     });
   });
+  if (fitOut.length)out.push(fitOut.join('') + '<p class="hint"><button class="btn sm ghost" data-a="fit-hide" data-id="' + s.id + '">Ocultar avisos de ajuste</button></p>');
+  if (hideFit && nFit)out.push('<p class="hint">' + (nFit === 1 ? '1 aviso de ajuste oculto.' : nFit + ' avisos de ajuste ocultos.') + ' <button class="btn sm ghost" data-a="fit-show" data-id="' + s.id + '">Mostrar</button></p>');
   return out.join('');
 }
 function playlistHtml(s) {
@@ -4724,7 +4729,7 @@ const MANUAL = {
    ['Veja o calendário', 'Mostra a semana, com todas as campanhas. Use as setas para mudar de semana e «Hoje» para voltar.'],
    ['Procure uma campanha', 'Escreva o nome, o cliente, o local ou o estado em «Procurar campanha».'],
    ['Abra uma campanha', 'Carregue nela para ver os detalhes ou, se tiver permissão, para a editar.'],
-   ['Avisos de ajuste automático', 'Quando um conteúdo é redimensionado para o ecrã (mesma proporção), a playlist mostra o aviso «Ajuste automático». Sai sozinho 24 horas depois de aparecer.'],
+   ['Avisos de ajuste automático', 'Quando um conteúdo é redimensionado para o ecrã (mesma proporção), a playlist mostra o aviso «Ajuste automático». Sai sozinho 24 horas depois de aparecer. Se quiser tirá-los antes, carregue em «Ocultar avisos de ajuste»; «Mostrar» traz-os de volta.'],
    ['Ignore avisos que não importam', 'Na ficha do ecrã, em «Playlist», os avisos de passagens por minuto e os avisos informativos têm o botão «Ignorar». O aviso desaparece e fica guardado na sua conta; se mudar as campanhas ou as horas, volta a aparecer. «Voltar a mostrar» traz de novo os ignorados. Os conflitos graves, como campanhas que ficam de fora por falta de vagas, não se ignoram.', 'campanhas.gerir'],
    ['Eliminar uma campanha', 'Abra a campanha e carregue em «Eliminar», à esquerda. Pede confirmação, diz o que acontece (sai dos ecrãs, do calendário e dos relatórios) e não dá para desfazer. Para parar só por uns dias, use «Pausar campanha». Se enganou nos dados, pode eliminar e criar de novo.', 'campanhas.gerir'],
    ['Pause ou retome', 'Dentro da campanha, «Pausar campanha» tira-a de todos os ecrãs até carregar em «Retomar campanha». Os dias anteriores não mudam nos relatórios.', 'campanhas.gerir']]},
@@ -6063,6 +6068,8 @@ const actions = {
     if (!guard('campanhas.gerir')) return;
     state.dismissed[t.dataset.k] = true; reopenScreen(t.dataset.id); render();
   },
+  'fit-hide':function(t) {state.dismissed['fitoff-' + t.dataset.id] = true; reopenScreen(t.dataset.id); render();},
+  'fit-show':function(t) {delete state.dismissed['fitoff-' + t.dataset.id]; reopenScreen(t.dataset.id); render();},
   'ign-reset':function(t) {
     if (!guard('campanhas.gerir')) return;
     Object.keys(state.dismissed).forEach(function(k) {if (k.indexOf('iss-' + t.dataset.id + '-') === 0) delete state.dismissed[k];});
