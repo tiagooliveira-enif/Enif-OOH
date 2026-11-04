@@ -5076,7 +5076,7 @@ function niceStep(x) {const p = Math.pow(10, Math.floor(Math.log10(x))), f = x /
 const typeNames = ['Totem vertical', 'Painel horizontal', 'Videowall', 'Outro'];
 const RES_PRESETS = [['1920×1080', 'Full HD horizontal'], ['1080×1920', 'Full HD vertical'], ['3840×2160', '4K horizontal'], ['2160×3840', '4K vertical'], ['3840×1080', 'Videowall largo'], ['2560×1440', 'QHD'], ['1366×768', 'HD 1366'], ['1280×720', 'HD 720p']];
 const resTxt = s=>s.res === 'auto' ? 'Por detetar' : s.res;
-const AREAS = [['inteiro', 'Ecrã inteiro do PC (por defeito)'], ['tl', 'Só uma área: canto superior esquerdo'], ['tr', 'Só uma área: canto superior direito'], ['bl', 'Só uma área: canto inferior esquerdo'], ['br', 'Só uma área: canto inferior direito'], ['c', 'Só uma área: ao centro']];
+const AREAS = [['inteiro', 'Ecrã inteiro (por defeito)'], ['tl', 'Canto superior esquerdo'], ['tr', 'Canto superior direito'], ['bl', 'Canto inferior esquerdo'], ['br', 'Canto inferior direito'], ['c', 'Ao centro']];
 const FITS = [['caber', 'Caber (barras pretas, nada cortado)'], ['preencher', 'Preencher (sem barras, corta as margens)'], ['esticar', 'Esticar (deforma a imagem)']];
 function resField(cur) {
   const preset = RES_PRESETS.some(p=>p[0] === cur);
