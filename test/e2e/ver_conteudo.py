@@ -1,4 +1,4 @@
-"""Ver um conteúdo: carregar no cartão abre uma janela com o vídeo (ou a imagem) para ver. Corre: python3 test/e2e/ver_conteudo.py"""
+"""Vista em lista dos conteúdos e ver um conteúdo: carregar no cartão abre uma janela com o vídeo (ou a imagem) para ver. Corre: python3 test/e2e/ver_conteudo.py"""
 import subprocess, os, json, time, urllib.request, tempfile, threading, http.server, datetime
 from playwright.sync_api import sync_playwright
 HERE = os.path.dirname(os.path.abspath(__file__)); ROOT = os.path.dirname(os.path.dirname(HERE))
@@ -47,6 +47,22 @@ try:
         pg.click('form[data-form=login] button[type=submit]'); pg.wait_for_selector('[data-a=nav][data-v=conteudos]')
         pg.click('[data-a=nav][data-v=conteudos]'); time.sleep(1)
         ok('o cartão do vídeo mostra a primeira imagem do vídeo', pg.locator('.tile .thumb video').count() >= 1)
+        ok('há os botões Cartões e Lista', pg.locator('[data-a=cmode]').count() == 2)
+        ok('por defeito é a vista de cartões', pg.locator('.gallery .tile').count() == 2 and pg.locator('table.tbl-cont').count() == 0)
+        pg.click('[data-a=cmode][data-m=list]'); time.sleep(.6)
+        pg.screenshot(path='/tmp/lista.png')
+        ok('a lista mostra uma linha por conteúdo', pg.locator('table.tbl-cont tbody tr').count() == 2 and pg.locator('.gallery').count() == 0)
+        ok('na lista também se vê o vídeo ao carregar na miniatura', (pg.locator('table.tbl-cont .thumb[data-a=content-view]').first.click() or True) and (time.sleep(.5) or True) and pg.locator('#modal-root .prev-media').count() == 1)
+        pg.locator('#modal-root [data-a=close]').first.click(); time.sleep(.4)
+        ok('os filtros continuam a funcionar na lista (só imagens)', (pg.click('[data-a=cfilter][data-f=Imagem]') or True) and (time.sleep(.5) or True) and pg.locator('table.tbl-cont tbody tr').count() == 1)
+        pg.click('[data-a=cfilter][data-f=todos]'); time.sleep(.4)
+        time.sleep(1.2); pg.reload(); pg.wait_for_selector('[data-a=nav][data-v=conteudos]'); pg.click('[data-a=nav][data-v=conteudos]'); time.sleep(1)
+        ok('a vista escolhida fica guardada depois de recarregar', pg.locator('table.tbl-cont').count() == 1)
+        pg.click('[data-a=cmode][data-m=cards]'); time.sleep(.5)
+        ok('voltar a Cartões', pg.locator('.gallery .tile').count() == 2)
+        pg.set_viewport_size({'width': 390, 'height': 800}); pg.click('[data-a=cmode][data-m=list]'); time.sleep(.5)
+        ok('no telemóvel a lista não tem barra horizontal', not pg.evaluate('document.documentElement.scrollWidth>innerWidth'))
+        pg.set_viewport_size({'width': 1300, 'height': 900}); pg.click('[data-a=cmode][data-m=cards]'); time.sleep(.4)
         pg.locator('.tile:has-text("Video_Teste.mp4") .thumb').click(); time.sleep(.6)
         ok('carregar no vídeo abre a janela com o leitor', pg.locator('#modal-root video.prev-media[controls]').count() == 1 and 'Video_Teste.mp4' in pg.inner_text('#modal-root'))
         ok('o leitor aponta para o ficheiro do servidor', '/media/' in pg.get_attribute('#modal-root video.prev-media', 'src'))

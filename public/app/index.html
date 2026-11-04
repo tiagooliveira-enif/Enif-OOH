@@ -1357,6 +1357,66 @@ iframe.prev-media {
 .scroll-x {
   overflow-x: auto;
 }
+.tbl-cont {
+  min-width: 0;
+}
+.tbl-cont td,
+.tbl-cont th {
+  padding: 10px 14px;
+  vertical-align: middle;
+}
+.cl-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.cl-th {
+  flex: none;
+  width: 88px;
+  border-radius: 8px;
+}
+.cl-th svg.i {
+  width: 20px;
+  height: 20px;
+}
+.cl-th .tag {
+  display: none;
+}
+.cl-n {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+.cl-n strong {
+  font-size: 14px;
+}
+.cl-a {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.cl-a .tile-sel,
+.cl-a .btn {
+  width: auto;
+  padding: 4px 10px;
+}
+.tbl-cont select {
+  width: auto;
+  min-width: 130px;
+  max-width: 170px;
+}
+@media (max-width: 760px) {
+  .cl-hide {
+    display: none;
+  }
+  .cl-th {
+    width: 64px;
+  }
+}
 
 /* modal */
 .overlay {
@@ -3218,7 +3278,7 @@ const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
 
-const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fitSeen:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
+const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', cmode:'cards', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fitSeen:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
 
 /* ---------- derived data ---------- */
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
@@ -4766,6 +4826,7 @@ const MANUAL = {
    ['Confirme', 'O ficheiro entra na biblioteca. Se não servir a nenhum ecrã, não é carregado e a plataforma diz porquê.']]},
   {h:'Organizar', steps:[
    ['Veja um conteúdo', 'Carregue na imagem do cartão para abrir o vídeo (ou a imagem) numa janela e vê-lo como vai passar no ecrã. O cartão dos vídeos mostra a primeira imagem, para os reconhecer sem abrir.'],
+   ['Mude a vista', 'Em «Cartões» vê cada conteúdo com a sua imagem; em «Lista» vê uma linha por conteúdo, com as campanhas, os ecrãs e a pasta. A escolha fica guardada na sua conta. Nas duas pode carregar na miniatura para ver o vídeo.'],
    ['Filtre e ordene', 'Use as pastas, os filtros Vídeos, Imagens e HTML5, e a ordenação por mais recentes ou maior tamanho.'],
    ['Use pastas', '«Nova pasta» cria uma pasta; em cada ficheiro escolha a pasta onde o quer.', 'conteudos.gerir'],
    ['Mude os ecrãs permitidos', '«Ecrãs permitidos» muda os ecrãs onde o ficheiro pode passar. Tem de ficar pelo menos um.', 'conteudos.gerir'],
@@ -4872,6 +4933,7 @@ function viewContentBase() {
   const folderBtns = cG && cur ? '<span class="c-fa"><button class="btn sm" data-a="rename-folder" data-id="' + cur.id + '">Renomear</button><button class="btn sm ghost" data-a="del-folder" data-id="' + cur.id + '">Eliminar pasta</button></span>' : '';
   const shownC = contents.filter(x=>inF(x, fo) && (f === 'todos' || x.type === f) && (state.cview !== 'exp' || (leftDays(x) !== null && leftDays(x) <= CLEAN_WARN)));
   if (state.csort === 'size')shownC.sort((a, b)=>sizeBytes(b.size) - sizeBytes(a.size));
+  const rowsL = [];
   const tiles = shownC.map(function(x) {
     const cs = campsOfFile(x), c = cs[0];
     const icon = x.type === 'Vídeo' ? 'play' : (x.type === 'Imagem' ? 'image' : 'code');
@@ -4882,13 +4944,16 @@ function viewContentBase() {
     const sel = '';
     const fol = x.folder ? folderById(x.folder) : null;
     const fsel = cG ? '<select data-a-change="mvfolder" data-id="' + x.id + '" aria-label="Pasta"><option value="">Sem pasta</option>' + folders.map(p=>'<option value="' + p.id + '"' + (x.folder === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('') + '</select>' : (fol ? '<span class="muted" style="font-size:13px">Pasta: ' + esc(fol.name) + '</span>' : '');
-    return '<article class="card tile"><div class="thumb" data-a="content-view" data-id="' + x.id + '" role="button" tabindex="0" aria-label="Ver ' + esc(x.name) + '" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : (x.src && x.type === 'Vídeo' ? '<video src="' + x.src + '#t=0.1" preload="metadata" muted playsinline></video>' : '') + ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div><div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
+    const thumbH = cls=>'<div class="thumb' + cls + '" data-a="content-view" data-id="' + x.id + '" role="button" tabindex="0" aria-label="Ver ' + esc(x.name) + '" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : (x.src && x.type === 'Vídeo' ? '<video src="' + x.src + '#t=0.1" preload="metadata" muted playsinline></video>' : '') + ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div>';
+    const acts = x.ready ? (cG && isAdm() ? '<button class="btn sm ghost" data-a="toggle-house" data-id="' + x.id + '">' + (x.house ? 'Deixar de ser spot da Enif' : 'Usar como spot da Enif') + '</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel" data-a="cont-screens" data-id="' + x.id + '">Ecrãs permitidos</button>' : '') : '';
+    rowsL.push('<tr><td><div class="cl-main">' + thumbH(' cl-th') + '<div class="cl-n"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted">' + meta + '</span></div></div></td><td>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted">Sem campanha</span>') + '</td><td class="cl-hide">' + (x.ready ? '<span class="muted">' + contScrTxt(x) + '</span>' : '') + '<div class="cl-a">' + acts + '</div></td><td class="cl-hide">' + fsel + '</td><td class="cl-hide">' + expLine(x, cG) + '</td></tr>');
+    return '<article class="card tile">' + thumbH('') + '<div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
   }).join('');
   return upBanner() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
     + '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Tipo de conteúdo">' + chips + '</div><div class="tools c-tools-r">' + newBtn + '<label class="field-inline" for="c-folder"><select id="c-folder" data-a-change="folderSel" aria-label="Pasta" style="width:auto">' + fopts + '</select></label>' + folderBtns + '</div></div>'
-    + '<div class="tools" style="margin-top:0"><span class="hint" style="margin:0">' + shownC.length + (shownC.length === 1 ? ' ficheiro' : ' ficheiros') + ' · ' + fmtBytes(shownC.reduce((a, x)=>a + sizeBytes(x.size), 0)) + ' · armazenamento do servidor: ' + diskInfo().pct.toFixed(0) + ' % usado (' + fmtBytes(diskInfo().free) + ' livres)</span><span style="flex:1"></span><label class="field-inline" for="c-sort"><span class="lab">Ordenar</span><select id="c-sort" data-a-change="csort" style="width:auto"><option value="recent"' + (state.csort === 'recent' ? ' selected' : '') + '>Mais recentes</option><option value="size"' + (state.csort === 'size' ? ' selected' : '') + '>Maior tamanho</option></select></label></div>'
+    + '<div class="tools" style="margin-top:0"><span class="hint" style="margin:0">' + shownC.length + (shownC.length === 1 ? ' ficheiro' : ' ficheiros') + ' · ' + fmtBytes(shownC.reduce((a, x)=>a + sizeBytes(x.size), 0)) + ' · armazenamento do servidor: ' + diskInfo().pct.toFixed(0) + ' % usado (' + fmtBytes(diskInfo().free) + ' livres)</span><span style="flex:1"></span><div class="seg sm" role="group" aria-label="Vista dos conteúdos"><button class="seg-b" data-a="cmode" data-m="cards" aria-pressed="' + (state.cmode !== 'list') + '">Cartões</button><button class="seg-b" data-a="cmode" data-m="list" aria-pressed="' + (state.cmode === 'list') + '">Lista</button></div><label class="field-inline" for="c-sort"><span class="lab">Ordenar</span><select id="c-sort" data-a-change="csort" style="width:auto"><option value="recent"' + (state.csort === 'recent' ? ' selected' : '') + '>Mais recentes</option><option value="size"' + (state.csort === 'size' ? ' selected' : '') + '>Maior tamanho</option></select></label></div>'
     + (diskInfo().pct >= 80 ? '<div class="banner">' + ic('alert') + '<p><b>Armazenamento quase cheio:</b> ' + diskInfo().pct.toFixed(0) + ' % usado. Apague conteúdos que já não usa ou aumente o espaço do servidor.</p></div>' : '')
-    + houseCard() + (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">Sem conteúdos nesta seleção.</div></div>');
+    + houseCard() + (tiles && state.cmode === 'list' ? '<div class="card"><div class="scroll-x"><table class="tbl tbl-cont"><thead><tr><th>Conteúdo</th><th>Campanhas</th><th class="cl-hide">Ecrãs</th><th class="cl-hide">Pasta</th><th class="cl-hide">Validade</th></tr></thead><tbody>' + rowsL.join('') + '</tbody></table></div></div>' : (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">Sem conteúdos nesta seleção.</div></div>'));
 }
 function folderModal(id) {
   const p = id ? folderById(id) : null;
@@ -5813,7 +5878,7 @@ const clone = o=>JSON.parse(JSON.stringify(o));
 function snapshot() {base = clone(collect());}
 let extraOps = [];
 function diffOps() {
-  if (state.user)state.user.ui = {dismissed:state.dismissed, finalSeen:state.finalSeen, finalDone:state.finalDone, fitSeen:state.fitSeen, fewMin:state.fewMin};
+  if (state.user)state.user.ui = {dismissed:state.dismissed, finalSeen:state.finalSeen, finalDone:state.finalDone, fitSeen:state.fitSeen, cmode:state.cmode, fewMin:state.fewMin};
   const cur = collect(), ops = [], canPl = can('playlist.gerir'), adm = !!(state.user && state.user.admin);
   ['screens', 'campaigns', 'folders', 'contents', 'users'].forEach(function(coll) {
     const c = cur[coll], b = base[coll];
@@ -5892,7 +5957,7 @@ function applyState(st) {
 }
 function loadUi() {
   const u = (state.user && state.user.ui) || {};
-  state.dismissed = u.dismissed || {}; state.finalSeen = u.finalSeen || {}; state.finalDone = u.finalDone || {}; state.fitSeen = u.fitSeen || {};
+  state.dismissed = u.dismissed || {}; state.finalSeen = u.finalSeen || {}; state.finalDone = u.finalDone || {}; state.fitSeen = u.fitSeen || {}; state.cmode = u.cmode === 'list' ? 'list' : 'cards';
   state.fewMin = isNil(u.fewMin) ? 3 : u.fewMin;
 }
 const sigOf = st=>JSON.stringify(Object.assign({}, st, {serverTime:0, now:0}));
@@ -6193,6 +6258,7 @@ const actions = {
   'help-go':function() {const b = document.querySelector('#head .head-actions .btn.primary'); closeModal(); if (b)setTimeout(function() {b.click();}, 60);},
   'cont-screens':function(t) {if (guard('conteudos.gerir'))contScreensModal(t.dataset.id);},
   cfilter:function(t) {state.cfilter = t.dataset.f; render();},
+  cmode:function(t) {state.cmode = t.dataset.m === 'list' ? 'list' : 'cards'; render();},
   cview:function(t) {state.cview = state.cview === t.dataset.v ? 'lib' : t.dataset.v; render();},
   'clean-see':function() {state.cview = 'exp'; state.view = 'conteudos'; render(); window.scrollTo(0, 0);},
   keep:function(t) {
