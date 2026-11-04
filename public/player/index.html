@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '7';
+const VERSION = '8';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -380,7 +380,10 @@ async function loop() {
 }
 function clearAll() {while (stage.firstChild) {const n = stage.firstChild; if (n.tagName === 'VIDEO') {try {n.pause(); n.removeAttribute('src'); n.load();} catch (e) {/* sem ação */}}stage.removeChild(n);}$('#brand').style.display = 'none'; cur = {c:null, f:null};}
 /* ---------- arranque ---------- */
-function drawDbg() {dbg.textContent = 'Enif DOOH player ' + VERSION + '\necrã ' + code + '\nrede ' + stats.net + '\npassagens ' + stats.plays + ' (falhas ' + stats.fails + ')\npor enviar ' + queue.length + '\nficheiros em cache ' + stats.cached + '\nhora ' + String(lisbon().h).padStart(2, '0') + ':' + String(lisbon().m).padStart(2, '0') + (Math.abs(skew) > 60000 ? ' (relógio do PC desfasado ' + Math.round(skew / 60000) + ' min, corrigido)' : '') + '\na passar ' + (cur.c || '-') + ' / ' + (cur.f || '-') + (stats.err ? '\n' + stats.err : '');}
+function loopTxt() {
+  try {const l = hourEntry().e; if (!l || !l.seq) return '-'; return l.seq.map(function(e, i) {return (i === (idx - 1 + l.seq.length) % l.seq.length ? '▶' : '') + String(e.n || e.c).slice(0, 14) + (e.items && e.items.length > 1 ? '(' + e.items.length + ')' : '');}).join(' · ');} catch (e) {return '?';}
+}
+function drawDbg() {dbg.textContent = 'Enif DOOH player ' + VERSION + '\necrã ' + code + '\nrede ' + stats.net + '\npassagens ' + stats.plays + ' (falhas ' + stats.fails + ')\npor enviar ' + queue.length + '\nficheiros em cache ' + stats.cached + '\nhora ' + String(lisbon().h).padStart(2, '0') + ':' + String(lisbon().m).padStart(2, '0') + (Math.abs(skew) > 60000 ? ' (relógio do PC desfasado ' + Math.round(skew / 60000) + ' min, corrigido)' : '') + '\nvolta: ' + loopTxt() + '\na passar ' + (cur.c || '-') + ' / ' + (cur.f || '-') + (stats.err ? '\n' + stats.err : '');}
 document.addEventListener('keydown', function(e) {if (e.key === 'd' || e.key === 'D') {dbg.style.display = dbg.style.display === 'block' ? 'none' : 'block';} if (e.key === 'r' && e.ctrlKey && e.shiftKey) {ls('enif.code', null); ls('enif.key', null); location.replace(location.pathname);}});
 if (Q.get('debug'))dbg.style.display = 'block';
 window.__enif = {state:function() {return {cur:cur, stats:stats, skew:skew, queue:queue.length, children:stage.children.length};}};
