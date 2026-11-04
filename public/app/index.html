@@ -1227,6 +1227,25 @@ button.crow:hover {
   width: 34px;
   height: 34px;
 }
+.thumb[data-a] {
+  cursor: pointer;
+}
+.thumb svg.i {
+  position: relative;
+  z-index: 1;
+}
+.prev-media {
+  display: block;
+  width: 100%;
+  max-height: 70vh;
+  border: 0;
+  border-radius: 12px;
+  background: #000;
+}
+iframe.prev-media {
+  height: 60vh;
+}
+.thumb video,
 .thumb img {
   position: absolute;
   inset: 0;
@@ -4746,6 +4765,7 @@ const MANUAL = {
    ['Escolha os ecrãs de cada ficheiro', 'É obrigatório e nada vem marcado: escolha um a um os ecrãs onde o conteúdo pode passar. «Marcar os compatíveis» ajuda, e «Limpar» desfaz. Os ecrãs com proporção diferente (mais de 10 píxeis) ficam desativados.'],
    ['Confirme', 'O ficheiro entra na biblioteca. Se não servir a nenhum ecrã, não é carregado e a plataforma diz porquê.']]},
   {h:'Organizar', steps:[
+   ['Veja um conteúdo', 'Carregue na imagem do cartão para abrir o vídeo (ou a imagem) numa janela e vê-lo como vai passar no ecrã. O cartão dos vídeos mostra a primeira imagem, para os reconhecer sem abrir.'],
    ['Filtre e ordene', 'Use as pastas, os filtros Vídeos, Imagens e HTML5, e a ordenação por mais recentes ou maior tamanho.'],
    ['Use pastas', '«Nova pasta» cria uma pasta; em cada ficheiro escolha a pasta onde o quer.', 'conteudos.gerir'],
    ['Mude os ecrãs permitidos', '«Ecrãs permitidos» muda os ecrãs onde o ficheiro pode passar. Tem de ficar pelo menos um.', 'conteudos.gerir'],
@@ -4862,7 +4882,7 @@ function viewContentBase() {
     const sel = '';
     const fol = x.folder ? folderById(x.folder) : null;
     const fsel = cG ? '<select data-a-change="mvfolder" data-id="' + x.id + '" aria-label="Pasta"><option value="">Sem pasta</option>' + folders.map(p=>'<option value="' + p.id + '"' + (x.folder === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('') + '</select>' : (fol ? '<span class="muted" style="font-size:13px">Pasta: ' + esc(fol.name) + '</span>' : '');
-    return '<article class="card tile"><div class="thumb" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div><div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
+    return '<article class="card tile"><div class="thumb" data-a="content-view" data-id="' + x.id + '" role="button" tabindex="0" aria-label="Ver ' + esc(x.name) + '" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : (x.src && x.type === 'Vídeo' ? '<video src="' + x.src + '#t=0.1" preload="metadata" muted playsinline></video>' : '') + ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div><div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
   }).join('');
   return upBanner() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
     + '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Tipo de conteúdo">' + chips + '</div><div class="tools c-tools-r">' + newBtn + '<label class="field-inline" for="c-folder"><select id="c-folder" data-a-change="folderSel" aria-label="Pasta" style="width:auto">' + fopts + '</select></label>' + folderBtns + '</div></div>'
@@ -5857,7 +5877,7 @@ function applyState(st) {
     c.items = (c.items || []).map(function(i) {return {f:i.f, h0:isNil(i.h0) ? null : i.h0, h1:isNil(i.h1) ? null : i.h1, d0:i.d0 ? parseISO(i.d0) : null, d1:i.d1 ? parseISO(i.d1) : null, ppm:i.ppm || 1};});
     return c;
   }));
-  setArr(contents, st.contents.map(function(f) {if (f.type === 'Imagem')f.url = '/media/' + f.id + '?t=' + tk; else if (f.type === 'Vídeo')f.src = '/media/' + f.id + '?t=' + tk; return f;}));
+  setArr(contents, st.contents.map(function(f) {if (f.type === 'Imagem')f.url = '/media/' + f.id + '?t=' + tk; else if (f.type === 'Vídeo' || f.type === 'HTML5')f.src = '/media/' + f.id + '?t=' + tk; return f;}));
   state.smtpReady = !!st.smtpReady; state.serverDisk = st.serverDisk || null; state.backupDisk = st.backupDisk || null;
   setArr(auditLog, (st.auditLog || [])); setArr(backups, (st.backups || [])); setArr(emailLog, (st.emailLog || []));
   setArr(folders, st.folders);
@@ -5944,6 +5964,13 @@ function guard(p) {if (can(p)) return true; toast('Não tem permissão para esta
 const actions = {
   nav:function(t) {state.view = t.dataset.v; state.logLimit = 10; closeModal(); render(); window.scrollTo(0, 0);},
   close:function() {closeModal();},
+  'content-view':function(t) {
+    const x = contents.find(c=>c.id === t.dataset.id); if (!x) return;
+    const media = x.type === 'Vídeo' && x.src ? '<video class="prev-media" src="' + x.src + '" controls autoplay playsinline></video>'
+      : (x.type === 'Imagem' && x.url ? '<img class="prev-media" src="' + x.url + '" alt="' + esc(x.name) + '">'
+        : (x.type === 'HTML5' && x.src ? '<iframe class="prev-media" src="' + x.src + '" sandbox="allow-scripts" title="' + esc(x.name) + '"></iframe>' : '<p class="muted">Não há pré-visualização para este conteúdo na demonstração.</p>'));
+    modal('<div class="modal-h"><div><h2>' + esc(x.name) + '</h2><p class="muted">' + esc(x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">' + media + '</div>');
+  },
   backdrop:function(t, e) {if (e.target === t)closeModal();},
   'open-screen':function(t) {if (guard('ecras.ver'))screenModal(t.dataset.id);},
   'resolve-alert':function(t) {if (!guard('alertas.resolver')) return; extraOps.push({op:'del', coll:'alerts', id:t.dataset.id}); alerts = alerts.filter(a=>a.id !== t.dataset.id); toast('Alerta marcado como resolvido.'); render();},
