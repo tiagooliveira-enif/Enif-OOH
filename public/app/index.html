@@ -3416,8 +3416,18 @@ function itemsOn(c, h, d, sc) {
     .sort(function(p, q) {return c.manual ? (p.k - q.k) : ((p.y[0] - q.y[0]) || (p.w[0] - q.w[0]) || (p.k - q.k));}).map(x=>x.i);
 }
 /* os vídeos de uma campanha alternam a cada passagem: A, B, C… e volta ao A; m = n.º da passagem */
+/* «Vezes/min» de um vídeo maior que 1 repete-o na ronda, com as repetições espaçadas por igual: A, B, C, A, D, E, F */
+const weightOf = i=>Math.max(1, Math.round(i.ppm || 1));
+function itemList(c, h, d, sc) {
+  const a = itemsOn(c, h, d, sc), m = a.length;
+  if (!a.some(i=>weightOf(i) > 1)) return a;
+  const ev = [];
+  a.forEach(function(i, x) {const w = weightOf(i); for (let j = 0; j < w; j++)ev.push({i:i, pos:(x + j * m / w) % m, x:x, j:j});});
+  ev.sort((p, q)=>(p.pos - q.pos) || (p.x - q.x) || (p.j - q.j));
+  return ev.map(e=>e.i);
+}
 function itemOn(c, h, d, m, sc) {
-  const a = itemsOn(c, h, d, sc); if (!a.length) return null;
+  const a = itemList(c, h, d, sc); if (!a.length) return null;
   return isNil(m) ? a[0] : a[((m % a.length) + a.length) % a.length];
 }
 function winsOf(c, fid) {
@@ -3451,7 +3461,7 @@ function playlistOf(s, draft) {
 /* vezes que a campanha entra numa volta do loop: o maior «passagens por minuto» dos vídeos ativos */
 function copiesOf(c, d, h, sc) {
   let k = Math.max(1, Math.ceil(c.ppm - 1e-9));
-  if (c.items.length)itemsOn(c, h, d, sc).forEach(function(i) {if ((i.ppm || 1) > k)k = i.ppm;});
+  if (c.items.length) {const a = itemsOn(c, h, d, sc); if (a.some(i=>weightOf(i) > 1))k = Math.max(k, a.reduce((t, i)=>t + weightOf(i), 0));}
   return Math.min(12, k);
 }
 /* repete cada campanha as vezes pedidas, distribuídas por igual ao longo da volta, pela ordem da playlist */
@@ -4586,7 +4596,7 @@ function itemsField(c) {
     return '<div class="ci-row"><label class="ci-main"><input type="checkbox" name="ci" value="' + f.id + '" data-a-change="ci-toggle"' + (it ? ' checked' : '') + '><span class="ell">' + esc(f.name) + '</span>' + (fo ? '<small class="muted">' + esc(fo.name) + '</small>' : '') + '</label>'
       + '<div class="ci-win"' + (it ? '' : ' hidden') + '>'
       + '<span class="ci-line"><small>Dias</small><input type="date" name="cid0_' + f.id + '" value="' + (it && it.d0 ? iso(it.d0) : '') + '" aria-label="Dia de entrada de ' + esc(f.name) + '"><span>–</span><input type="date" name="cid1_' + f.id + '" value="' + (it && it.d1 ? iso(it.d1) : '') + '" aria-label="Dia de saída de ' + esc(f.name) + '"></span>'
-      + '<span class="ci-line"><small title="Quantas vezes por minuto este vídeo passa. Deixe 1 se não precisar de um ritmo próprio.">Vezes/min</small><input type="number" name="cip_' + f.id + '" min="1" max="12" step="1" value="' + ((it && it.ppm) || 1) + '" aria-label="Passagens por minuto de ' + esc(f.name) + '"></span>'
+      + '<span class="ci-line"><small title="Quantas vezes por minuto este vídeo passa. Com mais de 1, o vídeo repete-se na ronda com as passagens espaçadas por igual (por exemplo A, B, C, A, D, E, F) e a campanha entra mais vezes por volta. Deixe 1 se não precisar de um ritmo próprio.">Vezes/min</small><input type="number" name="cip_' + f.id + '" min="1" max="12" step="1" value="' + ((it && it.ppm) || 1) + '" aria-label="Passagens por minuto de ' + esc(f.name) + '"></span>'
       + '<span class="ci-line ci-pos"><small>Posição</small><input type="number" name="cio_' + f.id + '" min="1" max="99" step="1" value="' + (rank[f.id] || '') + '" aria-label="Posição de ' + esc(f.name) + ' na ordem"></span>'
       + '<span class="ci-line ci-hours"><small>Horas</small>' + ivBox('ci0_' + f.id, 'ci1_' + f.id, (it && it.ivs && it.ivs.length) ? it.ivs : [[it ? it.h0 : null, it ? it.h1 : null]], 'Início da campanha', 'Fim da campanha', ' do vídeo ' + esc(f.name)) + '</span></div></div>';
   }).join('');

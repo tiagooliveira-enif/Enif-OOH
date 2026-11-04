@@ -101,3 +101,18 @@ console.log('schedule: ok');
   assert.equal(S.onOverlap({ on: 0, off: 24 }, 3, 3.25), 0.25, 'ecrã sempre ligado');
   console.log('horário de ligar/desligar ao minuto: ok');
 }
+
+{
+  // vídeo com «Vezes/min» maior: repete-se na ronda, espaçado por igual (A, B, C, A, D, E, F)
+  const sc = { id: 'E1', venue: 'V', res: '1920×1080', limit: 14, order: [], on: 0, off: 24, fit: null };
+  const mkC = w => ({ id: 'C', name: 'C', client: 'c', venues: ['V'], start: '2020-01-01', end: '2099-01-01', h0: 0, h1: 24, ppm: 1, dur: 10, items: ['A', 'B', 'C', 'D', 'E', 'F'].map((f, i) => ({ f, ppm: i === 0 ? w : 1 })), pauses: [] });
+  const ctx = { contents: [] }, ids = c => S.itemList(c, 10, '2026-11-04', sc, ctx).map(i => i.f).join('');
+  assert.equal(ids(mkC(1)), 'ABCDEF', 'sem pesos: ordem normal, tudo igual a antes');
+  assert.equal(ids(mkC(2)), 'ABCADEF', 'A 2×: A, B, C, A, D, E, F');
+  assert.equal(ids(mkC(3)), 'ABACDAEF', 'A 3×: repetições espaçadas por igual');
+  assert.equal(S.copiesOf(mkC(2), '2026-11-04', 10, sc, ctx), 7, 'a campanha entra 7 vezes por volta para a ronda caber numa volta');
+  assert.equal(S.copiesOf(mkC(1), '2026-11-04', 10, sc, ctx), 1, 'sem pesos entra 1 vez');
+  const e = S.hourLoop(sc, [mkC(2)], '2026-11-04', 10, ctx).seq.filter(x => !x.spot)[0];
+  assert.equal(e.items.join(''), 'ABCADEF', 'o player recebe a ronda com A repetido');
+  console.log('vídeo com mais passagens por minuto: ok');
+}
