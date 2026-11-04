@@ -60,6 +60,7 @@ try:
         pl = call('GET', '/api/state', tok=tok)
         pg.locator('[data-a=edit-camp][data-id=C2]').first.click(); time.sleep(.5)
         ok('depois de recarregar, a ficha mostra o grupo', 'Neste grupo' in pg.inner_text('#modal-root'))
+        pg.keyboard.press('Escape'); pg.evaluate("document.querySelector('#modal-root [data-a=close]') && document.querySelector('#modal-root [data-a=close]').click()"); time.sleep(.5)
         pg.locator('[data-a=edit-camp][data-id=C1]').first.click(); time.sleep(.5)
         pg.select_option('#c-share', ''); time.sleep(.2)
         pg.click('form[data-form=campaign] button[type=submit]'); time.sleep(1.5)
