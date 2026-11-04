@@ -4264,6 +4264,7 @@ function screenModal(id) {
   const ai = al.filter(a=>a.sev === 'ia').map(a=>'<div class="ai-box">' + ic('spark') + '<span class="hint">' + esc(a.detail) + '</span></div>').join('');
   modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
     + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? (s.disk.total - s.disk.free) + ' de ' + s.disk.total + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + s.disk.free + ' GB</span>') : '—') + '</dd></div><div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + '</dd></div>'
+    + '<div><dt>Área do PC</dt><dd>' + (canG ? '<select data-a-change="area" data-id="' + s.id + '" aria-label="Área do ecrã do PC onde o player desenha" style="width:auto">' + AREAS.map(f=>'<option value="' + f[0] + '"' + ((s.area || 'inteiro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((AREAS.find(f=>f[0] === (s.area || 'inteiro')) || AREAS[0])[1])) + '<small class="muted" style="display:block">Só uma área: o player desenha com o tamanho da resolução do ecrã e deixa o resto do PC a preto.</small></dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
     + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
     + (s.status === 'novo' ? '' : '<h3 class="sec-t">Playlist</h3>' + playlistHtml(s) + proofLogHtml(s))
@@ -4788,6 +4789,7 @@ const MANUAL = {
    ['Relatórios', 'Estas passagens não contam nos relatórios e ficam registadas no histórico.']]},
   {h:'Manutenção', need:'ecras.gerir', steps:[
    ['Atualizar agora', 'Faz o ecrã mostrar já a programação mais recente. Serve para quando está um cliente à frente do ecrã; no dia a dia o ecrã atualiza-se sozinho.'],
+   ['Área do PC', 'Por defeito o player ocupa o ecrã inteiro do PC. Se o painel LED só mostra uma parte do ecrã do PC (por exemplo, o canto superior esquerdo), escolha em «Área do PC» o canto ou o centro: o player passa a desenhar só com o tamanho da resolução do ecrã e deixa o resto do PC a preto.'],
    ['Reiniciar o player e Teste no ecrã', '«Reiniciar player» reinicia o programa do ecrã. «Teste no ecrã» mostra durante 30 segundos uma imagem de teste, para confirmar a posição e a resolução.'],
    ['Alterar dados', 'Ao lado da resolução, do horário e da localização há o botão «Alterar».'],
    ['Eliminar ecrã', 'Só quando o ecrã já não existir. Pede confirmação.']]}],
@@ -5074,6 +5076,7 @@ function niceStep(x) {const p = Math.pow(10, Math.floor(Math.log10(x))), f = x /
 const typeNames = ['Totem vertical', 'Painel horizontal', 'Videowall', 'Outro'];
 const RES_PRESETS = [['1920×1080', 'Full HD horizontal'], ['1080×1920', 'Full HD vertical'], ['3840×2160', '4K horizontal'], ['2160×3840', '4K vertical'], ['3840×1080', 'Videowall largo'], ['2560×1440', 'QHD'], ['1366×768', 'HD 1366'], ['1280×720', 'HD 720p']];
 const resTxt = s=>s.res === 'auto' ? 'Por detetar' : s.res;
+const AREAS = [['inteiro', 'Ecrã inteiro do PC (por defeito)'], ['tl', 'Só uma área: canto superior esquerdo'], ['tr', 'Só uma área: canto superior direito'], ['bl', 'Só uma área: canto inferior esquerdo'], ['br', 'Só uma área: canto inferior direito'], ['c', 'Só uma área: ao centro']];
 const FITS = [['caber', 'Caber (barras pretas, nada cortado)'], ['preencher', 'Preencher (sem barras, corta as margens)'], ['esticar', 'Esticar (deforma a imagem)']];
 function resField(cur) {
   const preset = RES_PRESETS.some(p=>p[0] === cur);
@@ -5841,7 +5844,7 @@ function sessionLost(msg) {
 function setArr(a, b) {a.length = 0; b.forEach(function(x) {a.push(x);});}
 const sleep = ms=>new Promise(function(r) {setTimeout(r, ms);});
 
-const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'bri'];
+const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri'];
 const CMP_KEYS = ['name', 'client', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'manual', 'color', 'items', 'pauses'];
 const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'photo', 'notif', 'ui'];
 const emptyBase = ()=>({screens:{}, campaigns:{}, folders:{}, contents:{}, users:{}});
@@ -6484,6 +6487,11 @@ document.addEventListener('change', function(e) {
     if (!guard('ecras.gerir')) return;
     const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
     s.fit = t.value; toast('Ajuste de ' + s.id + ': ' + FITS.find(f=>f[0] === s.fit)[1].split(' (')[0] + '. O ecrã atualiza em instantes.');
+  }
+  else if (ac === 'area') {
+    if (!guard('ecras.gerir')) return;
+    const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
+    s.area = t.value; toast('Área de ' + s.id + ': ' + AREAS.find(f=>f[0] === s.area)[1].split(' (')[0] + '. O ecrã atualiza em instantes.');
   }
   else if (ac === 'bri-mode') {const m = t.value === 'manual', a = $('#bri-auto'), b = $('#bri-man'); if (a)a.hidden = m; if (b)b.hidden = !m;}
   else if (ac === 'res') {const c = $('#res-custom'); if (c)c.hidden = t.value !== 'custom';}

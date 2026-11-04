@@ -59,8 +59,8 @@ body {
 }
 #brand small {
   display: block;
-  margin-top: 1vw;
-  font-size: 1.3vw;
+  margin-top: 0.33em;
+  font-size: 0.43em;
   color: #8f9bbd;
 }
 #dbg {
@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '9';
+const VERSION = '10';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -214,10 +214,30 @@ function setProof(p) {
 const proofOn = function() {return PROOF && Date.now() < PROOF.until;};
 function waitMs(ms) {return new Promise(function(r) {const t = setTimeout(function() {cancelFn = null; r();}, ms); cancelFn = function() {clearTimeout(t); cancelFn = null; r();};});}
 /* ---------- ecrã de teste (30 s) ---------- */
+/* área do PC onde se desenha: «inteiro» (por defeito) enche a janela; as outras usam o tamanho da resolução do ecrã, num canto ou ao centro, e o resto fica a preto */
+function areaBox() {
+  const sc = (PL && PL.screen) || {}, a = sc.area || 'inteiro', d = dimsOf(sc.res), W = window.innerWidth, H = window.innerHeight;
+  if (a === 'inteiro' || !d) return {on:false, w:W, h:H, x:0, y:0};
+  const w = Math.min(d.w, W), h = Math.min(d.h, H);
+  return {on:true, w:w, h:h, x:a === 'tr' || a === 'br' ? W - w : a === 'c' ? Math.round((W - w) / 2) : 0, y:a === 'bl' || a === 'br' ? H - h : a === 'c' ? Math.round((H - h) / 2) : 0};
+}
+function applyArea() {
+  const b = areaBox();
+  [$('#stage'), $('#brand'), $('#test')].forEach(function(el) {
+    if (!el) return;
+    if (!b.on) {el.style.inset = ''; el.style.width = ''; el.style.height = ''; el.style.fontSize = ''; el.style.padding = ''; return;}
+    el.style.inset = 'auto'; el.style.left = b.x + 'px'; el.style.top = b.y + 'px'; el.style.width = b.w + 'px'; el.style.height = b.h + 'px';
+  });
+  $('#brand').style.fontSize = b.on ? Math.round(b.w * 0.03) + 'px' : '';
+  $('#test').style.fontSize = b.on ? Math.round(b.w * 0.03) + 'px' : ''; $('#test').style.padding = b.on ? Math.round(b.w * 0.04) + 'px' : '';
+  dbg.style.left = (b.x + 8) + 'px'; dbg.style.bottom = (window.innerHeight - b.y - b.h + 8) + 'px'; dbg.style.maxWidth = (b.w - 16) + 'px'; dbg.style.whiteSpace = b.on ? 'pre-wrap' : 'pre';
+}
+window.addEventListener('resize', function() {applyArea();});
 function showTest() {
+  applyArea();
   testUntil = Date.now() + 30000;
   const t = $('#test'), s = (PL && PL.screen) || {};
-  t.innerHTML = '<div>' + (s.venue || '') + ' · ' + code + '</div><div style="font-weight:400;font-size:2vw;margin-top:1vw">Resolução medida: ' + window.innerWidth + '×' + window.innerHeight + ' (configurada: ' + (s.res || '-') + ')<br>Player ' + VERSION + ' · ' + new Date().toLocaleTimeString('pt-PT') + '</div><div class="bars">' + ['#fff', '#ff0', '#0ff', '#0f0', '#f0f', '#f00', '#00f', '#000'].map(function(c) {return '<i style="background:' + c + '"></i>';}).join('') + '</div>';
+  t.innerHTML = '<div>' + (s.venue || '') + ' · ' + code + '</div><div style="font-weight:400;font-size:' + Math.round(areaBox().w * 0.02) + 'px;margin-top:' + Math.round(areaBox().w * 0.01) + 'px">Resolução medida: ' + window.innerWidth + '×' + window.innerHeight + (areaBox().on ? ' · área ' + areaBox().w + '×' + areaBox().h : '') + ' (configurada: ' + (s.res || '-') + ')<br>Player ' + VERSION + ' · ' + new Date().toLocaleTimeString('pt-PT') + '</div><div class="bars">' + ['#fff', '#ff0', '#0ff', '#0f0', '#f0f', '#f00', '#00f', '#000'].map(function(c) {return '<i style="background:' + c + '"></i>';}).join('') + '</div>';
   t.style.display = 'block';
   setTimeout(function() {if (Date.now() >= testUntil)t.style.display = 'none';}, 30500);
 }
@@ -256,7 +276,7 @@ async function refresh() {
     const rl = ls('enif.reload'); if (rl !== null && +rl !== j.reload) {ls('enif.reload', String(j.reload)); location.reload(); return;}
     ls('enif.reload', String(j.reload));
     if (typeof j.generated === 'number')skew = j.generated - Date.now();
-    PL = j; ls('enif.playlist', JSON.stringify(j));
+    PL = j; ls('enif.playlist', JSON.stringify(j)); applyArea();
   } catch (e) {stats.net = 'sem ligação'; if (!PL) {try {PL = JSON.parse(ls('enif.playlist') || 'null');} catch (x) {PL = null;}}}
   await ensureFiles();
 }
@@ -394,7 +414,7 @@ setInterval(drawDbg, 1000);
 (async function() {
   try {if ('serviceWorker' in navigator)navigator.serviceWorker.register('/player/sw.js', {scope:'/player/'});} catch (e) {/* sem ação */}
   await openCache();
-  PL = null; try {PL = JSON.parse(ls('enif.playlist') || 'null');} catch (e) {/* sem ação */}
+  PL = null; try {PL = JSON.parse(ls('enif.playlist') || 'null');} catch (e) {/* sem ação */} applyArea();
   if (PL && cache) {Object.keys(PL.files).forEach(function(id) {have[id] = cacheKey(id, PL.files[id]);});}   // arranca já com o que tinha guardado, sem esperar pela rede
   loop();
   await refresh();

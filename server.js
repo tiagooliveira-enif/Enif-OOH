@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '9';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '10';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -128,6 +128,7 @@ const ids = (v, what) => { if (!Array.isArray(v) || v.length > 500) throw bad(wh
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 const FITS = ['caber', 'preencher', 'esticar'];
+const AREAS = ['inteiro', 'tl', 'tr', 'bl', 'br', 'c'];      // onde o player desenha no ecrã do PC: tudo, ou uma área do tamanho do ecrã num canto/ao centro
 function cleanBri(b, old) {
   if (b === undefined) return old || null;
   if (b === null) return null;
@@ -147,6 +148,7 @@ function cleanScreen(o, id, old) {
     on: num(isNil(o.on) ? 0 : o.on, 0, 24, 'Hora de ligar'), off: num(isNil(o.off) ? 24 : o.off, 0, 24, 'Hora de desligar'),
     onT: optStr(o.onT, 5) || '00:00', offT: optStr(o.offT, 5) || '23:59',
     fit: FITS.indexOf(o.fit) > -1 ? o.fit : ((old && old.fit) || 'caber'),
+    area: AREAS.indexOf(o.area) > -1 ? o.area : ((old && old.area) || 'inteiro'),
     bri: cleanBri(o.bri, old && old.bri)
   };
   if (loc.poi && typeof loc.poi === 'object' && out.loc.lat !== null && out.loc.lng !== null) {
@@ -258,7 +260,8 @@ function checkContentScreens(cand, screenIds) {
 /* ---------- sincronização (alterações vindas da interface) ---------- */
 const PL_FIELDS = ['order', 'limit', 'draft'];
 /* campos que mudaram; «share» é opcional e some do documento quando a campanha deixa de partilhar a posição */
-const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(n[k], old[k])).concat(!('share' in n) && !isNil(old.share) ? ['share'] : []);
+const dv = (o, k) => (k === 'area' && isNil(o[k]) ? 'inteiro' : o[k]);
+const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(dv(n, k), dv(old, k))).concat(!('share' in n) && !isNil(old.share) ? ['share'] : []);
 function applyOp(user, op) {
   if (!op || typeof op !== 'object') throw bad('Pedido inválido.');
   const { coll, id } = op;
@@ -674,7 +677,7 @@ function playlistFor(scr) {
   }));
   const lv = q1('SELECT reload FROM live WHERE screen=?', scr.id);
   return { playerVersion: PLAYER_VERSION, tz: TZ, generated: Date.now(), reload: lv ? lv.reload : 0, spotGap: S.SPOT_GAP,
-    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', bri: scr.bri || null, on: typeof scr.on === 'number' ? scr.on : 0, off: typeof scr.off === 'number' ? scr.off : 24 }, days, files, proof: proof ? { id: proof.t0, files: proof.files.filter(f => files[f]), until: proof.until, serverTime: proof.serverTime } : null };
+    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', area: scr.area || 'inteiro', bri: scr.bri || null, on: typeof scr.on === 'number' ? scr.on : 0, off: typeof scr.off === 'number' ? scr.off : 24 }, days, files, proof: proof ? { id: proof.t0, files: proof.files.filter(f => files[f]), until: proof.until, serverTime: proof.serverTime } : null };
 }
 function screenAuth(code, key) {
   const s = getDoc('screens', String(code || '')); if (!s) return null;
