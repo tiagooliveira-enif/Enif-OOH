@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '8';
+const VERSION = '9';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -280,9 +280,12 @@ function swapIn(el) {
   $('#brand').style.display = 'none';
 }
 async function playOne(c, id, secs) {
-  const f = PL.files[id]; if (!f) return false;
+  const f = PL.files[id]; if (!f) {stats.err = 'ficheiro ' + id + ' não vem na lista'; return false;}
   let s = await srcFor(id, f);
-  if (!s) { if (!cache && stats.net === 'ok')s = {url:mediaUrl(id), revoke:false}; else return false; }
+  if (!s) {                                                              // ainda não está em cache: vai buscar à rede em vez de saltar em silêncio
+    if (stats.net === 'ok')s = {url:mediaUrl(id), revoke:false};
+    else {stats.err = 'sem cache nem rede: ' + (f.name || id); logPlay(c, id, 0, false); return false;}
+  }
   cur = {c:c, f:id}; const t0 = Date.now(), fm = fitMode(f); let ok = true, aborted = false; lastFrameAt = Date.now();
   if (f.type === 'Vídeo') {
     const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.style.objectFit = fm; v.src = s.url;
