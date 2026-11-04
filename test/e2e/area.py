@@ -49,6 +49,7 @@ try:
         ap.click('[data-a=nav][data-v=ecras]'); time.sleep(.6); ap.click('[data-a=open-screen]:has-text("ECR-001")'); time.sleep(.8)
         ok('a ficha tem o seletor «Área do PC» em «Ecrã inteiro»', ap.locator('select[data-a-change=area]').count() == 1 and ap.locator('select[data-a-change=area]').input_value() == 'inteiro')
         ap.select_option('select[data-a-change=area]', 'tl'); time.sleep(2.5)
+        ok('a ficha mostra o esquema e a frase da área', ap.locator('[role=img][aria-label^=Esquema]').count() == 1 and 'canto superior esquerdo' in ap.inner_text('#modal-root'))
         ok('a escolha chega ao servidor', call('GET', '/api/player/playlist?code=ECR-001&key=' + key)['screen']['area'] == 'tl')
         ap.reload(); ap.wait_for_selector('[data-a=nav][data-v=ecras]'); ap.click('[data-a=nav][data-v=ecras]'); time.sleep(.6); ap.click('[data-a=open-screen]:has-text("ECR-001")'); time.sleep(.8)
         ok('depois de recarregar a ficha continua em «canto superior esquerdo»', ap.locator('select[data-a-change=area]').input_value() == 'tl')
