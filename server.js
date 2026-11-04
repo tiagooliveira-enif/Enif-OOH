@@ -262,7 +262,7 @@ const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).index
 function applyOp(user, op) {
   if (!op || typeof op !== 'object') throw bad('Pedido inválido.');
   const { coll, id } = op;
-  if (typeof id !== 'string' || !id || id.length > 80 || !/^[\w.\-]+$/.test(id)) throw bad('Identificador inválido.');
+  if (typeof id !== 'string' || !id || id.length > 80 || !/^[\w.-]+$/.test(id)) throw bad('Identificador inválido.');
   if (op.op === 'del') {
     if (coll === 'alerts') { need(user, 'alertas.resolver'); run('INSERT OR IGNORE INTO resolved(id,ts) VALUES(?,?)', id, Date.now()); return; }
     if (coll === 'folders') { need(user, 'conteudos.gerir'); const f = getDoc('folders', id); delDoc('folders', id); if (f) audit(user, 'Eliminou a pasta', f.name); return; }
@@ -750,7 +750,7 @@ async function upload(req, res, u) {
   const type = html ? 'HTML5' : /^video\//.test(mime) ? 'Vídeo' : /^image\//.test(mime) ? 'Imagem' : null;
   if (!type) throw bad('Tipo de ficheiro não suportado. Use imagens, vídeos ou HTML5.');
   if (html) mime = 'text/html; charset=utf-8';
-  if (!/^[\w.+\-]+\/[\w.+\-]+(;.*)?$/.test(mime)) throw bad('Tipo de ficheiro inválido.');
+  if (!/^[\w.+-]+\/[\w.+-]+(;.*)?$/.test(mime)) throw bad('Tipo de ficheiro inválido.');
   const wantHouse = u.searchParams.get('house') === '1';
   if (wantHouse && !user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
   const screenIds = String(u.searchParams.get('screens') || '').split(',').map(x => x.trim()).filter(Boolean);
@@ -1152,14 +1152,14 @@ const router = async (req, res) => {
   if (p === '/api/sync' && m === 'POST') { const user = needUser(req, u), b = await readJson(req); sync(user, b.ops); return send(res, 200, { ok: true }); }
   if (p === '/api/upload' && m === 'PUT') return upload(req, res, u);
   if (p === '/api/plays' && m === 'GET') return playsApi(res, u, needUser(req, u));
-  if ((r = /^\/api\/screens\/([\w.\-]+)\/restart$/.exec(p)) && m === 'POST') {
+  if ((r = /^\/api\/screens\/([\w.-]+)\/restart$/.exec(p)) && m === 'POST') {
     const user = needUser(req, u); need(user, 'ecras.gerir');
     if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
     run('INSERT INTO live(screen,reload) VALUES(?,1) ON CONFLICT(screen) DO UPDATE SET reload=reload+1', r[1]);
     audit(user, 'Reiniciou o player', r[1]);
     return send(res, 200, { ok: true });
   }
-  if ((r = /^\/api\/screens\/([\w.\-]+)\/(sync-now|test)$/.exec(p)) && m === 'POST') {
+  if ((r = /^\/api\/screens\/([\w.-]+)\/(sync-now|test)$/.exec(p)) && m === 'POST') {
     const user = needUser(req, u);
     if (r[2] === 'test') need(user, 'ecras.gerir'); else if (!A.can(user, 'ecras.gerir') && !A.can(user, 'playlist.gerir')) throw new HttpError(403, 'Não tem permissão para esta ação.');
     const sc = getDoc('screens', r[1]); if (!sc) throw new HttpError(404, 'Ecrã não existe');
@@ -1168,7 +1168,7 @@ const router = async (req, res) => {
     audit(user, r[2] === 'test' ? 'Teste no ecrã' : 'Atualizar agora no ecrã', sc.id + ' · ' + sc.venue);
     return send(res, 200, { ok: true });
   }
-  if ((r = /^\/api\/screens\/([\w.\-]+)\/proof$/.exec(p)) && m === 'POST') {
+  if ((r = /^\/api\/screens\/([\w.-]+)\/proof$/.exec(p)) && m === 'POST') {
     const user = needUser(req, u); need(user, 'playlist.gerir');
     const sc = getDoc('screens', r[1]); if (!sc) throw new HttpError(404, 'Ecrã não existe');
     const b = await readJson(req), files = Array.isArray(b.files) ? [...new Set(b.files.map(String))] : [];
@@ -1182,7 +1182,7 @@ const router = async (req, res) => {
     audit(user, 'Comprovativo iniciado', fileNames(files) + ' · ' + sc.id + ' · ' + secs + ' s');
     return send(res, 200, { ok: true, proof: proofView(proofRow(sc.id)) });
   }
-  if ((r = /^\/api\/screens\/([\w.\-]+)\/proof\/stop$/.exec(p)) && m === 'POST') {
+  if ((r = /^\/api\/screens\/([\w.-]+)\/proof\/stop$/.exec(p)) && m === 'POST') {
     const user = needUser(req, u); need(user, 'playlist.gerir');
     if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
     proofEnd(r[1], user, true);
