@@ -3572,7 +3572,7 @@ function noPlayWhy(c) {
   if (!sc.length) return 'não há ecrãs nos locais escolhidos.';
   const ok = playScreens(c);
   if (!ok.length) return 'nenhum conteúdo é compatível com os ecrãs dos locais escolhidos.';
-  if (ok.every(x=>x.status === 'offline' || x.status === 'novo')) return ok.length === 1 ? 'o ecrã ' + ok[0].id + ' está offline.' : 'os ecrãs estão offline.';
+  if (ok.every(x=>x.status === 'offline' || x.status === 'novo')) return ok.length === 1 ? 'o ecrã ' + ok[0].id + ' está sem ligação à plataforma. Pode continuar a passar o que tem guardado; só se confirma quando voltar.' : 'os ecrãs estão sem ligação à plataforma. Podem continuar a passar o que têm guardado; só se confirma quando voltarem.';
   if (ok.every(x=>!isOnNow(x))) return 'os ecrãs estão desligados a esta hora.';
   return 'ficou fora do limite de campanhas em simultâneo dos ecrãs.';
 }
@@ -4112,7 +4112,7 @@ function viewDash() {
   const playCamp = an.length ? an.map(function(c) {
     const n = screens.filter(s=>playingOn(s).indexOf(c) > -1).length;
     const why = n ? '' : noPlayWhy(c);
-    return '<div class="item"><span class="ico ' + (n ? 'ok' : 'warn') + '">' + ic(n ? 'play' : 'alert') + '</span><div class="grow"><div class="title">' + esc(c.name) + '</div><div class="muted">' + esc(c.client) + ' · ' + hrsC(c) + ' · ' + c.dur + ' s · ' + modTxt(c.ppm) + '</div>' + (why ? '<div class="muted"><b>Não está a passar:</b> ' + why + '</div>' : '') + '</div><div style="text-align:right">' + (n ? '<b>' + n + '</b> <span class="muted">' + (n === 1 ? 'ecrã' : 'ecrãs') + '</span>' : '<span class="pill warn">Parada</span>') + '<div>' + prioPill(c.priority) + '</div></div></div>';
+    return '<div class="item"><span class="ico ' + (n ? 'ok' : 'warn') + '">' + ic(n ? 'play' : 'alert') + '</span><div class="grow"><div class="title">' + esc(c.name) + '</div><div class="muted">' + esc(c.client) + ' · ' + hrsC(c) + ' · ' + c.dur + ' s · ' + modTxt(c.ppm) + '</div>' + (why ? '<div class="muted"><b>' + (/sem ligação/.test(why) ? 'Sem confirmação:' : 'Não está a passar:') + '</b> ' + why + '</div>' : '') + '</div><div style="text-align:right">' + (n ? '<b>' + n + '</b> <span class="muted">' + (n === 1 ? 'ecrã' : 'ecrãs') + '</span>' : '<span class="pill warn">' + (/sem ligação/.test(why) ? 'Sem ligação' : 'Parada') + '</span>') + '<div>' + prioPill(c.priority) + '</div></div></div>';
   }).join('') : '<div class="empty">Nenhuma campanha em reprodução neste momento.</div>';
   const stCls = {online:'ok', atencao:'warn', offline:'bad'};
   const playScr = screens.length ? screens.map(function(s) {
