@@ -393,6 +393,8 @@ function proofRow(id) {
 }
 const proofView = r => r ? { files: JSON.parse(r.files), t0: r.t0, secs: r.secs, by: r.who, until: r.t0 + r.secs * 1000, serverTime: Date.now() } : null;
 /* campanha abaixo do contratado: nas últimas 24 h passou menos de UNDER_PCT das passagens previstas (as que o loop prevê, hora a hora).
+   Um ecrã sem ligação (ou com passagens ainda por enviar) não entra na conta: enquanto está sem internet continua a passar e guarda as passagens;
+   quando volta e as envia, a conta faz-se e só há aviso se de facto ficou abaixo.
    Só aviso interno (painel e notificações): nunca entra nos relatórios. Guardado 1 minuto para não repetir a conta a cada pedido. */
 const UNDER_PCT = 0.9, UNDER_MIN = 20;
 let underCache = { at: 0, list: [] };
@@ -401,7 +403,10 @@ function underList() {
   if (now - underCache.at < 60000) return underCache.list;
   const all = docs('campaigns'), camps = all.filter(c => S.statusOf(c, S.lisbonNow(TZ).date) === 'Ativa'), ctx = sharedCtx(), scrs = docs('screens'), from = now - 24 * 3600000;
   const exp = {};                                                                  // exp[camp][screen] = passagens previstas
+  const hold = new Set();                                                          // ecrãs sem ligação ou com passagens ainda por enviar: não se avalia, as passagens existem mas ainda não chegaram
+  scrs.forEach(sc => { const l = q1('SELECT last_seen, queue FROM live WHERE screen=?', sc.id); if (l && (now - l.last_seen > ONLINE_MS || l.queue > 0)) hold.add(sc.id); });
   scrs.forEach(sc => {
+    if (hold.has(sc.id)) return;
     const lv = q1('SELECT first_seen FROM live WHERE screen=?', sc.id); if (!lv || !lv.first_seen) return;
     const lists = {};
     for (let t = Math.floor(from / 3600000) * 3600000; t < now; t += 3600000) {
@@ -413,7 +418,7 @@ function underList() {
       L.loop.forEach(c => { if (c.house || !camps.some(x => x.id === c.id)) return; const r = exp[c.id] = exp[c.id] || {}; r[sc.id] = (r[sc.id] || 0) + S.rateOf(c, L) * onMin; });
     }
   });
-  const act = {}; q('SELECT camp, screen, SUM(ok) n FROM plays WHERE ts>=? GROUP BY camp, screen', from).forEach(r => { (act[r.camp] = act[r.camp] || {})[r.screen] = r.n; });
+  const act = {}; q('SELECT camp, screen, SUM(ok) n FROM plays WHERE ts>=? GROUP BY camp, screen', from).forEach(r => { if (hold.has(r.screen)) return; (act[r.camp] = act[r.camp] || {})[r.screen] = r.n; });
   const day = S.lisbonNow(TZ).date, list = [];
   camps.forEach(c => {
     const e = exp[c.id]; if (!e) return;

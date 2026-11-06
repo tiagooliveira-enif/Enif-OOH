@@ -303,6 +303,12 @@ async function main() {
     ok('com passagens a chegar, o aviso desaparece', (await alertsOf()).length === 0);
     db.prepare("DELETE FROM plays WHERE camp='CU1'").run(); underReset();
     ok('o aviso volta se faltarem passagens', (await alertsOf()).length === 1);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 3600000, 'ECR-001'); underReset();
+    ok('ecrã sem internet: não há aviso de «abaixo do contratado» (as passagens estão guardadas no ecrã)', (await alertsOf()).length === 0);
+    db.prepare('UPDATE live SET last_seen=?, queue=? WHERE screen=?').run(Date.now(), 40, 'ECR-001'); underReset();
+    ok('voltou a internet mas ainda há passagens por enviar: ainda não se avalia', (await alertsOf()).length === 0);
+    db.prepare('UPDATE live SET queue=0 WHERE screen=?').run('ECR-001'); underReset();
+    ok('tudo enviado e continua abaixo: agora sim, o aviso aparece', (await alertsOf()).length === 1);
     r = await sync(adm, [{ op: 'del', coll: 'alerts', id: al[0].id }]); underReset();
     ok('marcar como resolvido tira o aviso', r.s === 200 && (await alertsOf()).length === 0);
     await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CU1' }]);
