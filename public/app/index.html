@@ -4251,10 +4251,12 @@ function drawScreenList() {
 }
 function logsFor(s) {
   const t = ms=>{const d = new Date(ms); return pad(d.getHours()) + ':' + pad(d.getMinutes());};
+  const dur = m=>m < 60 ? m + ' min' : (m < 2880 ? Math.floor(m / 60) + ' h' : Math.floor(m / 1440) + ' dias');
+  const since = ms=>{const d = new Date(ms), n = new Date(), y = new Date(n.getTime() - 864e5), same = (a, b)=>a.toDateString() === b.toDateString(); return (same(d, n) ? 'as ' : (same(d, y) ? 'ontem às ' : pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' às ')) + t(ms);};
   if (s.status === 'novo' || !s.lastSeen) return [['—', 'Ecrã registado. À espera da primeira ligação do player.', 'warn']];
   const out = [];
-  if (s.status === 'offline') {out.push([t(s.lastSeen), 'Sem sinal há ' + (s.sinceMin || '?') + ' min. O player deixou de responder.', 'bad']); out.push([t(s.lastSeen), 'Sem internet: o player continua a passar a última programação guardada no próprio ecrã. Nunca fica preto.', 'warn']);}
-  else if (s.status === 'fora') {out.push([t(s.lastSeen), 'Fora do horário e sem sinal desde as ' + t(s.lastSeen) + '. Pode estar desligado de propósito; se estiver sem internet, o player guarda o que passou e envia quando voltar.', 'warn']);}
+  if (s.status === 'offline') {out.push([t(s.lastSeen), 'Sem sinal desde ' + since(s.lastSeen) + ' (há ' + dur(s.sinceMin || 0) + '). O player deixou de responder.', 'bad']); out.push([t(s.lastSeen), 'Sem internet: o player continua a passar a última programação guardada no próprio ecrã. Nunca fica preto.', 'warn']);}
+  else if (s.status === 'fora') {out.push([t(s.lastSeen), 'Fora do horário e sem sinal desde ' + since(s.lastSeen) + ' (há ' + dur(s.sinceMin || 0) + '). Pode estar desligado de propósito; se estiver sem internet, o player guarda o que passou e envia quando voltar.', 'warn']);}
   else if (s.status === 'atencao')out.push([t(s.lastSeen), s.issueLog || 'Falhas de reprodução.', 'warn']);
   else out.push([t(s.lastSeen), 'Último sinal recebido. Reprodução normal.', '']);
   if (s.nowCamp) {const c = campById(s.nowCamp); out.push([t(s.lastSeen), 'A passar «' + (c ? c.name : s.nowCamp) + '».', '']);}

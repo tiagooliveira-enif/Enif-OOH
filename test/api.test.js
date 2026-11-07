@@ -181,6 +181,10 @@ async function main() {
   st = (await call('GET', '/api/state', undefined, top)).j;
   ok('sem sinal há 10 min → offline com alerta', st.screens[0].status === 'offline' && st.screens[0].sinceMin >= 10 && st.alerts.some(a => a.sev === 'bad'));
   const al = st.alerts.find(a => a.sev === 'bad');
+  ok('aviso de sem ligação diz a hora e a duração', /^Sem resposta desde (as|ontem às) \d\d:\d\d \(há 1\d min\)\.$/.test(al.detail));
+  db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 1357 * 60000, 'ECR-001');
+  ok('mais de 1 h conta em horas', /\(há 22 h\)/.test(((await call('GET', '/api/state', undefined, top)).j.alerts.find(a => a.sev === 'bad' && a.id.startsWith('off-')) || {}).detail));
+  db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 10 * 60000, 'ECR-001');
   ok('só consulta não resolve alertas', (await sync(tcn, [{ op: 'del', coll: 'alerts', id: al.id }])).s === 403);
   ok('operador resolve alerta', (await sync(top, [{ op: 'del', coll: 'alerts', id: al.id }])).s === 200 && !(await call('GET', '/api/state', undefined, top)).j.alerts.some(a => a.id === al.id));
   ok('ecrã fora do horário não gera alerta', await (async () => {

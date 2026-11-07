@@ -365,6 +365,8 @@ function sync(user, ops) {
 
 /* ---------- estado de ecrãs, alertas ---------- */
 const fmtHM = t => { const d = new Date(t), p = S.lisbonNow(TZ, d); return String(p.h).padStart(2, '0') + ':' + String(p.m).padStart(2, '0'); };
+const durTxt = m => m < 60 ? m + ' min' : (m < 2880 ? Math.floor(m / 60) + ' h' : Math.floor(m / 1440) + ' dias');   // minutos até 1 h, depois horas, depois dias
+const whenTxt = t => { const p = S.lisbonNow(TZ, new Date(t)), n = S.lisbonNow(TZ), y = S.lisbonNow(TZ, new Date(Date.now() - 864e5)); return p.date === n.date ? 'as ' + fmtHM(t) : (p.date === y.date ? 'ontem às ' + fmtHM(t) : p.date.slice(8, 10) + '/' + p.date.slice(5, 7) + ' às ' + fmtHM(t)); };
 function expectedMinutes(scr, from, to) {
   let t = from, total = 0;
   while (t < to) {
@@ -457,12 +459,12 @@ function screenViews(withKeys) {
       if (lv.disk_free / lv.disk_total < 0.1) { const dk = 'disk-' + s.id + '-' + ln.date; if (!resolved.has(dk)) alerts.push({ id: dk, sev: 'warn', screen: s.id, title: 'Disco quase cheio', detail: 'Só restam ' + lv.disk_free + ' GB livres no PC deste ecrã (de ' + lv.disk_total + ' GB). Liberte espaço ou use um disco maior.', time: fmtHM(now) }); }
     }
     o.nowCamp = age < ONLINE_MS && lv.now_c !== '__proof' ? lv.now_c : null; o.nowFile = age < ONLINE_MS ? lv.now_f : null;
-    o.ping = age < 90000 ? 'há ' + Math.max(1, Math.round(age / 1000)) + ' s' : 'há ' + mins + ' min';
+    o.ping = age < 90000 ? 'há ' + Math.max(1, Math.round(age / 1000)) + ' s' : 'há ' + durTxt(mins);
     const tt = tmap[s.id], total = tt ? tt.total : 0, failed = tt ? total - tt.good : 0;
     if (age > ONLINE_MS && inSched) {
       o.status = 'offline'; o.sinceMin = mins;
       const key = 'off-' + s.id + '-' + Math.floor(lv.last_seen / 60000);
-      if (!resolved.has(key)) alerts.push({ id: key, sev: 'bad', screen: s.id, title: 'Ecrã sem ligação', detail: 'Sem resposta há ' + mins + ' min.', time: fmtHM(lv.last_seen + ONLINE_MS) });
+      if (!resolved.has(key)) alerts.push({ id: key, sev: 'bad', screen: s.id, title: 'Ecrã sem ligação', detail: 'Sem resposta desde ' + whenTxt(lv.last_seen) + ' (há ' + durTxt(mins) + ').', min: mins, time: fmtHM(lv.last_seen + ONLINE_MS) });
     } else if (age > ONLINE_MS) {
       o.status = 'fora'; o.sinceMin = mins;   // fora do horário e sem sinal: pode estar desligado de propósito; sem alerta
     } else if (total >= 10 && failed / total >= 0.05) {
@@ -564,7 +566,7 @@ const testMailAt = new Map();
 function importantAlerts() {
   const ln = S.lisbonNow(TZ), out = [];
   screenViews(false).alerts.forEach(a => {
-    if (/^off-/.test(a.id)) { const m = /(\d+) min/.exec(a.detail || ''); if (m && +m[1] >= MAIL_OFF_MIN) out.push(a); }
+    if (/^off-/.test(a.id)) { if ((a.min || 0) >= MAIL_OFF_MIN) out.push(a); }
     else if (/^disk-/.test(a.id)) out.push(a);
     else if (/^under-/.test(a.id)) { const m = /Passou (\d+) %/.exec(a.detail || ''); if (m && +m[1] <= 10 && !/sem sinal/.test(a.detail || '')) out.push(a); }   // se a causa é o ecrã sem sinal, já há o aviso do ecrã
   });
