@@ -3572,7 +3572,7 @@ function noPlayWhy(c) {
   if (!sc.length) return 'não há ecrãs nos locais escolhidos.';
   const ok = playScreens(c);
   if (!ok.length) return 'nenhum conteúdo é compatível com os ecrãs dos locais escolhidos.';
-  if (ok.every(x=>x.status === 'offline' || x.status === 'novo')) return ok.length === 1 ? 'o ecrã ' + ok[0].id + ' está sem ligação à plataforma. Pode continuar a passar o que tem guardado; só se confirma quando voltar.' : 'os ecrãs estão sem ligação à plataforma. Podem continuar a passar o que têm guardado; só se confirma quando voltarem.';
+  if (ok.every(x=>x.status === 'offline' || x.status === 'fora' || x.status === 'novo')) return ok.length === 1 ? 'o ecrã ' + ok[0].id + ' está sem ligação à plataforma. Pode continuar a passar o que tem guardado; só se confirma quando voltar.' : 'os ecrãs estão sem ligação à plataforma. Podem continuar a passar o que têm guardado; só se confirma quando voltarem.';
   if (ok.every(x=>!isOnNow(x))) return 'os ecrãs estão desligados a esta hora.';
   return 'ficou fora do limite de campanhas em simultâneo dos ecrãs.';
 }
@@ -3596,7 +3596,7 @@ function proofLogHtml(s) {
 }
 function proofModal(id) {
   const s = screens.find(x=>x.id === id); if (!s || !guard('playlist.gerir')) return;
-  if (s.status === 'offline' || s.status === 'novo') {toast('O ecrã não está online. Só se pode gravar com o ecrã ligado.'); return;}
+  if (s.status === 'offline' || s.status === 'fora' || s.status === 'novo') {toast('O ecrã não está online. Só se pode gravar com o ecrã ligado.'); return;}
   if (!proofFiles(s).fs.length) {toast('Não há conteúdos na biblioteca que sirvam neste ecrã.'); return;}
   modal('<form data-form="proof" data-id="' + id + '" novalidate><div class="modal-h"><div><h2>Gravar comprovativo</h2><p class="muted">' + esc(s.venue) + ' · ' + esc(s.spot) + ' · ' + esc(s.res || '') + '</p></div><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
     + '<div class="field"><span class="lab">Conteúdos a repor (1 ou 2)</span><div id="pr-files" class="pr-files">' + proofFiles(s).html + '</div><span class="hint">Aparecem todos os conteúdos da biblioteca que passam neste ecrã. Os que não servem (outra resolução ou proporção) não aparecem.</span></div>'
@@ -3611,7 +3611,7 @@ function proofFiles(s) {
 function playingOn(s) {
   const pf = proofOf(s);
   if (pf) return [];
-  if (s.status === 'offline' || s.status === 'novo' || !isOnNow(s)) return [];
+  if (s.status === 'offline' || s.status === 'fora' || s.status === 'novo' || !isOnNow(s)) return [];
   return loopFrom(playlistOf(s, false), s.limit, today, Math.floor(hourNow), s).loop;
 }
 /* campanhas cujas passagens ficam seguidas na volta (contando a volta seguinte), quando há outras campanhas para as separar */
@@ -3923,7 +3923,7 @@ function sugHtml(g, cCamp, cSee, cRep) {
 }
 
 const hrs = (a, b)=>a + 'h–' + b + 'h';
-const statusPill = s=>({online:'<span class="pill ok dot">Online</span>', atencao:'<span class="pill warn dot">Atenção</span>', offline:'<span class="pill bad dot">Offline</span>', novo:'<span class="pill dot">Por emparelhar</span>'}[s]);
+const statusPill = s=>({online:'<span class="pill ok dot">Online</span>', atencao:'<span class="pill warn dot">Atenção</span>', offline:'<span class="pill bad dot">Offline</span>', fora:'<span class="pill dot" title="Fora do horário e sem sinal: pode estar desligado de propósito">Desligado · sem sinal</span>', novo:'<span class="pill dot">Por emparelhar</span>'}[s]);
 const prioPill = p=>'<span class="pill' + (p === 'Alta' ? ' accent' : '') + '">' + p + '</span>';
 
 /* ---------- permissões e utilizadores ---------- */
@@ -4084,6 +4084,7 @@ function viewDash() {
   const att = screens.filter(s=>s.status === 'atencao').length;
   const off = screens.filter(s=>s.status === 'offline').length;
   const fresh = screens.filter(s=>s.status === 'novo').length;
+  const fora = screens.filter(s=>s.status === 'fora').length;
   const act = campaigns.filter(c=>statusOf(c) === 'Ativa').length;
   const sched = campaigns.filter(c=>statusOf(c) === 'Agendada').length;
   const crit = alerts.filter(a=>a.sev === 'bad').length;
@@ -4127,7 +4128,7 @@ function viewDash() {
   const ai = (sg.length ? sg.slice(0, 6).map(g=>sugHtml(g, cCamp, cSee, cRep)).join('') + (sg.length > 6 ? '<p class="hint">Mais ' + (sg.length - 6) + ' sugestões depois de resolver estas.</p>' : '') : '<div class="empty">Sem sugestões por agora.</div>') + fewCtl;
   const pct = n=>total ? (n / total * 100).toFixed(2) : '0';
   const net = '<div class="netbar" role="img" aria-label="Estado da rede"><i style="width:' + pct(screens.filter(s=>s.status === 'online').length) + '%;background:var(--ok)"></i><i style="width:' + pct(att) + '%;background:var(--warn)"></i><i style="width:' + pct(off) + '%;background:var(--bad)"></i></div>'
-    + '<div class="legend"><span style="--lc:var(--ok)">Online <b>' + screens.filter(s=>s.status === 'online').length + '</b></span><span style="--lc:var(--warn)">Atenção <b>' + att + '</b></span><span style="--lc:var(--bad)">Offline <b>' + off + '</b></span>' + (fresh ? '<span style="--lc:var(--line-strong)">Por emparelhar <b>' + fresh + '</b></span>' : '') + '</div>';
+    + '<div class="legend"><span style="--lc:var(--ok)">Online <b>' + screens.filter(s=>s.status === 'online').length + '</b></span><span style="--lc:var(--warn)">Atenção <b>' + att + '</b></span><span style="--lc:var(--bad)">Offline <b>' + off + '</b></span>' + (fora ? '<span style="--lc:var(--line-strong)" title="Fora do horário e sem sinal">Desligado · sem sinal <b>' + fora + '</b></span>' : '') + (fresh ? '<span style="--lc:var(--line-strong)">Por emparelhar <b>' + fresh + '</b></span>' : '') + '</div>';
   return kpis + '<div class="cols"><div class="stack">'
     + '<div class="card"><div class="card-h"><h2>Precisa de atenção</h2>' + (cSee ? '<button class="btn sm ghost" data-a="nav" data-v="ecras">Ver todos os ecrãs</button>' : '') + '</div><div class="card-b">' + al + '</div></div>'
     + '<div class="card"><div class="card-h"><h2>A reproduzir agora</h2>' + playTog + '</div><div class="card-b">' + playing + '</div></div>'
@@ -4226,7 +4227,7 @@ const rowPills = s=>{const al = s.status === 'atencao' && !diskLow(s) && !hasCon
 function viewScreens() {
   head('Ecrãs', screens.length + ' ecrãs registados em ' + new Set(screens.map(s=>s.venue)).size + ' locais', can('ecras.gerir') ? '<button class="btn primary" data-a="new-screen">' + ic('plus') + 'Novo ecrã</button>' : '');
   const cnt = f=>screens.filter(s=>matchF(s, f)).length;
-  const chips = [['todos', 'Todos'], ['online', 'Online'], ['atencao', 'Atenção'], ['offline', 'Offline'], ['conflito', 'Conflitos', 'Ecrãs onde duas campanhas disputam o mesmo espaço na playlist'], ['porenviar', 'Por enviar', 'Ecrãs com a playlist alterada e ainda não enviada']].map(f=>'<button class="chip" data-a="filter" data-f="' + f[0] + '"' + (f[2] ? ' title="' + f[2] + '"' : '') + ' aria-pressed="' + (state.filter === f[0]) + '">' + f[1] + ' <b>' + cnt(f[0]) + '</b></button>').join('');
+  const chips = [['todos', 'Todos'], ['online', 'Online'], ['atencao', 'Atenção'], ['offline', 'Offline'], ['fora', 'Desligado', 'Fora do horário e sem sinal'], ['conflito', 'Conflitos', 'Ecrãs onde duas campanhas disputam o mesmo espaço na playlist'], ['porenviar', 'Por enviar', 'Ecrãs com a playlist alterada e ainda não enviada']].map(f=>'<button class="chip" data-a="filter" data-f="' + f[0] + '"' + (f[2] ? ' title="' + f[2] + '"' : '') + ' aria-pressed="' + (state.filter === f[0]) + '">' + f[1] + ' <b>' + cnt(f[0]) + '</b></button>').join('');
   return '<div class="tools"><div class="search">' + ic('search') + '<input id="q" type="search" placeholder="Procurar por local, cidade ou código" value="' + esc(state.q) + '" aria-label="Procurar ecrãs"></div><div class="chips">' + chips + '</div></div><div class="card" id="screen-list"></div>';
 }
 function drawScreenList() {
@@ -4247,6 +4248,7 @@ function logsFor(s) {
   if (s.status === 'novo' || !s.lastSeen) return [['—', 'Ecrã registado. À espera da primeira ligação do player.', 'warn']];
   const out = [];
   if (s.status === 'offline') {out.push([t(s.lastSeen), 'Sem sinal há ' + (s.sinceMin || '?') + ' min. O player deixou de responder.', 'bad']); out.push([t(s.lastSeen), 'Sem internet: o player continua a passar a última programação guardada no próprio ecrã. Nunca fica preto.', 'warn']);}
+  else if (s.status === 'fora') {out.push([t(s.lastSeen), 'Fora do horário e sem sinal desde as ' + t(s.lastSeen) + '. Pode estar desligado de propósito; se estiver sem internet, o player guarda o que passou e envia quando voltar.', 'warn']);}
   else if (s.status === 'atencao')out.push([t(s.lastSeen), s.issueLog || 'Falhas de reprodução.', 'warn']);
   else out.push([t(s.lastSeen), 'Último sinal recebido. Reprodução normal.', '']);
   if (s.nowCamp) {const c = campById(s.nowCamp); out.push([t(s.lastSeen), 'A passar «' + (c ? c.name : s.nowCamp) + '».', '']);}
@@ -5751,7 +5753,7 @@ function buildPdf(d, o) {
       y += 6;
       const ag = aggByFile(b.recs);
       tbl([['Conteúdo', 'Tipo', 'Passagens', 'Visualizações']], ag.keys.map(function(k) {const f = k === '—' ? null : fileById(k); return [ag.name(k), f ? f.type : '—', pdfTxt(fmt.format(ag.bf[k].plays)), pdfTxt(fmt.format(ag.bf[k].impr))];}), {columnStyles:{2:{halign:'right'}, 3:{halign:'right'}}});
-      tbl([['Ecrã', 'Local', 'Cidade', 'Estado', 'Passagens', 'Visualizações']], b.recs.slice().sort((p, q)=>q.impr - p.impr).map(r=>[r.s.id + ' · ' + r.s.spot, r.s.venue, r.s.city, ({online:'Online', atencao:'Atenção', offline:'Offline', novo:'Por emparelhar'})[r.s.status], pdfTxt(fmt.format(r.plays)), pdfTxt(fmt.format(r.impr))]), {columnStyles:{4:{halign:'right'}, 5:{halign:'right'}}});
+      tbl([['Ecrã', 'Local', 'Cidade', 'Estado', 'Passagens', 'Visualizações']], b.recs.slice().sort((p, q)=>q.impr - p.impr).map(r=>[r.s.id + ' · ' + r.s.spot, r.s.venue, r.s.city, ({online:'Online', atencao:'Atenção', offline:'Offline', fora:'Desligado · sem sinal', novo:'Por emparelhar'})[r.s.status], pdfTxt(fmt.format(r.plays)), pdfTxt(fmt.format(r.impr))]), {columnStyles:{4:{halign:'right'}, 5:{halign:'right'}}});
       const mine = shots.filter(sh=>sh.camp === b.c.name);
       if (mine.length) {
         if (y > PH - 150) {doc.addPage(); y = M;}

@@ -190,6 +190,13 @@ async function main() {
     await sync(top, [op('screens', 'ECR-001', { on: 0, off: 24 }, ['on', 'off'])]);
     return h + 2 > 23 || !s2.alerts.some(a => a.id.startsWith('off-ecr') || (a.sev === 'bad' && a.title === 'Ecrã sem ligação' && a.id !== al.id));
   })());
+  ok('fora do horário e sem sinal → «fora», não «online»', await (async () => {
+    const h = S.lisbonNow('Europe/Lisbon').h; if (h + 2 > 22) return true;
+    await sync(top, [op('screens', 'ECR-001', { on: h + 2, off: 24 }, ['on', 'off'])]);
+    const s3 = (await call('GET', '/api/state', undefined, top)).j.screens[0];
+    await sync(top, [op('screens', 'ECR-001', { on: 0, off: 24 }, ['on', 'off'])]);
+    return s3.status === 'fora' && s3.sinceMin >= 10;
+  })());
   ok('reiniciar player exige permissão', (await call('POST', '/api/screens/ECR-001/restart', {}, tpl2)).s === 403);
   const rel0 = (await call('GET', '/api/player/playlist?code=ECR-001&key=' + key)).j.reload;
   await call('POST', '/api/screens/ECR-001/restart', {}, top);
@@ -360,7 +367,7 @@ async function main() {
     let stc = (await call('GET', '/api/state', undefined, adm)).j;
     const ex = id => (stc.contents.find(f => f.id === id) || {}).exp;
     ok('conteúdo novo e nunca usado: caduca 60 dias depois do carregamento', ex(fNew) === plus(60));
-    ok('conteúdo nunca usado há 50 dias: já na janela de aviso (10 dias)', ex(fOld) === plus(10));
+    ok('conteúdo nunca usado há 50 dias: já na janela de aviso (10 dias)', [plus(9), plus(10), plus(11)].includes(ex(fOld))); // tolera a mudança de hora
     ok('conteúdo usado: caduca 180 dias depois do fim da última campanha', ex(fUsed) === plus(10));
     ok('conteúdo numa campanha ativa nunca caduca', ex(fAct) === undefined);
     ok('o estado traz a configuração e a reciclagem', stc.clean.used === 180 && stc.clean.never === 60 && stc.clean.bin === 30 && Array.isArray(stc.bin));

@@ -463,6 +463,8 @@ function screenViews(withKeys) {
       o.status = 'offline'; o.sinceMin = mins;
       const key = 'off-' + s.id + '-' + Math.floor(lv.last_seen / 60000);
       if (!resolved.has(key)) alerts.push({ id: key, sev: 'bad', screen: s.id, title: 'Ecrã sem ligação', detail: 'Sem resposta há ' + mins + ' min.', time: fmtHM(lv.last_seen + ONLINE_MS) });
+    } else if (age > ONLINE_MS) {
+      o.status = 'fora'; o.sinceMin = mins;   // fora do horário e sem sinal: pode estar desligado de propósito; sem alerta
     } else if (total >= 10 && failed / total >= 0.05) {
       const pct = Math.round(failed / total * 100);
       o.status = 'atencao'; o.issueLog = pct + ' % das reproduções de hoje falharam.';
@@ -577,7 +579,7 @@ function weeklyText() {
   const ln = S.lisbonNow(TZ), today = ln.date, sv = screenViews(false), L = [];
   const cnt = k => sv.screens.filter(x => x.status === k).length, weekEnd = S.addDay(today, 7);
   L.push('Resumo da semana · ' + today, '');
-  L.push('ECRÃS: ' + sv.screens.length + ' no total · ' + cnt('online') + ' online · ' + cnt('atencao') + ' com atenção · ' + cnt('offline') + ' offline · ' + cnt('novo') + ' ainda sem ligação');
+  L.push('ECRÃS: ' + sv.screens.length + ' no total · ' + cnt('online') + ' online · ' + cnt('atencao') + ' com atenção · ' + cnt('offline') + ' offline · ' + cnt('fora') + ' desligados fora de horário · ' + cnt('novo') + ' ainda sem ligação');
   sv.screens.filter(x => x.status === 'offline' || x.status === 'atencao').slice(0, 10).forEach(x => L.push('  - ' + x.venue + ', ' + x.spot + ': ' + (x.status === 'offline' ? 'sem ligação' : 'com falhas')));
   L.push('ALERTAS ABERTOS: ' + sv.alerts.length);
   sv.alerts.slice(0, 8).forEach(a => L.push('  - ' + a.title + (a.screen ? ' (' + a.screen + ')' : '')));
