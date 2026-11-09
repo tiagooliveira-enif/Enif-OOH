@@ -172,11 +172,12 @@ function cleanIvs(a, what) {
   v.forEach(p => { const l = out[out.length - 1]; if (l && p[0] <= l[1]) l[1] = Math.max(l[1], p[1]); else out.push(p); });
   return out;
 }
+const NO_END = '2099-12-31';   // campanha «sem fim»: o fim fica nesta data e a campanha leva noEnd
 function cleanCampaign(o, id, old) {
   const out = {
     id, name: str(o.name, 160, 'Nome'), client: optStr(o.client, 160) || 'Sem cliente', venues: ids(o.venues || [], 'Locais'),
     sector: optStr(o.sector, 40), sales: optStr(o.sales, 160).toLowerCase(),
-    start: o.start, end: o.end, h0: num(o.h0, 0, 23, 'Hora de início'), h1: num(o.h1, 1, 24, 'Hora de fim'), ivs: null,
+    start: o.start, end: o.noEnd ? NO_END : o.end, noEnd: !!o.noEnd, h0: num(o.h0, 0, 23, 'Hora de início'), h1: num(o.h1, 1, 24, 'Hora de fim'), ivs: null,
     ppm: num(o.ppm, 0.2, 12, 'Passagens por minuto'), dur: Math.round(num(isNil(o.dur) ? 10 : o.dur, 3, 60, 'Duração')),
     priority: o.priority === 'Alta' ? 'Alta' : 'Normal', share: null, manual: !!o.manual, color: Math.round(num(isNil(o.color) ? 1 : o.color, 1, 6, 'Cor')), items: [],
     pauses: []
@@ -261,7 +262,7 @@ function checkContentScreens(cand, screenIds) {
 /* ---------- sincronização (alterações vindas da interface) ---------- */
 const PL_FIELDS = ['order', 'limit', 'draft'];
 /* campos que mudaram; «share» é opcional e some do documento quando a campanha deixa de partilhar a posição */
-const dv = (o, k) => (k === 'area' && isNil(o[k]) ? 'inteiro' : o[k]);
+const dv = (o, k) => (k === 'area' && isNil(o[k]) ? 'inteiro' : (k === 'noEnd' ? !!o[k] : o[k]));
 const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(dv(n, k), dv(old, k))).concat(!('share' in n) && !isNil(old.share) ? ['share'] : []);
 function applyOp(user, op) {
   if (!op || typeof op !== 'object') throw bad('Pedido inválido.');
@@ -588,7 +589,7 @@ function weeklyText() {
   sv.alerts.slice(0, 8).forEach(a => L.push('  - ' + a.title + (a.screen ? ' (' + a.screen + ')' : '')));
   const camps = docs('campaigns'), st = c => S.statusOf(c, today);
   L.push('', 'CAMPANHAS: ' + camps.filter(c => st(c) === 'Ativa').length + ' ativas · ' + camps.filter(c => st(c) === 'Agendada').length + ' agendadas · ' + camps.filter(c => st(c) === 'Pausada').length + ' em pausa');
-  const ini = camps.filter(c => c.start > today && c.start <= weekEnd), fim = camps.filter(c => st(c) !== 'Terminada' && c.end >= today && c.end <= weekEnd);
+  const ini = camps.filter(c => c.start > today && c.start <= weekEnd), fim = camps.filter(c => !c.noEnd && st(c) !== 'Terminada' && c.end >= today && c.end <= weekEnd);
   L.push('  A começar nos próximos 7 dias: ' + (ini.length ? ini.map(c => c.name + ' (' + c.start + ')').join('; ') : 'nenhuma'));
   L.push('  A terminar nos próximos 7 dias: ' + (fim.length ? fim.map(c => c.name + ' (' + c.end + ')').join('; ') : 'nenhuma'));
   const ex = contentsView().filter(f => f.exp && !f.gone && f.exp <= S.addDay(today, 30)).length;

@@ -194,6 +194,14 @@ async function main() {
     await sync(top, [op('screens', 'ECR-001', { on: 0, off: 24 }, ['on', 'off'])]);
     return h + 2 > 23 || !s2.alerts.some(a => a.id.startsWith('off-ecr') || (a.sev === 'bad' && a.title === 'Ecrã sem ligação' && a.id !== al.id));
   })());
+  ok('campanha sem fim fica com fim 2099 e noEnd, nunca «Terminada»', await (async () => {
+    const base = (await call('GET', '/api/state', undefined, top)).j.campaigns[0];
+    const nova = Object.assign({}, base, { id: 'SEMFIM', name: 'Sem fim', noEnd: true, end: '2020-01-01', start: '2020-01-01', warnFor: undefined });
+    await sync(top, [op('campaigns', 'SEMFIM', nova, Object.keys(nova))]);
+    const c = (await call('GET', '/api/state', undefined, top)).j.campaigns.find(x => x.id === 'SEMFIM');
+    await sync(top, [{ op: 'del', coll: 'campaigns', id: 'SEMFIM' }]);
+    return !!c && c.noEnd === true && c.end === '2099-12-31' && S.statusOf(c, '2026-11-09') === 'Ativa';
+  })());
   ok('fora do horário e sem sinal → «fora», não «online»', await (async () => {
     const h = S.lisbonNow('Europe/Lisbon').h; if (h + 2 > 22) return true;
     await sync(top, [op('screens', 'ECR-001', { on: h + 2, off: 24 }, ['on', 'off'])]);

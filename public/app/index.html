@@ -1601,6 +1601,25 @@ iframe.prev-media {
   width: 14px;
   height: 14px;
 }
+.lab-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.noend-btn {
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.noend-box {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+}
 .log time {
   font-family: var(--mono);
   font-size: 12px;
@@ -3305,6 +3324,7 @@ const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDay
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
 const pausedOn = (c, d)=>(c.pauses || []).some(p=>p.from <= d && (!p.to || p.to >= d));
 const openPause = c=>(c.pauses || []).find(p=>!p.to);
+const NOEND = new Date(2099, 11, 31);   // campanha «sem fim»: fim guardado como 31/12/2099 e marcada com noEnd
 const statusOf = c=>c.end < today ? 'Terminada' : (pausedOn(c, today) ? 'Pausada' : (c.start > today ? 'Agendada' : 'Ativa'));
 const screensOf = c=>screens.filter(s=>c.venues.indexOf(s.venue) > -1);
 /* ecrãs onde a campanha passa de facto: os do local em que algum conteúdo serve */
@@ -4737,7 +4757,7 @@ function campModal(id) {
     + pauseNote(ex) + secField(c)
     + '<div class="field"><label for="c-sales">E-mail do comercial (opcional)</label><input id="c-sales" name="sales" type="email" inputmode="email" autocomplete="off" list="c-sales-l" value="' + esc(c.sales || '') + '" placeholder="Ex.: comercial@enif.pt"><datalist id="c-sales-l">' + users.filter(function(u) {return u.active;}).map(function(u) {return '<option value="' + esc(u.email) + '">' + esc(u.name) + '</option>';}).join('') + '</datalist><span class="hint">No fim da campanha envio-lhe automaticamente o relatório final, com as imagens dos conteúdos, para poder mostrá-lo ao cliente.</span></div>' + mailStatusLine(ex)
     + '<div class="field"><span class="lab">Onde passa</span><div class="checks">' + venues.map(v=>'<label><input type="checkbox" name="venue" value="' + esc(v) + '"' + (c.venues.indexOf(v) > -1 ? ' checked' : '') + '>' + esc(v) + '</label>').join('') + '</div></div>'
-    + '<div class="grid2"><div class="field"><label for="c-start">Início</label><input id="c-start" type="date" name="start" value="' + iso(c.start) + '"></div><div class="field"><label for="c-end">Fim</label><input id="c-end" type="date" name="end" value="' + iso(c.end) + '"></div></div>'
+    + '<div class="grid2"><div class="field"><label for="c-start">Início</label><input id="c-start" type="date" name="start" value="' + iso(c.start) + '"></div><div class="field" id="c-end-box"><span class="lab-row"><label for="c-end">Fim</label><button type="button" class="linklike noend-btn" data-a="noend" id="c-noend-btn">' + (c.noEnd ? 'Definir fim' : 'Sem fim') + '</button></span>' + (c.noEnd ? '<div class="noend-box" id="c-end-open">Sem fim: passa até ser terminada.</div><input id="c-end" type="date" name="end" value="' + iso(addDays(today, 14)) + '" hidden>' : '<input id="c-end" type="date" name="end" value="' + iso(c.end) + '">') + '<input type="hidden" name="noend" id="c-noend" value="' + (c.noEnd ? '1' : '') + '"></div></div>'
     + '<div class="field"><span class="lab">Horas em que passa</span><div class="iv-camp" id="c-ivs">' + ivBox('h0', 'h1', civs(c), '', '', '') + '</div><span class="hint" id="c-iv-hint">Pode ter até 3 intervalos no mesmo dia, por exemplo 7h–10h e 19h–22h. Se dois se sobrepuserem, junto-os num só.</span></div>'
     + '<div class="grid2"><div class="field"><label for="c-dur">Duração do vídeo (segundos)</label><input id="c-dur" type="number" name="dur" min="3" max="60" step="1" value="' + c.dur + '"></div><div class="field"><label for="c-mod">Modalidade de passagem (mínimo)</label><select id="c-mod" name="mod" data-a-change="mod-change">' + modOpts(c.ppm) + '</select><input id="c-ppm" type="number" name="ppm" min="0.2" max="12" step="any" value="' + c.ppm + '" aria-label="Passagens por minuto (mínimo)" style="margin-top:6px;' + (modIdx(c.ppm) < 0 ? '' : 'display:none') + '"></div></div><p class="hint" id="ppm-hint" style="margin:-6px 0 14px">' + ppmHint(c.ppm, c.dur) + '</p><div class="grid2"><div class="field"><label for="c-pri">Prioridade</label><select id="c-pri" name="priority">' + ['Alta', 'Normal'].map(p=>'<option' + (p === c.priority ? ' selected' : '') + '>' + p + '</option>').join('') + '</select></div></div><p class="hint" style="margin:-6px 0 14px"><b>Alta:</b> a plataforma garante as passagens por minuto que definiu acima, repetindo a campanha no loop as vezes que forem precisas (as outras passam menos vezes). <b>Normal:</b> passa 1 vez por volta; se o loop for longo, pode ficar abaixo do mínimo e aparece um aviso.</p>'
     + shareField(c) + itemsField(c) + '<div id="asp-hint"></div>'
@@ -5515,6 +5535,7 @@ function mailStatusLine(c) {
   const avLine = av ? '<br>Aviso de fim de campanha: ' + mailPill(mailStatus(av)) + ' · ' + esc(av.to) + ' · ' + esc(mailWhen(av.events[0].t)) + ' <button type="button" class="linklike" data-a="mail-detail" data-id="' + av.id + '">Ver comprovativo</button>'
     : (c.end >= today ? '<br>Aviso de fim de campanha: será enviado a ' + esc(c.sales) + ' ' + (n <= END_WARN ? 'em breve' : 'uma semana antes do fim (' + esc(dFull.format(addDays(c.end, -END_WARN))) + ')') + '.' : '');
   const e = emailLog.find(x=>x.camp === c.id && x.kind !== 'aviso');
+  if (c.noEnd) return '<p class="hint" id="c-mail-st" style="margin:-4px 0 14px">Campanha sem data de fim: o relatório final e o aviso de fim só são enviados quando definir o fim.</p>';
   if (!e) return '<p class="hint" id="c-mail-st" style="margin:-4px 0 14px">Relatório final: será enviado a ' + esc(c.sales) + ' na manhã a seguir ao fim da campanha (' + esc(dFull.format(addDays(c.end, 1))) + ').' + avLine + '</p>';
   return '<p class="hint" id="c-mail-st" style="margin:-4px 0 14px">Último envio do relatório final: ' + mailPill(mailStatus(e)) + ' · ' + esc(e.to) + ' · ' + esc(mailWhen(e.events[0].t)) + ' <button type="button" class="linklike" data-a="mail-detail" data-id="' + e.id + '">Ver comprovativo</button>' + avLine + '</p>';
 }
@@ -5910,7 +5931,7 @@ function setArr(a, b) {a.length = 0; b.forEach(function(x) {a.push(x);});}
 const sleep = ms=>new Promise(function(r) {setTimeout(r, ms);});
 
 const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri'];
-const CMP_KEYS = ['name', 'client', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'manual', 'color', 'items', 'pauses'];
+const CMP_KEYS = ['name', 'client', 'noEnd', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'manual', 'color', 'items', 'pauses'];
 const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'photo', 'notif', 'ui'];
 const emptyBase = ()=>({screens:{}, campaigns:{}, folders:{}, contents:{}, users:{}});
 let base = emptyBase();
@@ -6273,9 +6294,16 @@ const actions = {
       audit('Pausou a campanha', c.name); closeModal(); render(); toast('«' + c.name + '» em pausa. Não passa em nenhum ecrã até a retomar.');
     }
   },
+  noend:function() {
+    const on = $('#c-noend').value !== '1', inp = $('#c-end'), box = $('#c-end-open');
+    $('#c-noend').value = on ? '1' : '';
+    $('#c-noend-btn').textContent = on ? 'Definir fim' : 'Sem fim';
+    if (on) {inp.hidden = true; if (!box)inp.insertAdjacentHTML('beforebegin', '<div class="noend-box" id="c-end-open">Sem fim: passa até ser terminada.</div>');}
+    else {inp.hidden = false; if (box)box.remove();}
+  },
   extend:function(t) {
     if (!guard('campanhas.gerir')) return;
-    const c = campById(t.dataset.id); if (!c) return;
+    const c = campById(t.dataset.id); if (!c || c.noEnd) return;
     c.end = addDays(c.end, 7); toast('«' + c.name + '» prolongada até ' + dShort.format(c.end) + '.'); render();
   },
   'final-report':function(t) {
@@ -6810,7 +6838,7 @@ document.addEventListener('submit', function(e) {
   }
   if (!guard('campanhas.gerir')) return;
   const name = String(fd.get('name') || '').trim(), client = String(fd.get('client') || '').trim();
-  const vs = fd.getAll('venue'), sv = fd.get('start'), ev = fd.get('end');
+  const vs = fd.getAll('venue'), sv = fd.get('start'), noEnd = fd.get('noend') === '1', ev = noEnd ? iso(NOEND) : fd.get('end');
   const raw0 = fd.getAll('h0'), raw1 = fd.getAll('h1'), rawIv = raw0.map((v, q)=>[+v, +raw1[q]]);
   const ppm = parseFloat(String(fd.get('ppm')).replace(',', '.'));
   const dur = Math.round(parseFloat(String(fd.get('dur')).replace(',', '.')));
@@ -6827,7 +6855,7 @@ document.addEventListener('submit', function(e) {
   if (!(ppm >= 0.2 && ppm <= 12)) {err.textContent = 'Passagens por minuto: indique um valor entre 0,2 (1 a cada 5 minutos) e 12.'; return;}
   const ri = readItems(fd, h0, h1, parseISO(sv), parseISO(ev), cvl);
   if (ri.err) {err.textContent = ri.err; return;}
-  const data = {name:name, client:client || 'Sem cliente', venues:vs, start:parseISO(sv), end:parseISO(ev), h0:h0, h1:h1, ivs:cvl.length > 1 ? cvl : null, ppm:ppm, dur:dur, priority:fd.get('priority'), items:ri.items, manual:ri.manual, sales:sales, sector:sector};
+  const data = {name:name, client:client || 'Sem cliente', venues:vs, start:parseISO(sv), end:parseISO(ev), noEnd:noEnd, h0:h0, h1:h1, ivs:cvl.length > 1 ? cvl : null, ppm:ppm, dur:dur, priority:fd.get('priority'), items:ri.items, manual:ri.manual, sales:sales, sector:sector};
   let c;
   if (f.dataset.id) {c = campById(f.dataset.id); Object.assign(c, data);}
   else {c = Object.assign({id:'C' + Date.now().toString(36), color:campaigns.length % 6 + 1}, data); campaigns.push(c);}
