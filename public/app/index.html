@@ -1587,6 +1587,20 @@ iframe.prev-media {
 .log:first-of-type {
   border-top: 0;
 }
+.name-edit {
+  padding: 2px 5px;
+  margin-left: 4px;
+  vertical-align: middle;
+  opacity: 0.45;
+}
+.name-edit:hover,
+.name-edit:focus-visible {
+  opacity: 1;
+}
+.name-edit .i {
+  width: 14px;
+  height: 14px;
+}
 .log time {
   font-family: var(--mono);
   font-size: 12px;
@@ -3202,6 +3216,7 @@ const P = {
   film:'<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M3 15h18M8 4v16M16 4v16"/>',
   chart:'<path d="M5 20v-8M12 20V5M19 20v-11"/>',
   plus:'<path d="M12 5v14M5 12h14"/>',
+  pencil:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
   search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/>',
   check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>',
@@ -4282,7 +4297,7 @@ function screenModal(id) {
   const al = alerts.filter(a=>a.screen === id);
   const canG = can('ecras.gerir'), canA = can('alertas.resolver');
   const ai = al.filter(a=>a.sev === 'ia').map(a=>'<div class="ai-box">' + ic('spark') + '<span class="hint">' + esc(a.detail) + '</span></div>').join('');
-  modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
+  modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + (canG ? ' <button class="btn ghost sm name-edit" data-a="edit-name" data-id="' + s.id + '" aria-label="Alterar o nome do ecrã" title="Alterar o nome">' + ic('pencil') + '</button>' : '') + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
     + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? (s.disk.total - s.disk.free) + ' de ' + s.disk.total + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + s.disk.free + ' GB</span>') : '—') + '</dd></div><div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + '</dd></div>'
     + '<div style="grid-row:span 2"><dt>Área do PC</dt><dd>' + (canG ? '<select data-a-change="area" data-id="' + s.id + '" aria-label="Área do ecrã do PC onde o player desenha" style="width:auto">' + AREAS.map(f=>'<option value="' + f[0] + '"' + ((s.area || 'inteiro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((AREAS.find(f=>f[0] === (s.area || 'inteiro')) || AREAS[0])[1])) + '<small class="muted" style="display:block;margin-top:6px">' + areaTxt(s) + '</small>' + areaDiagram(s) + '</dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
@@ -5259,6 +5274,14 @@ function readPlace(fd) {
   try {poi = JSON.parse(String(fd.get('poi') || 'null'));} catch (e) {poi = null;}
   if (!poi || isNil(lat) || typeof poi.shops !== 'number') poi = null;
   return {loc:{addr:addr, lat:lat, lng:lng, env:env, pop:pop, poi:poi}, on:on, off:off, onT:onT, offT:offT};
+}
+function nameModal(id) {
+  const s = screens.find(x=>x.id === id); if (!s) return;
+  modal('<form data-form="name" data-id="' + id + '" novalidate><div class="modal-h"><div><h2>Nome do ecrã</h2><p class="muted mono">' + esc(s.id) + ' · o código não muda</p></div><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
+    + '<div class="field"><label for="nm-venue">Local</label><input id="nm-venue" name="venue" list="nm-venues" value="' + esc(s.venue) + '" maxlength="120" autocomplete="off"><datalist id="nm-venues">' + venues.map(v=>'<option value="' + esc(v) + '">').join('') + '</datalist></div>'
+    + '<div class="field"><label for="nm-spot">Ponto</label><input id="nm-spot" name="spot" value="' + esc(s.spot) + '" maxlength="120" autocomplete="off"></div>'
+    + '<p class="hint">As campanhas, os conteúdos e o player continuam ligados a este ecrã. Se mudares o Local e houver outros ecrãs no Local antigo, as campanhas desse Local deixam de passar aqui até as associares ao novo.</p>'
+    + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Guardar</button></div></form>');
 }
 function placeModal(id) {
   const s = screens.find(x=>x.id === id); if (!s) return;
@@ -6346,6 +6369,7 @@ const actions = {
     c.items = c.items.filter(i=>i.f !== x.id);
     toast('«' + x.name + '» retirado de «' + c.name + '».'); render();
   },
+  'edit-name':function(t) {if (guard('ecras.gerir'))nameModal(t.dataset.id);},
   'edit-place':function(t) {if (guard('ecras.gerir'))placeModal(t.dataset.id);},
   period:function(t) {state.period = +t.dataset.n; state.custom = null; state.logLimit = 10; render();},
   'period-custom':function() {state.custom = {from:addDays(today, -13), to:today}; state.logLimit = 10; render();},
@@ -6704,6 +6728,25 @@ document.addEventListener('submit', function(e) {
     if (files.length > 2) {err.textContent = 'Escolha no máximo 2 conteúdos.'; return;}
     api('POST', '/api/screens/' + encodeURIComponent(s.id) + '/proof', {files:files, secs:secs}).then(function() {closeModal(); toast('A gravar comprovativo no ecrã ' + s.id + '. O resto fica em pausa até terminar (o ecrã pode demorar uns segundos a mudar).'); return poll(true);}).then(function() {screenModal(s.id);}).catch(function(e) {err.textContent = e.message;});
     return;
+  }
+  if (kind === 'name') {
+    if (!guard('ecras.gerir')) return;
+    const s = screens.find(x=>x.id === f.dataset.id); if (!s) return;
+    const venue = String(fd.get('venue') || '').trim(), spot = String(fd.get('spot') || '').trim();
+    if (!venue || !spot) {err.textContent = 'Preencha o Local e o Ponto.'; return;}
+    const old = s.venue;
+    if (venue === old && spot === s.spot) {closeModal(); return;}
+    if (venue !== old && !screens.some(x=>x.id !== s.id && x.venue === old) && campaigns.some(c=>c.venues.indexOf(old) > -1) && !can('campanhas.gerir')) {err.textContent = 'Este Local tem campanhas e só quem gere campanhas o pode renomear.'; return;}
+    s.venue = venue; s.spot = spot;
+    let note = '';
+    if (venue !== old) {
+      if (!screens.some(x=>x.venue === old)) {   // era o único ecrã desse Local: as campanhas acompanham o novo nome
+        campaigns.forEach(function(c) {c.venues = c.venues.map(v=>v === old ? venue : v).filter((v, i, a)=>a.indexOf(v) === i);});
+      } else {
+        note = ' As campanhas do Local antigo deixam de passar aqui até as associar ao novo.';
+      }
+    }
+    toast('Nome do ecrã atualizado.' + note); reopenScreen(s.id); render(); return;
   }
   if (kind === 'place') {
     if (!guard('ecras.gerir')) return;
