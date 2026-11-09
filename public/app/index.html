@@ -4160,7 +4160,7 @@ function viewDash() {
   const stCls = {online:'ok', atencao:'warn', offline:'bad'};
   const playScr = screens.length ? screens.map(function(s) {
     const pl = playingOn(s), st = stCls[s.status] || 'warn';
-    const txt = pl.length ? pl.map(c=>'<b>' + esc(c.name) + '</b> <span class="muted">' + esc(c.client) + ' · ' + hrsC(c) + '</span>').join('<br>') : '<span class="muted">' + (s.status === 'offline' ? 'Sem ligação' : (s.status === 'novo' ? 'Por emparelhar' : 'Nada a passar neste momento')) + '</span>';
+    const txt = pl.length ? '<button type="button" class="linklike" data-a="open-screen" data-id="' + s.id + '" title="' + esc(pl.map(c=>c.name).join(' · ')) + '"><b>' + pl.length + (pl.length === 1 ? ' campanha' : ' campanhas') + ' online</b></button>' : '<span class="muted">' + (s.status === 'offline' ? 'Sem ligação' : (s.status === 'novo' ? 'Por emparelhar' : 'Nada a passar neste momento')) + '</span>';
     return '<div class="item"><span class="ico ' + (pl.length ? 'ok' : st) + '">' + ic(pl.length ? 'play' : (s.status === 'offline' ? 'off' : 'alert')) + '</span><div class="grow"><div class="title">' + esc(s.venue) + ' <span class="muted" style="font-weight:500">· ' + esc(s.spot) + '</span></div></div><div style="text-align:right">' + txt + '</div></div>';
   }).join('') : '<div class="empty">Ainda não há ecrãs.</div>';
   const playing = byScr ? playScr : playCamp;
