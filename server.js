@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '10';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '11';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS proofs(screen TEXT PRIMARY KEY, files TEXT NOT NULL, 
 CREATE TABLE IF NOT EXISTS alert_mail(id TEXT PRIMARY KEY, ts INTEGER NOT NULL, title TEXT, screen TEXT, closed INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS proof_log(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, t0 INTEGER NOT NULL, files TEXT NOT NULL, secs INTEGER NOT NULL, who TEXT);
 `);
+try { db.exec('ALTER TABLE plays ADD COLUMN why TEXT'); } catch (e) { /* já existe */ }
 for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const q1 = (sql, ...a) => db.prepare(sql).get(...a);
@@ -724,7 +725,7 @@ function playerApi(req, res, u, body) {
         if (!x || !x.pid) return;
         if (x.c === '__proof') { got.push(x.pid); return; }                          // comprovativo: confirma a receção mas não conta nos relatórios
         const ts = Math.min(+x.ts || Date.now(), Date.now() + 60000), ln = S.lisbonNow(TZ, new Date(ts));
-        const r = run('INSERT OR IGNORE INTO plays(pid,screen,camp,file,ts,day,hour,dur,ok) VALUES(?,?,?,?,?,?,?,?,?)', String(x.pid).slice(0, 80), s.id, String(x.c || '').slice(0, 80), String(x.f || '').slice(0, 80), ts, ln.date, ln.h, +x.dur || 0, x.ok ? 1 : 0);
+        const r = run('INSERT OR IGNORE INTO plays(pid,screen,camp,file,ts,day,hour,dur,ok,why) VALUES(?,?,?,?,?,?,?,?,?,?)', String(x.pid).slice(0, 80), s.id, String(x.c || '').slice(0, 80), String(x.f || '').slice(0, 80), ts, ln.date, ln.h, +x.dur || 0, x.ok ? 1 : 0, x.ok ? null : String(x.why || '').slice(0, 60) || null);
         saved += Number(r.changes); got.push(x.pid);
       });
       db.exec('COMMIT');
@@ -1163,6 +1164,13 @@ const router = async (req, res) => {
   }
   if (p === '/api/sync' && m === 'POST') { const user = needUser(req, u), b = await readJson(req); sync(user, b.ops); return send(res, 200, { ok: true }); }
   if (p === '/api/upload' && m === 'PUT') return upload(req, res, u);
+  if ((r = /^\/api\/screens\/([\w.-]+)\/falhas$/.exec(p)) && m === 'GET') {
+    const user = needUser(req, u); need(user, 'ecras.ver');
+    if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
+    const since = Date.now() - 14 * 864e5, tot = q1('SELECT COUNT(*) n FROM plays WHERE screen=? AND ok=0 AND ts>=?', r[1], since).n;
+    const rows = q('SELECT ts,camp,file,why FROM plays WHERE screen=? AND ok=0 AND ts>=? ORDER BY ts DESC LIMIT 40', r[1], since).map(x => { const c = getDoc('campaigns', x.camp), f = contentAny(x.file); return { ts: x.ts, camp: c ? c.name : x.camp, file: f ? f.name : x.file, why: x.why || 'motivo não registado (player antigo)' }; });
+    return send(res, 200, { total: tot, rows });
+  }
   if (p === '/api/plays' && m === 'GET') return playsApi(res, u, needUser(req, u));
   if ((r = /^\/api\/screens\/([\w.-]+)\/restart$/.exec(p)) && m === 'POST') {
     const user = needUser(req, u); need(user, 'ecras.gerir');

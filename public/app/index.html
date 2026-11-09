@@ -4289,8 +4289,18 @@ function screenModal(id) {
     + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
     + (s.status === 'novo' ? '' : '<h3 class="sec-t">Playlist</h3>' + playlistHtml(s) + proofLogHtml(s))
     + '<h3 class="sec-t">Registo recente</h3>' + logsFor(s).map(l=>'<div class="log ' + l[2] + '"><time>' + l[0] + '</time><span>' + esc(l[1]) + '</span></div>').join('')
+    + failsHtml(s)
     + (canG ? playerBox(s) : '') + '</div>'
     + '<div class="modal-f scr-f"><div class="scr-acts">' + (al.length && canA ? '<button class="btn" data-a="resolve-screen" data-id="' + s.id + '">Resolver alertas</button>' : '') + ((canG || can('playlist.gerir')) && s.status !== 'novo' && s.status !== 'offline' ? '<button class="btn" data-a="sync-now" data-id="' + s.id + '">Atualizar agora</button>' : '') + (canG && s.status !== 'novo' ? '<button class="btn" data-a="restart" data-id="' + s.id + '">Reiniciar player</button>' : '') + (canG && s.status !== 'novo' && s.status !== 'offline' ? '<button class="btn" data-a="screen-test" data-id="' + s.id + '">Teste no ecrã</button>' : '') + (canG ? '<button class="btn" data-a="del-screen" data-id="' + s.id + '" style="color:var(--bad)">Eliminar ecrã</button>' : '') + '</div><button class="btn primary" data-a="close">Fechar</button></div>');
+}
+const failsState = {};
+function failsHtml(s) {
+  const f = failsState[s.id];
+  if (!f) return '<div class="more"><button class="btn sm ghost" data-a="fails" data-id="' + s.id + '">Ver falhas de reprodução</button></div>';
+  const when = ts=>{const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());};
+  return '<h3 class="sec-t">Falhas de reprodução (últimos 14 dias' + (f.total ? ' · ' + f.total : '') + ')</h3>'
+    + (f.rows.length ? f.rows.map(r=>'<div class="log bad"><time style="width:auto;white-space:nowrap">' + when(r.ts) + '</time><span>' + esc(r.camp) + ' · ' + esc(r.file) + ': ' + esc(r.why) + '</span></div>').join('') + (f.total > f.rows.length ? '<div class="log"><span>A mostrar as últimas ' + f.rows.length + '.</span></div>' : '') : '<div class="log"><span>Sem falhas nos últimos 14 dias.</span></div>')
+    + '<div class="more"><button class="btn sm ghost" data-a="fails-hide" data-id="' + s.id + '">Esconder falhas</button></div>';
 }
 function reopenScreen(id) {
   const o = $('.overlay'), st = o ? o.scrollTop : 0;
@@ -6075,6 +6085,8 @@ const actions = {
   'open-screen':function(t) {if (guard('ecras.ver'))screenModal(t.dataset.id);},
   'resolve-alert':function(t) {if (!guard('alertas.resolver')) return; extraOps.push({op:'del', coll:'alerts', id:t.dataset.id}); alerts = alerts.filter(a=>a.id !== t.dataset.id); toast('Alerta marcado como resolvido.'); render();},
   'resolve-screen':function(t) {if (!guard('alertas.resolver')) return; alerts.filter(a=>a.screen === t.dataset.id).forEach(a=>extraOps.push({op:'del', coll:'alerts', id:a.id})); alerts = alerts.filter(a=>a.screen !== t.dataset.id); closeModal(); toast('Alertas do ecrã resolvidos.'); render();},
+  fails:function(t) {api('GET', '/api/screens/' + encodeURIComponent(t.dataset.id) + '/falhas').then(function(j) {failsState[t.dataset.id] = j; reopenScreen(t.dataset.id);}).catch(function(e) {toast('Não foi possível carregar as falhas: ' + e.message);});},
+  'fails-hide':function(t) {delete failsState[t.dataset.id]; reopenScreen(t.dataset.id);},
   restart:function(t) {if (!guard('ecras.gerir')) return; closeModal(); api('POST', '/api/screens/' + encodeURIComponent(t.dataset.id) + '/restart', {}).then(function() {toast('Pedido de reinício enviado a ' + t.dataset.id + '. O player reinicia em instantes.');}).catch(function(e) {toast(e.message);});},
   copy:function(t) {copyText(t.dataset.t || '');},
   'forgot-open':function() {loginStep('forgot');},

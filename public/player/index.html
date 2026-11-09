@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '10';
+const VERSION = '11';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -172,7 +172,7 @@ function lisbon() {
 /* ---------- fila de passagens (sobrevive a quedas de internet e a reinícios) ---------- */
 let queue = []; try {queue = JSON.parse(ls('enif.queue') || '[]');} catch (e) {queue = [];}
 const saveQ = function() {ls('enif.queue', JSON.stringify(queue.slice(-5000)));};
-function logPlay(c, f, dur, ok) {queue.push({pid:uid(), c:c, f:f, ts:Date.now(), dur:Math.round(dur * 10) / 10, ok:ok ? 1 : 0}); saveQ(); if (ok)stats.plays++; else stats.fails++;}
+function logPlay(c, f, dur, ok, why) {const q1 = {pid:uid(), c:c, f:f, ts:Date.now(), dur:Math.round(dur * 10) / 10, ok:ok ? 1 : 0}; if (!ok)q1.why = String(why || 'motivo desconhecido').slice(0, 60); queue.push(q1); saveQ(); if (ok)stats.plays++; else stats.fails++;}
 function post(path, body) {
   body.code = code; body.key = key;
   return fetch(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)}).then(function(r) {if (!r.ok) throw new Error('HTTP ' + r.status); return r.json();});
@@ -304,19 +304,19 @@ async function playOne(c, id, secs) {
   let s = await srcFor(id, f);
   if (!s) {                                                              // ainda não está em cache: vai buscar à rede em vez de saltar em silêncio
     if (stats.net === 'ok')s = {url:mediaUrl(id), revoke:false};
-    else {stats.err = 'sem cache nem rede: ' + (f.name || id); logPlay(c, id, 0, false); return false;}
+    else {stats.err = 'sem cache nem rede: ' + (f.name || id); logPlay(c, id, 0, false, 'ficheiro não está no PC e sem internet'); return false;}
   }
-  cur = {c:c, f:id}; const t0 = Date.now(), fm = fitMode(f); let ok = true, aborted = false; lastFrameAt = Date.now();
+  cur = {c:c, f:id}; const t0 = Date.now(), fm = fitMode(f); let ok = true, aborted = false, why = ''; lastFrameAt = Date.now();
   if (f.type === 'Vídeo') {
     const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.style.objectFit = fm; v.src = s.url;
     await new Promise(function(done) {
-      let fin = false; const end = function(good) {if (fin) return; fin = true; ok = good; done();};
+      let fin = false; const end = function(good, w) {if (fin) return; fin = true; ok = good; if (!good)why = w || ''; done();};
       cancelFn = function() {aborted = true; cancelFn = null; end(true);};
       v.onplaying = function() {swapIn(v);};
-      v.onended = function() {end(true);}; v.onerror = function() {end(false);};
-      setTimeout(function() {end(false);}, Math.max(20, (f.dur || 10) * 2 + 10) * 1000);
-      setTimeout(function() {if (!v.parentNode)end(false);}, 8000);                    // não arrancou: passa ao seguinte (fica o último quadro)
-      const pr = v.play(); if (pr && pr.catch)pr.catch(function() {end(false);});
+      v.onended = function() {end(true);}; v.onerror = function() {end(false, 'o vídeo não abriu (ficheiro com erro)');};
+      setTimeout(function() {end(false, 'demorou mais do dobro da duração');}, Math.max(20, (f.dur || 10) * 2 + 10) * 1000);
+      setTimeout(function() {if (!v.parentNode)end(false, 'não arrancou em 8 segundos');}, 8000);                    // não arrancou: passa ao seguinte (fica o último quadro)
+      const pr = v.play(); if (pr && pr.catch)pr.catch(function() {end(false, 'o browser bloqueou a reprodução');});
     });
     if (!v.parentNode) {try {v.removeAttribute('src'); v.load();} catch (e) {/* sem ação */}}
   } else if (f.type === 'HTML5') {
@@ -325,7 +325,7 @@ async function playOne(c, id, secs) {
     aborted = Date.now() - t0 < Math.max(1, secs || f.dur || 10) * 1000 - 50;
   } else {
     const im = document.createElement('img'); im.style.objectFit = fm; im.src = s.url;
-    await new Promise(function(d) {im.onload = function() {swapIn(im); d();}; im.onerror = function() {ok = false; d();};});
+    await new Promise(function(d) {im.onload = function() {swapIn(im); d();}; im.onerror = function() {ok = false; why = 'a imagem não abriu'; d();};});
     if (ok) {
       await waitMs(Math.max(1, secs || f.dur || 10) * 1000);
       aborted = Date.now() - t0 < Math.max(1, secs || f.dur || 10) * 1000 - 50;
@@ -334,7 +334,7 @@ async function playOne(c, id, secs) {
   cancelFn = null;
   if (s.revoke)setTimeout(function() {URL.revokeObjectURL(s.url);}, 4000);
   if (aborted) return true;                                              // interrompido por um comprovativo: não conta
-  logPlay(c, id, (Date.now() - t0) / 1000, ok);
+  logPlay(c, id, (Date.now() - t0) / 1000, ok, why);
   return ok;
 }
 /* nunca preto: sem nada para mostrar, deixa o último quadro; se não houver, o ecrã da marca */

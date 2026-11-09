@@ -281,6 +281,10 @@ async function main() {
     r = await call('GET', '/api/player/playlist?code=ECR-001&key=' + key);
     ok('a playlist traz os ficheiros do comprovativo', r.j.proof && r.j.proof.files.length === 2 && r.j.files[pA.j.id] && r.j.files[pB.j.id]);
     const n0 = db.prepare('SELECT COUNT(*) n FROM plays').get().n;
+    r = await call('POST', '/api/player/plays', { code: 'ECR-001', key, plays: [{ pid: 'falha-1', c: 'C1', f: pA.j.id, ts: Date.now(), dur: 0, ok: 0, why: 'o vídeo não abriu (ficheiro com erro)' }] });
+    const fl = (await call('GET', '/api/screens/ECR-001/falhas', undefined, top)).j;
+    ok('lista de falhas mostra o motivo', fl.total >= 1 && fl.rows[0].why === 'o vídeo não abriu (ficheiro com erro)');
+    db.prepare('DELETE FROM plays WHERE pid=?').run('falha-1');
     r = await call('POST', '/api/player/plays', { code: 'ECR-001', key, plays: [{ pid: 'prova-1', c: '__proof', f: pA.j.id, ts: Date.now(), dur: 10, ok: 1 }] });
     ok('passagens do comprovativo são confirmadas mas não contam', r.j.received.includes('prova-1') && r.j.saved === 0 && db.prepare('SELECT COUNT(*) n FROM plays').get().n === n0);
     ok('terminar exige permissão', (await stop(tvwP)).s === 403);
