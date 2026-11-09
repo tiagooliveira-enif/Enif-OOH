@@ -4188,6 +4188,7 @@ function plState(c, s, L, h) {
   if (statusOf(c) === 'Pausada') return ['off', 'Em pausa', ''];
   if (statusOf(c) === 'Agendada') return ['sched', 'Agendada · ' + dShort.format(c.start), 'accent'];
   if (!screenOn(s, h)) return ['off', 'Ecrã desligado', ''];
+  if (c.items.length && !c.items.some(function(i) {const d = itemDays(c, i); return d[0] <= today && d[1] >= today;})) return ['off', 'Sem vídeo hoje', ''];
   if (!onAt(c, today, h, s)) return ['off', (function() {const v = civs(c), nx = v.find(x=>x[0] > h), pv = v.filter(x=>x[1] <= h).pop(); return inIvs(v, h) ? 'Sem vídeo a esta hora' : (nx ? 'Entra às ' + nx[0] + 'h' : (pv ? 'Saiu às ' + pv[1] + 'h' : 'Sem vídeo a esta hora'));})(), ''];
   if (L.out.indexOf(c) > -1) return ['limit', 'Fora do limite agora', 'warn'];
   if (s.status === 'offline') return ['on', 'Passa a última lista guardada', 'warn dot'];
