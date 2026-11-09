@@ -4117,7 +4117,7 @@ function userModal(id) {
 }
 
 /* ---------- painel ---------- */
-let playMode = 'auto';
+let playMode = 'screen';   // por defeito «Por ecrã»
 function viewDash() {
   const h = now.getHours();
   head(h < 13 ? 'Bom dia' : (h < 20 ? 'Boa tarde' : 'Boa noite'), cap(dLong.format(now)), can('campanhas.gerir') ? newCampBtn : '');
@@ -4151,7 +4151,7 @@ function viewDash() {
   }).join('');
   const al = (plAl + alReal) || '<div class="empty">Sem alertas. Está tudo em ordem.</div>';
   const an = activeNow();
-  const byScr = playMode === 'screen' || (playMode === 'auto' && screens.length >= 6);
+  const byScr = playMode === 'screen';
   const playCamp = an.length ? an.map(function(c) {
     const n = screens.filter(s=>playingOn(s).indexOf(c) > -1).length;
     const why = n ? '' : noPlayWhy(c);
