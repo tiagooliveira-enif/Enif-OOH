@@ -3318,7 +3318,7 @@ const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
 
-const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', cmode:'cards', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fitSeen:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
+const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', ccal:'new', cmode:'cards', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fitSeen:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
 
 /* ---------- derived data ---------- */
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
@@ -4476,7 +4476,8 @@ function campDays() {
 function campRows() {
   const days = campDays(), G = allIssues(), q = normQ(state.cq);
   const order = {Ativa:0, Pausada:1, Agendada:2, Terminada:3};
-  const rows = campaigns.filter(c=>campMatch(c, q)).sort((a, b)=>order[statusOf(a)] - order[statusOf(b)] || (PRI[b.priority] || 1) - (PRI[a.priority] || 1)).map(function(c) {
+  const idx = new Map(campaigns.map((c, i)=>[c, i])), dir = state.ccal === 'old' ? 1 : -1;   // ordem de criação: por defeito a mais recente em cima
+  const rows = campaigns.filter(c=>campMatch(c, q)).sort((a, b)=>(statusOf(a) === 'Terminada') - (statusOf(b) === 'Terminada') || dir * (idx.get(a) - idx.get(b))).map(function(c) {
     const st = statusOf(c), inConf = G.some(g=>g.i.ids.indexOf(c.id) > -1);
     const cells = days.map(function(d, i) {
       const on = d >= c.start && d <= c.end;
@@ -4604,7 +4605,7 @@ function viewCamp() {
   const banner = G.map(g=>'<div class="banner">' + ic('alert') + '<p><b>Conflito:</b> ' + issueText(g.i) + ' (' + esc(g.venue) + (g.screens.length > 1 ? ', ' + g.screens.length + ' ecrãs' : ', ' + esc(g.screens[0].spot)) + ')</p>' + (can('ecras.ver') ? '<button class="btn sm" data-a="open-screen" data-id="' + g.screens[0].id + '">Ver ecrã</button>' : '') + '</div>').join('');
   const ovB = '';
   const dh = days.map(d=>'<span class="dh' + (dayDiff(d, today) === 0 ? ' today' : '') + '"><span>' + wdShort.format(d).replace('.', '') + '</span><b>' + d.getDate() + '</b></span>').join('');
-  return tabs + banner + ovB + '<div class="card"><div class="card-h camp-h" style="flex-wrap:wrap"><div class="week-nav"><button class="btn sm" data-a="week" data-d="-1" aria-label="Semana anterior">' + ic('left') + '</button><span class="lbl">' + dShort.format(days[0]) + ' – ' + dShort.format(days[6]) + '</span><button class="btn sm" data-a="week" data-d="1" aria-label="Semana seguinte">' + ic('right') + '</button>' + (state.week ? '<button class="btn sm ghost" data-a="week" data-d="0">Hoje</button>' : '') + '</div><div class="search camp-s" style="flex:0 1 320px;margin-left:auto">' + ic('search') + '<input id="cq" type="search" placeholder="Procurar campanha" value="' + esc(state.cq) + '" aria-label="Procurar campanhas"></div></div>'
+  return tabs + banner + ovB + '<div class="card"><div class="card-h camp-h" style="flex-wrap:wrap"><div class="week-nav"><button class="btn sm" data-a="week" data-d="-1" aria-label="Semana anterior">' + ic('left') + '</button><span class="lbl">' + dShort.format(days[0]) + ' – ' + dShort.format(days[6]) + '</span><button class="btn sm" data-a="week" data-d="1" aria-label="Semana seguinte">' + ic('right') + '</button>' + (state.week ? '<button class="btn sm ghost" data-a="week" data-d="0">Hoje</button>' : '') + '</div><button class="btn sm" data-a="ccal" aria-label="Ordem das campanhas" title="Mudar a ordem das campanhas">' + (state.ccal === 'old' ? 'Mais antigas primeiro' : 'Mais recentes primeiro') + '</button><div class="search camp-s" style="flex:0 1 320px;margin-left:auto">' + ic('search') + '<input id="cq" type="search" placeholder="Procurar campanha" value="' + esc(state.cq) + '" aria-label="Procurar campanhas"></div></div>'
     + '<div class="cal-wrap"><div class="cal" style="margin-top:10px"><div class="crow chead"><span class="hint" id="cq-n" style="align-self:center;font-size:12px;line-height:1.3;padding-left:20px">' + campHint() + '</span>' + dh + '</div><div id="camp-rows" style="display:contents">' + campRows() + '</div></div></div></div>';
 }
 
@@ -5969,7 +5970,7 @@ const clone = o=>JSON.parse(JSON.stringify(o));
 function snapshot() {base = clone(collect());}
 let extraOps = [];
 function diffOps() {
-  if (state.user)state.user.ui = {dismissed:state.dismissed, finalSeen:state.finalSeen, finalDone:state.finalDone, fitSeen:state.fitSeen, cmode:state.cmode, fewMin:state.fewMin};
+  if (state.user)state.user.ui = {dismissed:state.dismissed, finalSeen:state.finalSeen, finalDone:state.finalDone, fitSeen:state.fitSeen, cmode:state.cmode, ccal:state.ccal, fewMin:state.fewMin};
   const cur = collect(), ops = [], canPl = can('playlist.gerir'), adm = !!(state.user && state.user.admin);
   ['screens', 'campaigns', 'folders', 'contents', 'users'].forEach(function(coll) {
     const c = cur[coll], b = base[coll];
@@ -6048,7 +6049,7 @@ function applyState(st) {
 }
 function loadUi() {
   const u = (state.user && state.user.ui) || {};
-  state.dismissed = u.dismissed || {}; state.finalSeen = u.finalSeen || {}; state.finalDone = u.finalDone || {}; state.fitSeen = u.fitSeen || {}; state.cmode = u.cmode === 'list' ? 'list' : 'cards';
+  state.dismissed = u.dismissed || {}; state.finalSeen = u.finalSeen || {}; state.finalDone = u.finalDone || {}; state.fitSeen = u.fitSeen || {}; state.cmode = u.cmode === 'list' ? 'list' : 'cards'; state.ccal = u.ccal === 'old' ? 'old' : 'new';
   state.fewMin = isNil(u.fewMin) ? 3 : u.fewMin;
 }
 const sigOf = st=>JSON.stringify(Object.assign({}, st, {serverTime:0, now:0}));
@@ -6358,6 +6359,7 @@ const actions = {
   'help-go':function() {const b = document.querySelector('#head .head-actions .btn.primary'); closeModal(); if (b)setTimeout(function() {b.click();}, 60);},
   'cont-screens':function(t) {if (guard('conteudos.gerir'))contScreensModal(t.dataset.id);},
   cfilter:function(t) {state.cfilter = t.dataset.f; render();},
+  ccal:function() {state.ccal = state.ccal === 'old' ? 'new' : 'old'; render();},
   cmode:function(t) {state.cmode = t.dataset.m === 'list' ? 'list' : 'cards'; render();},
   cview:function(t) {state.cview = state.cview === t.dataset.v ? 'lib' : t.dataset.v; render();},
   'clean-see':function() {state.cview = 'exp'; state.view = 'conteudos'; render(); window.scrollTo(0, 0);},
