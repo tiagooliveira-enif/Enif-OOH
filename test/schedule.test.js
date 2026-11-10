@@ -136,5 +136,13 @@ console.log('schedule: ok');
   assert.ok(/^(ABCD)+$/.test(memb), 'o grupo alterna pela ordem: ' + memb);
   const dois = L(grupo(1, k => k > 1 ? { start: '2026-11-20' } : {}).concat(outras)), m2 = dois.seq.filter(c => c.share).map(c => c.id).join('');
   assert.ok(m2.length >= 4 && /^(AB)+$/.test(m2), 'com duas ativas alternam A, B, A, B: ' + m2);
+  // as passagens do grupo ficam espalhadas por igual pela volta (diferença de distância até 1 entrada)
+  [5, 7, 8, 12].forEach(n => [1, 2].forEach(gm => {
+    const x = Array.from({ length: n }, (_, i) => mk('X' + i, { items: [{ f: 'o' }] }));
+    const q = L(grupo(gm, k => k > 1 ? { start: '2026-11-20' } : {}).concat(x)).seq, at = q.map((c, i) => c.share ? i : -1).filter(i => i >= 0);
+    if (at.length < 2) return;
+    const gaps = at.map((v, i) => ((at[(i + 1) % at.length] - v + q.length) % q.length) || q.length);
+    assert.ok(Math.max(...gaps) - Math.min(...gaps) <= 1, 'grupo espalhado por igual (' + n + ' campanhas, mínimo ' + gm + '): ' + gaps);
+  }));
   console.log('mínimo do grupo: ok');
 }

@@ -3606,6 +3606,29 @@ function gmAlt(sq, reps, slots, cp, v) {
   });
   return out;
 }
+/* posição partilhada com mínimo: as passagens do grupo ficam à mesma distância (em tempo) umas das outras ao longo da volta */
+function gmSpread(seq, slots, cp) {
+  let out = seq;
+  slots.forEach(function(sl, si) {
+    const k = cp[sl[0].id] || 1;
+    if (k < 2 || sl.length < 2 || sl.some(c=>c.priority === 'Alta') || !sl.some(c=>+c.gmin > 0)) return;
+    const mine = out.filter(c=>sl.indexOf(c) > -1), rest = out.filter(c=>sl.indexOf(c) < 0);
+    if (!rest.length || mine.length < 2) return;
+    const starts = []; let t = 0; rest.forEach(function(c) {starts.push(t); t += c.dur || 10;});
+    starts.push(t);
+    const at = mine.map(function(c, j) {
+      const target = (j + (si % 2) * 0.5) * t / mine.length; let b = 0;
+      starts.forEach(function(x, i) {if (Math.abs(x - target) < Math.abs(starts[b] - target))b = i;});
+      return b;
+    });
+    const nw = [];
+    rest.forEach(function(c, i) {at.forEach(function(b, j) {if (b === i)nw.push(mine[j]);}); nw.push(c);});
+    at.forEach(function(b, j) {if (b === rest.length)nw.push(mine[j]);});
+    if (secCost(nw) >= 100 && secCost(out) < 100) return;
+    out = nw;
+  });
+  return out;
+}
 function loopFrom(list, limit, d, h, sc) {
   const all = list.filter(c=>onAt(c, d, h, sc)), S = slotsOf(all, limit), loop = S.loop, out = S.out, slots = S.slots;
   const cp0 = {}; loop.forEach(function(c) {cp0[c.id] = copiesOf(c, d, h, sc);});
@@ -3614,7 +3637,7 @@ function loopFrom(list, limit, d, h, sc) {
   const build = function(cp) {
     let seq = [], sp = null, sp5 = null; const occ = {};
     for (let v = 0; v < per; v++) {
-      const reps = slots.map(sl=>sl[v % sl.length]), sq = sectorFix(gmAlt(spreadSeq(reps, cp), reps, slots, cp, v)), sp0 = sq.length ? spotOf(sc) : null;
+      const reps = slots.map(sl=>sl[v % sl.length]), sq = gmSpread(sectorFix(gmAlt(spreadSeq(reps, cp), reps, slots, cp, v)), slots, cp), sp0 = sq.length ? spotOf(sc) : null;
       if (sp0 && !cheio)sp = sp0;
       if (sp0 && cheio)sp5 = sp0;
       seq = seq.concat(sp0 && !cheio ? sq.concat([sp0]) : sq);
