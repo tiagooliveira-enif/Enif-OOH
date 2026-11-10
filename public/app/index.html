@@ -3595,6 +3595,17 @@ function slotsOf(all, limit) {
   return {loop:loop, out:out, slots:slots, demand:demand};
 }
 const gcd = (a, b)=>b ? gcd(b, a % b) : a;
+/* posição partilhada com mínimo: as passagens do grupo alternam entre as campanhas ativas (8, 9, 8, 9…), mesmo quando se repetem na mesma volta */
+function gmAlt(sq, reps, slots, cp, v) {
+  const out = sq.slice();
+  slots.forEach(function(sl, i) {
+    const k = cp[reps[i].id] || 1;
+    if (k < 2 || sl.length < 2 || sl.some(c=>c.priority === 'Alta') || !sl.some(c=>+c.gmin > 0)) return;
+    let a = 0;
+    sq.forEach(function(c, j) {if (c === reps[i]) {out[j] = sl[(v * k + a) % sl.length]; a++;}});
+  });
+  return out;
+}
 function loopFrom(list, limit, d, h, sc) {
   const all = list.filter(c=>onAt(c, d, h, sc)), S = slotsOf(all, limit), loop = S.loop, out = S.out, slots = S.slots;
   const cp0 = {}; loop.forEach(function(c) {cp0[c.id] = copiesOf(c, d, h, sc);});
@@ -3603,7 +3614,7 @@ function loopFrom(list, limit, d, h, sc) {
   const build = function(cp) {
     let seq = [], sp = null, sp5 = null; const occ = {};
     for (let v = 0; v < per; v++) {
-      const reps = slots.map(sl=>sl[v % sl.length]), sq = sectorFix(spreadSeq(reps, cp)), sp0 = sq.length ? spotOf(sc) : null;
+      const reps = slots.map(sl=>sl[v % sl.length]), sq = sectorFix(gmAlt(spreadSeq(reps, cp), reps, slots, cp, v)), sp0 = sq.length ? spotOf(sc) : null;
       if (sp0 && !cheio)sp = sp0;
       if (sp0 && cheio)sp5 = sp0;
       seq = seq.concat(sp0 && !cheio ? sq.concat([sp0]) : sq);
@@ -4296,8 +4307,8 @@ function playlistHtml(s) {
   blocks.forEach(function(b, bi) {
     if (b.m.length < 2) {items += row(b.m[0], bi + 1, b.m[0].share ? ' · posição partilhada' : ''); return;}
     const act = b.m.filter(c=>L.loop.indexOf(c) > -1), k = act.length;
-    items += '<div class="pl-group"><div class="pl-ghead"><span class="pl-n">' + (bi + 1) + '</span><span class="grow"><b class="ell" style="display:block">Posição partilhada · ' + b.m.length + ' campanhas</b><small class="muted">' + (k > 1 ? 'Passam à vez, uma por volta: agora são ' + k + ' no grupo, cada uma passa 1 volta em ' + k + '.' : (k === 1 ? 'Agora só uma está ativa e fica com a posição.' : 'Nenhuma está ativa agora.')) + (gmOf(b.m) ? ' Garantido: o grupo passa pelo menos ' + gmOf(b.m) + (gmOf(b.m) === 1 ? ' vez' : ' vezes') + ' por minuto, à vez.' : '') + '</small></span>' + gmCtl(b.m, s.id) + mv(bi) + '</div>'
-      + '<div class="pl-gm">' + b.m.map(function(c) {const q = act.indexOf(c); return row(c, 0, q > -1 && k > 1 ? ' · volta ' + (q + 1) + ' de ' + k : '');}).join('') + '</div></div>';
+    items += '<div class="pl-group"><div class="pl-ghead"><span class="pl-n">' + (bi + 1) + '</span><span class="grow"><b class="ell" style="display:block">Posição partilhada · ' + b.m.length + ' campanhas</b><small class="muted">' + (k > 1 ? (gmOf(b.m) ? 'Passam à vez: agora são ' + k + ' no grupo e alternam sempre pela mesma ordem.' : 'Passam à vez, uma por volta: agora são ' + k + ' no grupo, cada uma passa 1 volta em ' + k + '.') : (k === 1 ? 'Agora só uma está ativa e fica com a posição.' : 'Nenhuma está ativa agora.')) + (gmOf(b.m) ? ' Garantido: o grupo passa pelo menos ' + gmOf(b.m) + (gmOf(b.m) === 1 ? ' vez' : ' vezes') + ' por minuto, à vez.' : '') + '</small></span>' + gmCtl(b.m, s.id) + mv(bi) + '</div>'
+      + '<div class="pl-gm">' + b.m.map(function(c) {const q = act.indexOf(c); return row(c, 0, q > -1 && k > 1 && !gmOf(b.m) ? ' · volta ' + (q + 1) + ' de ' + k : '');}).join('') + '</div></div>';
   });
   const sameVenue = screens.filter(x=>x.venue === s.venue).length > 1;
   const proofBtn = edit && !proofOf(s) && s.status !== 'novo' ? '<div style="margin-top:8px"><button class="btn sm" data-a="proof-open" data-id="' + s.id + '">' + ic('eye') + 'Gravar comprovativo (máx. 2 min)</button></div>' : '';

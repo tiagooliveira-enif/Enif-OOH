@@ -131,5 +131,10 @@ console.log('schedule: ok');
   assert.ok(S.gRateOf(so.gm[0], so) >= 1 - 1e-9 && so.loop.filter(c => c.share).length === 1, 'só a campanha ativa conta e cumpre o mínimo');
   const alta = L(grupo(2, k => k === 0 ? { priority: 'Alta' } : {}).concat(outras));
   assert.equal(alta.gm.length, 0, 'com uma campanha Alta no grupo o mínimo do grupo não se aplica');
+  // as passagens do grupo alternam sempre entre as campanhas (A, B, C, D, A, B…), mesmo quando o grupo repete na volta
+  const gr = L(grupo(2).concat(outras)), memb = gr.seq.filter(c => c.share).map(c => c.id).join('');
+  assert.ok(/^(ABCD)+$/.test(memb), 'o grupo alterna pela ordem: ' + memb);
+  const dois = L(grupo(1, k => k > 1 ? { start: '2026-11-20' } : {}).concat(outras)), m2 = dois.seq.filter(c => c.share).map(c => c.id).join('');
+  assert.ok(m2.length >= 4 && /^(AB)+$/.test(m2), 'com duas ativas alternam A, B, A, B: ' + m2);
   console.log('mínimo do grupo: ok');
 }
