@@ -186,6 +186,7 @@ function cleanCampaign(o, id, old) {
     if (!/^[A-Za-z0-9_-]{1,40}$/.test(String(o.share))) throw bad('Posição partilhada inválida.');
     out.share = String(o.share);
   } else delete out.share;
+  if (out.share && !isNil(o.gmin) && +o.gmin > 0) out.gmin = Math.round(num(o.gmin, 1, 6, 'Mínimo do grupo')); else delete out.gmin;
   if (!out.name) throw bad('Dê um nome à campanha.');
   if (out.sales && !validEmail(out.sales)) throw bad('O e-mail do comercial não parece válido.');
   if (!isDate(out.start) || !isDate(out.end) || out.end < out.start) throw bad('Datas inválidas.');
@@ -263,7 +264,7 @@ function checkContentScreens(cand, screenIds) {
 const PL_FIELDS = ['order', 'limit', 'draft'];
 /* campos que mudaram; «share» é opcional e some do documento quando a campanha deixa de partilhar a posição */
 const dv = (o, k) => (k === 'area' && isNil(o[k]) ? 'inteiro' : (k === 'noEnd' ? !!o[k] : o[k]));
-const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(dv(n, k), dv(old, k))).concat(!('share' in n) && !isNil(old.share) ? ['share'] : []);
+const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(dv(n, k), dv(old, k))).concat(!('share' in n) && !isNil(old.share) ? ['share'] : [], !('gmin' in n) && !isNil(old.gmin) ? ['gmin'] : []);
 function applyOp(user, op) {
   if (!op || typeof op !== 'object') throw bad('Pedido inválido.');
   const { coll, id } = op;

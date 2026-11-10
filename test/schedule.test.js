@@ -116,3 +116,18 @@ console.log('schedule: ok');
   assert.equal(e.items.join(''), 'ABCADEF', 'o player recebe a ronda com A repetido');
   console.log('vídeo com mais passagens por minuto: ok');
 }
+
+// mínimo do grupo: a posição partilhada passa pelo menos N vezes por minuto, à vez, e só conta as campanhas ativas
+{
+  const sc = { id: 'S1', venue: 'V', on: 0, off: 24, limit: 14, order: [], res: '1920×1080' };
+  const cx = { contents: ['a', 'b', 'c', 'd', 'o'].map(i => file(i)) };
+  const outras = Array.from({ length: 8 }, (_, i) => mk('X' + i, { items: [{ f: 'o' }] }));
+  const grupo = (gmin, extra) => ['a', 'b', 'c', 'd'].map((i, k) => mk(i.toUpperCase(), Object.assign({ share: 'G', gmin: gmin || undefined, items: [{ f: i }] }, extra && extra(k))));
+  const L = (cs) => S.loopFrom(S.playlistOf(sc, cs, cx, D), 14, D, 10, sc, cx);
+  const sem = L(grupo(0).concat(outras)), com = L(grupo(2).concat(outras));
+  assert.ok(S.gRateOf({ m: grupo(0) }, sem) < 1, 'sem mínimo o grupo passa menos de 1 vez por minuto');
+  assert.ok(com.gm.length === 1 && Math.abs(S.gRateOf(com.gm[0], com) - 2) < 1e-6, 'com mínimo 2 o grupo passa 2 vezes por minuto');
+  const so = L(grupo(1, k => k ? { start: '2026-11-20' } : {}).concat(outras));
+  assert.ok(S.gRateOf(so.gm[0], so) >= 1 - 1e-9 && so.loop.filter(c => c.share).length === 1, 'só a campanha ativa conta e cumpre o mínimo');
+  console.log('mínimo do grupo: ok');
+}

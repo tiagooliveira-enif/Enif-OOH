@@ -2133,6 +2133,16 @@ iframe.prev-media {
   flex: 1;
   min-width: 0;
 }
+.gm-ctl {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+}
+.gm-ctl select {
+  width: auto;
+  font-size: 13px;
+}
 .pl-ghead small {
   display: block;
 }
@@ -3594,19 +3604,29 @@ function loopFrom(list, limit, d, h, sc) {
     return {seq:seq, spot:sp, spot5:sp5, occ:occ, per:per, cycle:seq.reduce((a, c)=>a + c.dur, 0)};
   };
   /* prioridade Alta: cumpre as passagens por minuto pedidas, repetindo a campanha na volta o que for preciso (no máximo 12 vezes por volta) */
-  const cp = Object.assign({}, cp0), alta = loop.filter(c=>c.priority === 'Alta');
+  const cp = Object.assign({}, cp0);
+  /* mínimo do grupo (gmin): a posição partilhada passa pelo menos N vezes por minuto, à vez entre as campanhas ativas do grupo */
+  const gm = slots.map(function(sl) {return {m:sl, need:sl.reduce(function(a, c) {return Math.max(a, +c.gmin || 0);}, 0)};}).filter(g=>g.need > 0), inG = {};
+  gm.forEach(function(g) {g.m.forEach(function(c) {inG[c.id] = 1;});});
+  const alta = loop.filter(c=>c.priority === 'Alta' && !inG[c.id]);
   let R = build(cp);
-  for (let n = 0; alta.length && n < 12 * alta.length; n++) {
-    let worst = null, wr = 1;
-    alta.forEach(function(c) {const r = rateOf(c, R) / needOf(c, {copies:cp0}); if (r < 1 - 1e-9 && r < wr && cp[c.id] < 12) {wr = r; worst = c;}});
+  for (let n = 0; (alta.length || gm.length) && n < 12 * (alta.length + gm.length); n++) {
+    let worst = null, wr = 1, wg = null;
+    alta.forEach(function(c) {const r = rateOf(c, R) / needOf(c, {copies:cp0}); if (r < 1 - 1e-9 && r < wr && cp[c.id] < 12) {wr = r; worst = c; wg = null;}});
+    gm.forEach(function(g) {const r = gRateOf(g, R) / g.need; if (r < 1 - 1e-9 && r < wr && cp[g.m[0].id] < 12) {wr = r; wg = g; worst = null;}});
+    if (wg) {wg.m.forEach(function(c) {cp[c.id]++;}); R = build(cp); continue;}
     if (!worst) break;
     cp[worst.id]++; R = build(cp);
   }
-  return {all:all, loop:loop, out:out, seq:R.seq, spot:R.spot, spot5:R.spot5, copies:cp0, occ:R.occ, per:per, demand:S.demand, cycle:R.cycle};
+  return {gm:gm, all:all, loop:loop, out:out, seq:R.seq, spot:R.spot, spot5:R.spot5, copies:cp0, occ:R.occ, per:per, demand:S.demand, cycle:R.cycle};
 }
 function loopS(s, list, limit, d, h) {return screenOn(s, h) ? loopFrom(list, limit, d, h, s) : {all:[], loop:[], out:[], seq:[], copies:{}, occ:{}, per:1, demand:0, cycle:0};}
 const spotCut = L=>L.spot5 ? SPOT_GAP / (SPOT_GAP + L.spot5.dur) : 1;
 const rateOf = (c, L)=>L.cycle ? ((L.occ[c.id] || 1) * 60 / L.cycle) * spotCut(L) : 0;
+const gRateOf = (g, L)=>L.cycle ? (g.m.reduce((a, c)=>a + (L.occ[c.id] || 0), 0) * 60 / L.cycle) * spotCut(L) : 0;
+const inGm = (c, L)=>(L.gm || []).some(g=>g.m.indexOf(c) > -1);
+const slowOf = L=>L.loop.filter(c=>!inGm(c, L) && needOf(c, L) > rateOf(c, L) + 1e-9);
+const slowG = L=>(L.gm || []).filter(g=>gRateOf(g, L) < g.need - 1e-9);
 const needOf = (c, L)=>Math.max(c.ppm, L.copies[c.id] > Math.ceil(c.ppm - 1e-9) ? L.copies[c.id] : 0);
 function rateTxt(L) {
   const r = L.loop.map(c=>Math.round(rateOf(c, L) * 100) / 100);
@@ -3682,7 +3702,7 @@ function screenIssues(s, draft, all) {
     ds.forEach(function(d) {const L = loopS(s, list, lim, d, h); if (!best || L.demand > best.L.demand)best = {L:L, d:d};});
     const L = best.L; let kind = null, ids = [];
     if (L.demand > lim) {kind = 'limit'; ids = L.all.map(c=>c.id);}
-    else if (L.loop.some(c=>needOf(c, L) > rateOf(c, L) + 1e-9)) {kind = 'ppm'; ids = L.loop.map(c=>c.id);}
+    else if (slowOf(L).length || slowG(L).length) {kind = 'ppm'; ids = L.loop.map(c=>c.id);}
     else if (secPairs(L).length) {kind = 'sec'; ids = L.loop.map(c=>c.id);}
     else if (adjOf(L).length) {kind = 'adj'; ids = L.loop.map(c=>c.id);}
     else if (lim > 1 && L.demand === lim) {kind = 'full'; ids = L.all.map(c=>c.id);}
@@ -3706,8 +3726,8 @@ function issueText(i) {
   const when = 'Entre as ' + i.h0 + 'h e as ' + i.h1 + 'h';
   if (i.kind === 'limit') return when + ' passam ' + i.L.all.length + ' campanhas' + (i.L.demand < i.L.all.length ? ' em ' + i.L.demand + ' posições' : '') + ' (' + names(i.ids) + ') e o limite é ' + i.limit + '. Ficam de fora: ' + names(i.L.out.map(c=>c.id)) + '.';
   if (i.kind === 'ppm') {
-    const slow = i.L.loop.filter(c=>needOf(c, i.L) > rateOf(c, i.L) + 1e-9);
-    return when + ' o loop dura ' + i.L.cycle + ' s' + (i.L.spot ? ' (com o spot da Enif)' : '') + ', por isso ' + slow.map(function(c) {const r = Math.round(rateOf(c, i.L) * 100) / 100; return '«' + c.name + '» passa ' + fmtPpm(r) + (r === 1 ? ' vez' : ' vezes') + ' por minuto' + (c.share ? ' (partilha a posição com outras campanhas)' : '') + (c.priority === 'Alta' ? ' (mesmo com prioridade Alta e repetida o máximo de vezes, não chega)' : '') + ' (pedido: ' + fmtPpm(needOf(c, i.L)) + ')';}).join('; ') + '.';
+    const slow = slowOf(i.L);
+    return when + ' o loop dura ' + i.L.cycle + ' s' + (i.L.spot ? ' (com o spot da Enif)' : '') + ', por isso ' + slow.map(function(c) {const r = Math.round(rateOf(c, i.L) * 100) / 100; return '«' + c.name + '» passa ' + fmtPpm(r) + (r === 1 ? ' vez' : ' vezes') + ' por minuto' + (c.share ? ' (partilha a posição com outras campanhas)' : '') + (c.priority === 'Alta' ? ' (mesmo com prioridade Alta e repetida o máximo de vezes, não chega)' : '') + ' (pedido: ' + fmtPpm(needOf(c, i.L)) + ')';}).concat(slowG(i.L).map(function(g) {const r = Math.round(gRateOf(g, i.L) * 100) / 100; return 'a posição partilhada de ' + g.m.map(c=>'«' + c.name + '»').join(', ') + ' passa ' + fmtPpm(r) + (r === 1 ? ' vez' : ' vezes') + ' por minuto (mínimo do grupo: ' + g.need + ')';})).join('; ') + '.';
   }
   if (i.kind === 'sec') {
     const ps = secPairs(i.L), k = secKey(ps[0][0]), oth = i.L.loop.filter(c=>secKey(c) !== k).length;
@@ -4201,6 +4221,14 @@ function plState(c, s, L, h) {
   if (s.status === 'offline') return ['on', 'Passa a última lista guardada', 'warn dot'];
   return ['on', 'A passar agora', 'ok dot'];
 }
+/* mínimo de passagens por minuto da posição partilhada: um campo no cabeçalho do grupo */
+const gmOf = m=>m.reduce((a, c)=>Math.max(a, +c.gmin || 0), 0);
+function gmCtl(m, sid) {
+  const g = m.reduce(function(a, c) {return Math.max(a, +c.gmin || 0);}, 0);
+  if (!can('campanhas.gerir')) return g ? '<span class="pill">Mínimo ' + g + '× por minuto</span>' : '';
+  return '<label class="gm-ctl"><span class="muted">Mínimo do grupo</span><select data-a-change="gmin" data-g="' + esc(m[0].share) + '" data-s="' + esc(sid) + '" aria-label="Mínimo de passagens por minuto do grupo"><option value="0">Sem mínimo</option>'
+    + [1, 2, 3, 4].map(n=>'<option value="' + n + '"' + (g === n ? ' selected' : '') + '>' + n + (n === 1 ? ' vez' : ' vezes') + ' por minuto</option>').join('') + '</select></label>';
+}
 /* posições da playlist: uma campanha sozinha, ou várias que partilham a posição (grupo) */
 function plBlocks(list) {
   const bl = [], gi = {};
@@ -4259,7 +4287,7 @@ function playlistHtml(s) {
   blocks.forEach(function(b, bi) {
     if (b.m.length < 2) {items += row(b.m[0], bi + 1, b.m[0].share ? ' · posição partilhada' : ''); return;}
     const act = b.m.filter(c=>L.loop.indexOf(c) > -1), k = act.length;
-    items += '<div class="pl-group"><div class="pl-ghead"><span class="pl-n">' + (bi + 1) + '</span><span class="grow"><b class="ell" style="display:block">Posição partilhada · ' + b.m.length + ' campanhas</b><small class="muted">' + (k > 1 ? 'Passam à vez, uma por volta: agora são ' + k + ' no grupo, cada uma passa 1 volta em ' + k + '.' : (k === 1 ? 'Agora só uma está ativa e fica com a posição.' : 'Nenhuma está ativa agora.')) + '</small></span>' + mv(bi) + '</div>'
+    items += '<div class="pl-group"><div class="pl-ghead"><span class="pl-n">' + (bi + 1) + '</span><span class="grow"><b class="ell" style="display:block">Posição partilhada · ' + b.m.length + ' campanhas</b><small class="muted">' + (k > 1 ? 'Passam à vez, uma por volta: agora são ' + k + ' no grupo, cada uma passa 1 volta em ' + k + '.' : (k === 1 ? 'Agora só uma está ativa e fica com a posição.' : 'Nenhuma está ativa agora.')) + (gmOf(b.m) ? ' Garantido: o grupo passa pelo menos ' + gmOf(b.m) + (gmOf(b.m) === 1 ? ' vez' : ' vezes') + ' por minuto, à vez.' : '') + '</small></span>' + gmCtl(b.m, s.id) + mv(bi) + '</div>'
       + '<div class="pl-gm">' + b.m.map(function(c) {const q = act.indexOf(c); return row(c, 0, q > -1 && k > 1 ? ' · volta ' + (q + 1) + ' de ' + k : '');}).join('') + '</div></div>';
   });
   const sameVenue = screens.filter(x=>x.venue === s.venue).length > 1;
@@ -4753,9 +4781,9 @@ function applyShare(c, sw) {
   const x = sw ? campById(sw) : null;
   if (x && x !== c) {
     if (!x.share)x.share = 'G' + Math.random().toString(36).slice(2, 8);
-    c.share = x.share;
-  } else if (!sw)c.share = null;
-  campaigns.forEach(function(k) {if (k.share && campaigns.filter(z=>z.share === k.share).length < 2)k.share = null;});
+    c.share = x.share; c.gmin = x.gmin || null;
+  } else if (!sw) {c.share = null; c.gmin = null;}
+  campaigns.forEach(function(k) {if (k.share && campaigns.filter(z=>z.share === k.share).length < 2) {k.share = null; k.gmin = null;}});
 }
 function campModal(id) {
   const ex = id ? campById(id) : null;
@@ -5941,7 +5969,7 @@ function setArr(a, b) {a.length = 0; b.forEach(function(x) {a.push(x);});}
 const sleep = ms=>new Promise(function(r) {setTimeout(r, ms);});
 
 const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri'];
-const CMP_KEYS = ['name', 'client', 'noEnd', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'manual', 'color', 'items', 'pauses'];
+const CMP_KEYS = ['name', 'client', 'noEnd', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'gmin', 'manual', 'color', 'items', 'pauses'];
 const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'photo', 'notif', 'ui'];
 const emptyBase = ()=>({screens:{}, campaigns:{}, folders:{}, contents:{}, users:{}});
 let base = emptyBase();
@@ -6211,7 +6239,7 @@ const actions = {
     if (!guard('campanhas.gerir')) return;
     const i = campaigns.findIndex(x=>x.id === t.dataset.id); if (i < 0) return;
     const c = campaigns[i]; campaigns.splice(i, 1);
-    campaigns.forEach(function(k) {if (k.share && campaigns.filter(z=>z.share === k.share).length < 2)k.share = null;});
+    campaigns.forEach(function(k) {if (k.share && campaigns.filter(z=>z.share === k.share).length < 2) {k.share = null; k.gmin = null;}});
     screens.forEach(function(s) {
       if (s.order)s.order = s.order.filter(id=>id !== c.id);
       if (s.draft && s.draft.order)s.draft.order = s.draft.order.filter(id=>id !== c.id);
@@ -6645,6 +6673,12 @@ document.addEventListener('change', function(e) {
       toast('Conteúdo associado a «' + c.name + '».' + (c.items.length > 1 ? ' Os vídeos da campanha passam alternados, um em cada passagem.' : ''));
       render();
     }
+  }
+  else if (ac === 'gmin') {
+    if (!guard('campanhas.gerir')) return;
+    const n = Math.max(0, Math.min(6, Math.round(+t.value) || 0)), g = campaigns.filter(c=>c.share === t.dataset.g); if (!g.length) return;
+    g.forEach(function(c) {c.gmin = n || null;});
+    toast(n ? 'O grupo passa agora pelo menos ' + n + (n === 1 ? ' vez' : ' vezes') + ' por minuto.' : 'O grupo deixou de ter mínimo por minuto.'); if (t.dataset.s)reopenScreen(t.dataset.s); render();
   }
   else if (ac === 'mvfolder') {
     const x = fileById(t.dataset.id);

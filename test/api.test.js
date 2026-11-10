@@ -141,6 +141,13 @@ async function main() {
   ok('prioridade «Baixa» já não existe (passa a Normal)', cps.find(x => x.id === 'CP').priority === 'Normal');
   ok('prioridade Alta guardada', cps.find(x => x.id === 'CQ').priority === 'Alta');
   ok('posição partilhada guardada', cps.find(x => x.id === 'CQ').share === 'G1' && cps.find(x => x.id === 'CR').share === 'G1');
+  await sync(top, [camp('CQ', { share: 'G1', gmin: 2 }), camp('CR', { share: 'G1', gmin: 2 })]);
+  const gq = (await call('GET', '/api/state', undefined, top)).j.campaigns;
+  ok('mínimo do grupo guardado', gq.find(x => x.id === 'CQ').gmin === 2 && gq.find(x => x.id === 'CR').gmin === 2);
+  ok('mínimo do grupo fora do intervalo recusado', (await sync(top, [camp('CQ', { share: 'G1', gmin: 99 })])).s === 400);
+  await sync(top, [camp('CQ', { share: 'G1' })]);
+  ok('mínimo do grupo some quando deixa de estar definido', !('gmin' in (await call('GET', '/api/state', undefined, top)).j.campaigns.find(x => x.id === 'CQ')));
+  await sync(top, [camp('CQ', { priority: 'Alta', share: 'G1' })]);
   ok('posição partilhada inválida recusada', (await sync(top, [camp('CS', { share: 'a b<c>' })])).s === 400);
   await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CP' }, { op: 'del', coll: 'campaigns', id: 'CQ' }, { op: 'del', coll: 'campaigns', id: 'CR' }]);
   await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CI' }, { op: 'del', coll: 'campaigns', id: 'CJ' }]);
