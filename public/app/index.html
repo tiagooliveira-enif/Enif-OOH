@@ -4344,6 +4344,8 @@ function playlistHtml(s) {
 }
 
 const matchF = (s, f)=>f === 'todos' || (f === 'conflito' ? hasConf(s) : (f === 'porenviar' ? !!s.draft : s.status === f));
+/* «A reproduzir» na lista de ecrãs: fica fixa na última campanha que foi adicionada (as campanhas guardam-se por ordem de criação) */
+const latestOf = pl=>pl.reduce((a, c)=>campaigns.indexOf(c) > campaigns.indexOf(a) ? c : a, pl[0]);
 const rowPills = s=>{const al = s.status === 'atencao' && !diskLow(s) && !hasConf(s) ? alerts.find(x=>x.screen === s.id) : null; const a = (al ? '<span class="pill warn">' + esc(al.title) + '</span> ' : '') + (hasConf(s) ? '<span class="pill warn">Conflito</span> ' : '') + (diskLow(s) ? '<span class="pill bad">Disco quase cheio</span> ' : '') + (s.draft ? '<span class="pill accent">Por enviar</span>' : ''); return a ? '<span style="display:block;margin-top:3px">' + a + '</span>' : '';};
 function viewScreens() {
   head('Ecrãs', screens.length + ' ecrãs registados em ' + new Set(screens.map(s=>s.venue)).size + ' locais', can('ecras.gerir') ? '<button class="btn primary" data-a="new-screen">' + ic('plus') + 'Novo ecrã</button>' : '');
@@ -4357,7 +4359,7 @@ function drawScreenList() {
   const shown = list.slice(0, state.limit);
   const rows = shown.map(function(s) {
     const pl = playingOn(s);
-    const play = s.status === 'offline' ? '<span class="muted">Última lista guardada</span>' : (s.status === 'novo' ? '<span class="muted">—</span>' : (!isOnNow(s) ? '<span class="muted">Desligado · ' + untilTxt(s) + '</span>' : (pl.length ? '<span class="ell rot"' + (pl.length > 1 ? ' data-names="' + esc(pl.map(c=>c.name).join('\u0001')) + '"' : '') + '><span class="rot-n">' + esc(pl[0].name) + '</span>' + (pl.length > 1 ? ' <span class="muted rot-m">+' + (pl.length - 1) + '</span>' : '') + '</span>' : '<span class="muted">Sem campanha agora</span>')));
+    const play = s.status === 'offline' ? '<span class="muted">Última lista guardada</span>' : (s.status === 'novo' ? '<span class="muted">—</span>' : (!isOnNow(s) ? '<span class="muted">Desligado · ' + untilTxt(s) + '</span>' : (pl.length ? '<span class="ell">' + esc(latestOf(pl).name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') + '</span>' : '<span class="muted">Sem campanha agora</span>')));
     return '<button class="t-row" data-a="open-screen" data-id="' + s.id + '"><span style="min-width:0"><b class="ell" style="display:block">' + esc(s.venue) + ' · ' + esc(s.spot) + '</b><small class="mono">' + s.id + ' · ' + esc(s.city) + '</small>' + rowPills(s) + '</span><span class="hm">' + esc(s.type) + '<small>' + resTxt(s) + '</small></span><span class="hm ell" style="min-width:0">' + esc(s.city) + '</span><span class="hm" style="min-width:0">' + play + '</span><span>' + statusPill(s.status) + '</span></button>';
   }).join('');
   $('#screen-list').innerHTML = '<div class="t-row t-head"><span>Ecrã</span><span class="hm">Tipo</span><span class="hm">Cidade</span><span class="hm">A reproduzir</span><span>Estado</span></div>'
@@ -6187,15 +6189,6 @@ function idleCheck() {
   else if (left <= 60000 && !idleWarned) {idleWarned = true; toast('A sessão termina dentro de 1 minuto por inatividade. Carregue numa tecla ou toque no ecrã para continuar.');}
 }
 setInterval(idleCheck, 5000);
-/* «A reproduzir» na lista de ecrãs: vai mudando o nome da campanha de 10 em 10 minutos, para não ficar sempre a mesma */
-setInterval(function() {
-  const k = Math.floor(Date.now() / 600000);
-  Array.prototype.slice.call(document.querySelectorAll('.rot[data-names]')).forEach(function(el, i) {
-    const n = el.dataset.names.split('\u0001'), t = n[(k + i) % n.length], e = el.querySelector('.rot-n');
-    if (e && e.textContent !== t)e.textContent = t;
-    const m = el.querySelector('.rot-m'); if (m)m.textContent = '+' + (n.length - 1);
-  });
-}, 1000);
 
 function idleOut() {
   flushSave().then(function() {
