@@ -6116,9 +6116,9 @@ function idleCheck() {
   else if (left <= 60000 && !idleWarned) {idleWarned = true; toast('A sessão termina dentro de 1 minuto por inatividade. Carregue numa tecla ou toque no ecrã para continuar.');}
 }
 setInterval(idleCheck, 5000);
-/* «A reproduzir» na lista de ecrãs: vai mudando o nome da campanha, para não ficar sempre a mesma */
+/* «A reproduzir» na lista de ecrãs: vai mudando o nome da campanha de 10 em 10 minutos, para não ficar sempre a mesma */
 setInterval(function() {
-  const k = Math.floor(Date.now() / 4000);
+  const k = Math.floor(Date.now() / 600000);
   Array.prototype.slice.call(document.querySelectorAll('.rot[data-names]')).forEach(function(el, i) {
     const n = el.dataset.names.split('\u0001'), t = n[(k + i) % n.length], e = el.querySelector('.rot-n');
     if (e && e.textContent !== t)e.textContent = t;
