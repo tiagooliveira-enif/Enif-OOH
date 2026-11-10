@@ -2139,6 +2139,14 @@ iframe.prev-media {
   gap: 2px;
   font-size: 12px;
 }
+.gm-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  max-width: 260px;
+  font-size: 12px;
+  color: var(--muted);
+}
 .gm-ctl select {
   width: auto;
   font-size: 13px;
@@ -3606,7 +3614,7 @@ function loopFrom(list, limit, d, h, sc) {
   /* prioridade Alta: cumpre as passagens por minuto pedidas, repetindo a campanha na volta o que for preciso (no máximo 12 vezes por volta) */
   const cp = Object.assign({}, cp0);
   /* mínimo do grupo (gmin): a posição partilhada passa pelo menos N vezes por minuto, à vez entre as campanhas ativas do grupo */
-  const gm = slots.map(function(sl) {return {m:sl, need:sl.reduce(function(a, c) {return Math.max(a, +c.gmin || 0);}, 0)};}).filter(g=>g.need > 0), inG = {};
+  const gm = slots.map(function(sl) {return {m:sl, need:sl.some(c=>c.priority === 'Alta') ? 0 : sl.reduce(function(a, c) {return Math.max(a, +c.gmin || 0);}, 0)};}).filter(g=>g.need > 0), inG = {};
   gm.forEach(function(g) {g.m.forEach(function(c) {inG[c.id] = 1;});});
   const alta = loop.filter(c=>c.priority === 'Alta' && !inG[c.id]);
   let R = build(cp);
@@ -4222,9 +4230,10 @@ function plState(c, s, L, h) {
   return ['on', 'A passar agora', 'ok dot'];
 }
 /* mínimo de passagens por minuto da posição partilhada: um campo no cabeçalho do grupo */
-const gmOf = m=>m.reduce((a, c)=>Math.max(a, +c.gmin || 0), 0);
+const gmOf = m=>m.some(c=>c.priority === 'Alta') ? 0 : m.reduce((a, c)=>Math.max(a, +c.gmin || 0), 0);
 function gmCtl(m, sid) {
-  const g = m.reduce(function(a, c) {return Math.max(a, +c.gmin || 0);}, 0);
+  const g = gmOf(m), alta = m.filter(c=>c.priority === 'Alta');
+  if (alta.length) return can('campanhas.gerir') ? '<span class="gm-warn">' + ic('alert') + 'Mínimo do grupo indisponível: ' + alta.map(c=>'«' + esc(c.name) + '»').join(', ') + (alta.length === 1 ? ' tem' : ' têm') + ' prioridade Alta. Passe todas as campanhas do grupo para Normal.</span>' : '';
   if (!can('campanhas.gerir')) return g ? '<span class="pill">Mínimo ' + g + '× por minuto</span>' : '';
   return '<label class="gm-ctl"><span class="muted">Mínimo do grupo</span><select data-a-change="gmin" data-g="' + esc(m[0].share) + '" data-s="' + esc(sid) + '" aria-label="Mínimo de passagens por minuto do grupo"><option value="0">Sem mínimo</option>'
     + [1, 2, 3, 4].map(n=>'<option value="' + n + '"' + (g === n ? ' selected' : '') + '>' + n + (n === 1 ? ' vez' : ' vezes') + ' por minuto</option>').join('') + '</select></label>';

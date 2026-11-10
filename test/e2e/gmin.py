@@ -38,6 +38,9 @@ try:
         pg.select_option('.gm-ctl select', '0'); time.sleep(1.5)
         g = {c['id']: c.get('gmin') for c in call('GET', '/api/state', tok=tok)['campaigns']}
         ok('«Sem mínimo» tira o mínimo às duas', not g['C1'] and not g['C2'])
+        call('POST', '/api/sync', {'ops': [{'op': 'put', 'coll': 'campaigns', 'id': 'C2', 'doc': camp('C2', share='G1', priority='Alta')}]}, tok)
+        pg.reload(); pg.wait_for_selector('[data-a=nav][data-v=ecras]'); pg.click('[data-a=nav][data-v=ecras]'); time.sleep(.6); pg.click('[data-a=open-screen]:has-text("ECR-001")'); time.sleep(.8)
+        ok('com uma campanha Alta no grupo o campo não aparece e há aviso', pg.locator('.gm-ctl select').count() == 0 and 'prioridade Alta' in pg.inner_text('.pl-ghead'))
         ok('zero erros JS', not errs)
         br.close()
 finally:

@@ -129,5 +129,7 @@ console.log('schedule: ok');
   assert.ok(com.gm.length === 1 && Math.abs(S.gRateOf(com.gm[0], com) - 2) < 1e-6, 'com mínimo 2 o grupo passa 2 vezes por minuto');
   const so = L(grupo(1, k => k ? { start: '2026-11-20' } : {}).concat(outras));
   assert.ok(S.gRateOf(so.gm[0], so) >= 1 - 1e-9 && so.loop.filter(c => c.share).length === 1, 'só a campanha ativa conta e cumpre o mínimo');
+  const alta = L(grupo(2, k => k === 0 ? { priority: 'Alta' } : {}).concat(outras));
+  assert.equal(alta.gm.length, 0, 'com uma campanha Alta no grupo o mínimo do grupo não se aplica');
   console.log('mínimo do grupo: ok');
 }
