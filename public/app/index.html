@@ -918,6 +918,18 @@ select.inline {
   text-align: left;
   transition: background 0.15s;
 }
+.play-c {
+  display: flex;
+  gap: 5px;
+  align-items: baseline;
+  min-width: 0;
+}
+.play-c .ell {
+  min-width: 0;
+}
+.play-c .muted {
+  flex: none;
+}
 button.t-row:hover {
   background: var(--surface-2);
 }
@@ -4359,7 +4371,7 @@ function drawScreenList() {
   const shown = list.slice(0, state.limit);
   const rows = shown.map(function(s) {
     const pl = playingOn(s);
-    const play = s.status === 'offline' ? '<span class="muted">Última lista guardada</span>' : (s.status === 'novo' ? '<span class="muted">—</span>' : (!isOnNow(s) ? '<span class="muted">Desligado · ' + untilTxt(s) + '</span>' : (pl.length ? '<span class="ell">' + esc(latestOf(pl).name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') + '</span>' : '<span class="muted">Sem campanha agora</span>')));
+    const play = s.status === 'offline' ? '<span class="muted">Última lista guardada</span>' : (s.status === 'novo' ? '<span class="muted">—</span>' : (!isOnNow(s) ? '<span class="muted">Desligado · ' + untilTxt(s) + '</span>' : (pl.length ? '<span class="play-c"><span class="ell">' + esc(latestOf(pl).name) + '</span>' + (pl.length > 1 ? '<span class="muted">+' + (pl.length - 1) + '</span>' : '') + '</span>' : '<span class="muted">Sem campanha agora</span>')));
     return '<button class="t-row" data-a="open-screen" data-id="' + s.id + '"><span style="min-width:0"><b class="ell" style="display:block">' + esc(s.venue) + ' · ' + esc(s.spot) + '</b><small class="mono">' + s.id + ' · ' + esc(s.city) + '</small>' + rowPills(s) + '</span><span class="hm">' + esc(s.type) + '<small>' + resTxt(s) + '</small></span><span class="hm ell" style="min-width:0">' + esc(s.city) + '</span><span class="hm" style="min-width:0">' + play + '</span><span>' + statusPill(s.status) + '</span></button>';
   }).join('');
   $('#screen-list').innerHTML = '<div class="t-row t-head"><span>Ecrã</span><span class="hm">Tipo</span><span class="hm">Cidade</span><span class="hm">A reproduzir</span><span>Estado</span></div>'
