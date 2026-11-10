@@ -1302,6 +1302,13 @@ iframe.prev-media {
 .tile-sel:hover {
   border-color: var(--accent);
 }
+.tile-del {
+  color: var(--muted);
+}
+.tile-del:hover {
+  border-color: var(--bad, #c0392b);
+  color: var(--bad, #c0392b);
+}
 
 /* reports */
 .chart {
@@ -5008,14 +5015,14 @@ function viewContentBase() {
     const cs = campsOfFile(x), c = cs[0];
     const icon = x.type === 'Vídeo' ? 'play' : (x.type === 'Imagem' ? 'image' : 'code');
     const ext = (x.name.split('.').pop() || '').toUpperCase();
-    const scrLine = x.ready ? '<span class="muted" style="font-size:13px">' + contScrTxt(x) + '</span>' + (cG && isAdm() ? '<button class="btn sm ghost" data-a="toggle-house" data-id="' + x.id + '">' + (x.house ? 'Deixar de ser spot da Enif' : 'Usar como spot da Enif') + '</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel" data-a="cont-screens" data-id="' + x.id + '">Ecrãs permitidos</button>' : '') : '';
+    const scrLine = x.ready ? '<span class="muted" style="font-size:13px">' + contScrTxt(x) + '</span>' + (cG && isAdm() ? '<button class="btn sm ghost" data-a="toggle-house" data-id="' + x.id + '">' + (x.house ? 'Deixar de ser spot da Enif' : 'Usar como spot da Enif') + '</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel" data-a="cont-screens" data-id="' + x.id + '">Ecrãs permitidos</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel tile-del" data-a="del-content" data-id="' + x.id + '">Eliminar</button>' : '') : '';
     const meta = !x.ready ? 'A preparar o conteúdo…' : (x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size);
     const pills = cs.map(k=>'<span class="pill">' + esc(k.name) + (cG ? '<button class="pill-x" data-a="unassoc" data-id="' + x.id + '" data-c="' + k.id + '" aria-label="Retirar da campanha ' + esc(k.name) + '">' + ic('x') + '</button>' : '') + '</span>').join('');
     const sel = '';
     const fol = x.folder ? folderById(x.folder) : null;
     const fsel = cG ? '<select data-a-change="mvfolder" data-id="' + x.id + '" aria-label="Pasta"><option value="">Sem pasta</option>' + folders.map(p=>'<option value="' + p.id + '"' + (x.folder === p.id ? ' selected' : '') + '>' + esc(p.name) + '</option>').join('') + '</select>' : (fol ? '<span class="muted" style="font-size:13px">Pasta: ' + esc(fol.name) + '</span>' : '');
     const thumbH = cls=>'<div class="thumb' + cls + '" data-a="content-view" data-id="' + x.id + '" role="button" tabindex="0" aria-label="Ver ' + esc(x.name) + '" style="--tc:var(--c' + (c ? c.color : 6) + ')">' + (x.url ? '<img src="' + x.url + '" alt="">' : (x.src && x.type === 'Vídeo' ? '<video src="' + x.src + '#t=0.1" preload="metadata" muted playsinline></video>' : '') + ic(icon)) + '<span class="tag">' + esc(ext) + '</span></div>';
-    const acts = x.ready ? (cG && isAdm() ? '<button class="btn sm ghost" data-a="toggle-house" data-id="' + x.id + '">' + (x.house ? 'Deixar de ser spot da Enif' : 'Usar como spot da Enif') + '</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel" data-a="cont-screens" data-id="' + x.id + '">Ecrãs permitidos</button>' : '') : '';
+    const acts = x.ready ? (cG && isAdm() ? '<button class="btn sm ghost" data-a="toggle-house" data-id="' + x.id + '">' + (x.house ? 'Deixar de ser spot da Enif' : 'Usar como spot da Enif') + '</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel" data-a="cont-screens" data-id="' + x.id + '">Ecrãs permitidos</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel tile-del" data-a="del-content" data-id="' + x.id + '">Eliminar</button>' : '') : '';
     rowsL.push('<tr><td><div class="cl-main">' + thumbH(' cl-th') + '<div class="cl-n"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted">' + meta + '</span></div></div></td><td>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted">Sem campanha</span>') + '</td><td class="cl-hide">' + (x.ready ? '<span class="muted">' + contScrTxt(x) + '</span>' : '') + '<div class="cl-a">' + acts + '</div></td><td class="cl-hide">' + fsel + '</td><td class="cl-hide">' + expLine(x, cG) + '</td></tr>');
     return '<article class="card tile">' + thumbH('') + '<div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
   }).join('');
@@ -6372,6 +6379,21 @@ const actions = {
     if (!guard('conteudos.gerir')) return;
     const L = expiring();
     api('POST', '/api/contents/keep', {ids:L.map(x=>x.id)}).then(function(r) {toast(r.n === 1 ? 'Conteúdo mantido.' : r.n + ' conteúdos mantidos.'); return poll(true);}).catch(function(e) {toast(e.message);});
+  },
+  'del-content':function(t) {
+    if (!guard('conteudos.gerir')) return;
+    const x = contents.find(c=>c.id === t.dataset.id); if (!x) return;
+    const live = campsOfFile(x).filter(c=>statusOf(c) !== 'Terminada');
+    const ok = !x.house && !live.length;
+    const body = x.house ? '<p>«' + esc(x.name) + '» é um spot da Enif. Deixe primeiro de o usar como spot para o poder eliminar.</p>'
+      : (live.length ? '<p><b>«' + esc(x.name) + '»</b> está a ser usado ' + (live.length === 1 ? 'nesta campanha' : 'nestas campanhas') + ':</p><ul>' + live.map(c=>'<li>' + esc(c.name) + '</li>').join('') + '</ul><p class="muted">Retire-o primeiro ' + (live.length === 1 ? 'dessa campanha' : 'dessas campanhas') + ' e depois pode eliminá-lo.</p>'
+        : '<p>Eliminar <b>«' + esc(x.name) + '»</b>?</p><p class="muted">Vai para a Reciclagem e pode ser restaurado durante ' + ((state.clean && state.clean.bin) || 30) + ' dias. Depois é apagado de vez.</p>');
+    modal('<div class="modal-h"><h2>Eliminar conteúdo</h2><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">' + body + '</div><div class="modal-f"><button class="btn" data-a="close">' + (ok ? 'Cancelar' : 'Fechar') + '</button>' + (ok ? '<button class="btn primary" data-a="del-content-ok" data-id="' + x.id + '">Eliminar</button>' : '') + '</div>');
+  },
+  'del-content-ok':function(t) {
+    if (!guard('conteudos.gerir')) return;
+    const x = contents.find(c=>c.id === t.dataset.id); if (!x) return;
+    api('POST', '/api/contents/delete', {id:x.id}).then(function() {closeModal(); toast('«' + x.name + '» foi para a Reciclagem.'); return poll(true);}).catch(function(e) {toast(e.message);});
   },
   restore:function(t) {
     if (!guard('conteudos.gerir')) return;

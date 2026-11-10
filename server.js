@@ -1101,6 +1101,17 @@ const router = async (req, res) => {
     putDoc('contents', f.id, o); delDoc('bin', f.id); audit(user, 'Restaurou da reciclagem', f.name, ipOf(req));
     return send(res, 200, { ok: true });
   }
+  if (p === '/api/contents/delete' && m === 'POST') {
+    const user = needUser(req, u); need(user, 'conteudos.gerir'); const b = await readJson(req), f = getDoc('contents', String(b.id || ''));
+    if (!f) throw bad('Este conteúdo já não existe.');
+    if (f.house) throw bad('Este conteúdo é um spot da Enif. Deixe primeiro de o usar como spot.');
+    const today = S.lisbonNow(TZ).date;
+    const use = docs('campaigns').filter(c => (c.items || []).some(i => i.f === f.id) && S.statusOf(c, today) !== 'Terminada');
+    if (use.length) throw bad('Está em uso nas campanhas: ' + use.map(c => '«' + c.name + '»').join(', ') + '. Retire-o primeiro dessas campanhas.');
+    delDoc('contents', f.id); putDoc('bin', f.id, Object.assign({}, f, { del: today }));
+    audit(user, 'Eliminou um conteúdo (foi para a reciclagem)', f.name, ipOf(req));
+    return send(res, 200, { ok: true });
+  }
   if (p === '/api/clean' && m === 'POST') {
     const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
     const b = await readJson(req), used = Math.round(+b.used), never = Math.round(+b.never);
