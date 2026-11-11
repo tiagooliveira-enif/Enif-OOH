@@ -12,8 +12,15 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 $Servidor = $Servidor.TrimEnd('/')
-$edge = @("$env:ProgramFiles (x86)\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $edge) { throw 'Não encontrei o Microsoft Edge neste PC.' }
+# procura o Edge (instalado para todos, só para o utilizador, ou registado no Windows) e, em último caso, o Google Chrome
+$cands = @("${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe", "$env:ProgramFiles\Microsoft\Edge\Application\msedge.exe", "$env:LocalAppData\Microsoft\Edge\Application\msedge.exe")
+foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe', 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths\msedge.exe') {
+  try { $v = (Get-ItemProperty -Path $k -ErrorAction Stop).'(default)'; if ($v) { $cands += $v } } catch { }
+}
+$cands += @("${env:ProgramFiles(x86)}\Google\Chrome\Application\chrome.exe", "$env:ProgramFiles\Google\Chrome\Application\chrome.exe", "$env:LocalAppData\Google\Chrome\Application\chrome.exe")
+$edge = $cands | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 1
+if (-not $edge) { throw 'Não encontrei o Microsoft Edge nem o Google Chrome neste PC. Instala o Edge (https://www.microsoft.com/edge) e corre este comando outra vez.' }
+Write-Host "Navegador encontrado: $edge"
 
 $dir = 'C:\EnifPlayer'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
