@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '11';
+const VERSION = '12';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -245,7 +245,13 @@ function showTest() {
 const mediaUrl = function(id) {return '/media/' + id + '?code=' + encodeURIComponent(code) + '&key=' + encodeURIComponent(key);};
 const cacheKey = function(id, f) {return '/cache/' + id + '/' + (f.size || 0);};
 async function openCache() {try {if (window.caches)cache = await caches.open('enif-media-v1');} catch (e) {cache = null;}}
-async function ensureFiles() {
+/* uma só descarga de cada vez: se a anterior ainda decorre (ecrã novo, muitos vídeos), as novas chamadas esperam por ela em vez de descarregar tudo outra vez */
+let ensuring = null;
+function ensureFiles() {
+  if (!ensuring)ensuring = ensureFilesRun().then(function() {ensuring = null;}, function() {ensuring = null;});
+  return ensuring;
+}
+async function ensureFilesRun() {
   if (!PL) return;
   const ids = Object.keys(PL.files);
   for (let i = 0; i < ids.length; i++) {
@@ -254,7 +260,7 @@ async function ensureFiles() {
     try {
       if (cache && await cache.match(k)) {have[id] = k; continue;}
       const r = await fetch(mediaUrl(id)); if (!r.ok) throw new Error('HTTP ' + r.status);
-      if (cache) {await cache.put(k, r); have[id] = k;}
+      if (cache) {await cache.put(k, r); have[id] = k; stats.cached = Object.keys(have).length;}
     } catch (e) {stats.err = 'transferência ' + id + ': ' + e.message;}
   }
   if (cache) { // apaga só o que já não é usado, e só depois de a lista nova estar completa
@@ -406,7 +412,7 @@ function clearAll() {while (stage.firstChild) {const n = stage.firstChild; if (n
 function loopTxt() {
   try {const l = hourEntry().e; if (!l || !l.seq) return '-'; return l.seq.map(function(e, i) {return (i === (idx - 1 + l.seq.length) % l.seq.length ? '▶' : '') + String(e.n || e.c).slice(0, 14) + (e.items && e.items.length > 1 ? '(' + e.items.length + ')' : '');}).join(' · ');} catch (e) {return '?';}
 }
-function drawDbg() {dbg.textContent = 'Enif DOOH player ' + VERSION + '\necrã ' + code + '\nrede ' + stats.net + '\npassagens ' + stats.plays + ' (falhas ' + stats.fails + ')\npor enviar ' + queue.length + '\nficheiros em cache ' + stats.cached + '\nhora ' + String(lisbon().h).padStart(2, '0') + ':' + String(lisbon().m).padStart(2, '0') + (Math.abs(skew) > 60000 ? ' (relógio do PC desfasado ' + Math.round(skew / 60000) + ' min, corrigido)' : '') + '\nvolta: ' + loopTxt() + '\na passar ' + (cur.c || '-') + ' / ' + (cur.f || '-') + (stats.err ? '\n' + stats.err : '');}
+function drawDbg() {dbg.textContent = 'Enif DOOH player ' + VERSION + '\necrã ' + code + '\nrede ' + stats.net + '\npassagens ' + stats.plays + ' (falhas ' + stats.fails + ')\npor enviar ' + queue.length + '\nficheiros em cache ' + stats.cached + (PL && PL.files ? ' de ' + Object.keys(PL.files).length : '') + '\nhora ' + String(lisbon().h).padStart(2, '0') + ':' + String(lisbon().m).padStart(2, '0') + (Math.abs(skew) > 60000 ? ' (relógio do PC desfasado ' + Math.round(skew / 60000) + ' min, corrigido)' : '') + '\nvolta: ' + loopTxt() + '\na passar ' + (cur.c || '-') + ' / ' + (cur.f || '-') + (stats.err ? '\n' + stats.err : '');}
 document.addEventListener('keydown', function(e) {if (e.key === 'd' || e.key === 'D') {dbg.style.display = dbg.style.display === 'block' ? 'none' : 'block';} if (e.key === 'r' && e.ctrlKey && e.shiftKey) {ls('enif.code', null); ls('enif.key', null); location.replace(location.pathname);}});
 if (Q.get('debug'))dbg.style.display = 'block';
 window.__enif = {state:function() {return {cur:cur, stats:stats, skew:skew, queue:queue.length, children:stage.children.length};}};
@@ -417,9 +423,10 @@ setInterval(drawDbg, 1000);
   PL = null; try {PL = JSON.parse(ls('enif.playlist') || 'null');} catch (e) {/* sem ação */} applyArea();
   if (PL && cache) {Object.keys(PL.files).forEach(function(id) {have[id] = cacheKey(id, PL.files[id]);});}   // arranca já com o que tinha guardado, sem esperar pela rede
   loop();
-  await refresh();
+  /* sinal de vida e envio das passagens começam já: não esperam pela descarga dos vídeos (num ecrã novo pode demorar muitos minutos) */
   setInterval(refresh, REFRESH); setInterval(heartbeat, HB); setInterval(flush, FLUSH);
   heartbeat();
+  await refresh();
   // vigilante: se nada mudar durante 10 minutos, recarrega a página (sem nunca ficar preto: arranca da lista guardada)
   setInterval(function() {if (PL && Date.now() - lastFrameAt > 600e3)location.reload();}, 60000);
   // recarrega uma vez por dia (3h da manhã) para evitar fugas de memória
