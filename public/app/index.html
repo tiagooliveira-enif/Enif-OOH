@@ -3408,7 +3408,7 @@ function securityHtml() {
     + secItem(true, 'Recuperação da palavra-passe só para o administrador', 'O código é enviado para o e-mail de recuperação. Os outros pedem ao administrador.', 'Ativo')
     + secItem(!!me.twoFA, 'Verificação em dois passos', state.smtpReady ? 'Além da palavra-passe, pede um código enviado por e-mail.' : 'Precisa do envio de e-mail configurado no servidor (ficheiro enif-config.json).', me.twoFA ? 'Ligada' : (state.smtpReady ? 'Recomendado' : 'Falta o e-mail'))
     + secItem(backups.length > 0, 'Cópias de segurança', backups.length ? 'Última cópia ' + bkAgo() + ' (' + backups[0].mb + ' MB). Automáticas todas as noites, às 03h30.' : 'Ainda não há cópias. A primeira é feita esta noite, ou já com «Fazer cópia agora».', backups.length ? 'Ativo' : 'Por fazer')
-    + secItem(false, 'Ligação segura (HTTPS)', 'Obrigatória antes de abrir à internet. Faz-se na fase do servidor.', 'Por fazer')
+    + secItem(location.protocol === 'https:', 'Ligação segura (HTTPS)', location.protocol === 'https:' ? 'A ligação a esta página é cifrada, com certificado automático.' : 'Obrigatória antes de abrir à internet. Faz-se na fase do servidor.', location.protocol === 'https:' ? 'Ativo' : 'Por fazer')
     + secItem(false, 'Teste de segurança independente', 'Convém antes de abrir ao exterior.', 'Por fazer');
   const rec = me.recovery || me.email;
   const acc = '<div class="card"><div class="card-h"><h2>' + ic('users') + 'A minha conta de administrador</h2></div><div class="card-b">'
