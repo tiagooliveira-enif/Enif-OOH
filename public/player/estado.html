@@ -21,6 +21,7 @@
 </main>
 <script>
 /* lê o estado que o player guarda no navegador (mesma origem e mesmo perfil) e mostra-o nesta janela, que pode estar noutro ecrã */
+try {window.moveTo(40, 40);} catch (e) {/* sem ação */}   // tenta ir para o canto do ecrã principal (o navegador pode não deixar; nesse caso arrasta a janela uma vez)
 const t = document.getElementById('t'), a = document.getElementById('a');
 function draw() {
   let o = null;
