@@ -4,11 +4,13 @@
    .\instalar-player-windows.ps1 -Servidor "http://192.168.1.50:8080" -Codigo "ECR-001" -Chave "abcdef123456"
  Faz: página do player em ecrã inteiro (Microsoft Edge), arranque automático com o Windows,
  reinício automático se o Edge fechar, e desliga a suspensão do PC e do ecrã.
+ Com -SegundoEcra: em modo «Expandir», abre o player só no segundo ecrã (a posição é lida em cada arranque).
 #>
 param(
   [Parameter(Mandatory = $true)][string]$Servidor,
   [Parameter(Mandatory = $true)][string]$Codigo,
-  [Parameter(Mandatory = $true)][string]$Chave
+  [Parameter(Mandatory = $true)][string]$Chave,
+  [switch]$SegundoEcra   # PC com 2 ecrãs em modo «Expandir»: o player abre só no segundo ecrã (o LED) e o principal fica livre
 )
 $ErrorActionPreference = 'Stop'
 $Servidor = $Servidor.TrimEnd('/')
@@ -27,13 +29,28 @@ New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $url = "$Servidor/player/?code=$Codigo&key=$Chave"
 
 # script de arranque: volta a abrir o Edge se ele fechar ou falhar
-$bat = @"
+$pos = ''
+$calc = ''
+if ($SegundoEcra) {
+  # pequeno script que diz onde está o segundo ecrã (lido em cada arranque; se não houver, usa o principal)
+  $posPs1 = @'
+Add-Type -AssemblyName System.Windows.Forms
+$s = [System.Windows.Forms.Screen]::AllScreens | Where-Object { -not $_.Primary } | Select-Object -First 1
+if ($s) { '{0},{1}' -f $s.Bounds.X, $s.Bounds.Y } else { '0,0' }
+'@
+  Set-Content -Path "$dir\posicao-ecra.ps1" -Value $posPs1 -Encoding UTF8
+  $calc = 'set "POS=0,0"' + "`r`n" + 'for /f %%p in (''powershell -NoProfile -ExecutionPolicy Bypass -File "' + $dir + '\posicao-ecra.ps1"'') do set "POS=%%p"'
+  $pos = '--window-position=%POS% '
+}
+$bat = @'
 @echo off
 :loop
-"$edge" --kiosk "$url" --edge-kiosk-type=fullscreen --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required --unsafely-treat-insecure-origin-as-secure="$Servidor" --user-data-dir="$dir\profile" --disable-pinch --overscroll-history-navigation=0
+__CALC__
+"__EDGE__" __POS__--kiosk "__URL__" --edge-kiosk-type=fullscreen --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required --unsafely-treat-insecure-origin-as-secure="__SERV__" --user-data-dir="__DIR__\profile" --disable-pinch --overscroll-history-navigation=0
 timeout /t 5 /nobreak >nul
 goto loop
-"@
+'@
+$bat = $bat.Replace('__CALC__', $calc).Replace('__EDGE__', $edge).Replace('__POS__', $pos).Replace('__URL__', $url).Replace('__SERV__', $Servidor).Replace('__DIR__', $dir)
 Set-Content -Path "$dir\player.bat" -Value $bat -Encoding ASCII
 
 # arranque automático para todos os utilizadores
