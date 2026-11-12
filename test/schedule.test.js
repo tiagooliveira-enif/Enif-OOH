@@ -75,7 +75,7 @@ console.log('schedule: ok');
   const sc = { id: 'E1', venue: 'V', res: '1920×1080', limit: 14, order: [], on: 0, off: 24, fit: null };
   const mk = (id, ppm, pri, share) => ({ id, name: id, client: 'c', sector: '', venues: ['V'], start: '2026-10-01', end: '2026-10-31', h0: 0, h1: 24, ppm, dur: 10, priority: pri, share: share || undefined, manual: false, pauses: [], items: [{ f: 'f' + id.slice(1), h0: null, h1: null, d0: null, d1: null, ppm: 1 }] });
   // 5 campanhas Normal: o loop dura 50 s + spot; a campanha 1 pede 2×/min
-  const camps = [mk('c1', 2, 'Normal'), mk('c2', 0.2, 'Normal'), mk('c3', 0.2, 'Normal'), mk('c4', 0.2, 'Normal'), mk('c5', 0.2, 'Normal')];
+  const camps = [mk('c1', 2, 'Normal'), mk('c2', 1, 'Normal'), mk('c3', 1, 'Normal'), mk('c4', 1, 'Normal'), mk('c5', 1, 'Normal')];
   const rate = (list) => { const L = S2.loopFrom(list, 14, '2026-10-20', 12, sc, ctx); return { L, r: S2.rateOf(list[0], L) }; };
   const normal = rate(camps);
   assert2.ok(normal.r < 2 - 1e-9, 'Normal sem garantia fica abaixo do pedido');
@@ -90,6 +90,17 @@ console.log('schedule: ok');
   assert2.strictEqual(L2.per, 2, 'duas voltas por ronda');
   assert2.deepStrictEqual(L2.seq.filter(c => !c.house).map(c => c.id), ['c1', 'c3', 'c2', 'c3']);
   console.log('prioridade Alta e posição partilhada: ok');
+  // campanhas lentas (1× a cada 5 min): só entram nas voltas que dão o intervalo pedido, nunca em todas
+  const lenta = (pri) => [mk('c1', 1, 'Normal'), mk('c2', 1, 'Normal'), mk('c3', 1, 'Normal'), mk('c4', 0.2, pri)];
+  ['Normal', 'Alta'].forEach(pri => {
+    const Ls = S2.loopFrom(lenta(pri), 14, '2026-10-20', 12, sc, ctx), c4 = lenta(pri)[3];
+    const r = S2.rateOf(Ls.loop.find(c => c.id === 'c4'), Ls);
+    assert2.ok(r < 0.35, pri + ': a campanha de 1× a cada 5 min não passa a cada volta (' + r + ' por minuto)');
+    assert2.ok(pri === 'Alta' ? r >= 0.2 - 1e-9 : r >= 0.18, pri + ': e não fica abaixo do pedido (' + r + ')');
+    assert2.ok(Ls.per > 1, 'a ronda tem várias voltas');
+    assert2.ok(Ls.seq.filter(c => c.id === 'c1').length > Ls.seq.filter(c => c.id === 'c4').length, 'as outras passam mais vezes');
+  });
+  console.log('campanha lenta (intervalo pedido): ok');
 }
 
 {
