@@ -146,3 +146,13 @@ console.log('schedule: ok');
   }));
   console.log('mínimo do grupo: ok');
 }
+
+/* margem oculta: a resolução útil (ecrã menos margem) é a que conta para a compatibilidade */
+{
+  const sc = { id: 'E', res: '763×492', crop: { t: 30, b: 0, l: 0, r: 0 } };
+  assert.deepStrictEqual(S.usefulDims(sc), { w: 763, h: 462 });
+  assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '763×462' }, sc).k, 'igual', 'conteúdo à medida da resolução útil enche sem ajustes');
+  assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '763×492' }, sc).ok, false, 'conteúdo do tamanho do painel já não serve (30 px a mais)');
+  assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '763×492' }, { id: 'E', res: '763×492' }).k, 'igual', 'sem margem tudo como antes');
+  console.log('margem oculta: ok');
+}

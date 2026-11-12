@@ -3317,7 +3317,7 @@ let alerts = [];
 const FIT_PX = 10, FIT_MS = 24 * 3600000;   /* os avisos «Ajuste automático» saem 24 h depois de aparecerem */
 const dimsOf = function(res) {const m = /(\d+)\s*[×x]\s*(\d+)/.exec(res || ''); return m && +m[1] > 0 && +m[2] > 0 ? {w:+m[1], h:+m[2]} : null;};
 function fitOf(f, s) {
-  const a = f && f.type !== 'HTML5' ? dimsOf(f.res) : null, b = dimsOf(s.res);
+  const a = f && f.type !== 'HTML5' ? dimsOf(f.res) : null, b = usefulDims(s);
   if (!a || !b) return {k:'livre', ok:true};
   const de = a.w + '×' + a.h, para = b.w + '×' + b.h;
   if (a.w === b.w && a.h === b.h) return {k:'igual', ok:true, de:de, para:para};
@@ -4412,10 +4412,9 @@ function screenModal(id) {
   const canG = can('ecras.gerir'), canA = can('alertas.resolver');
   const ai = al.filter(a=>a.sev === 'ia').map(a=>'<div class="ai-box">' + ic('spark') + '<span class="hint">' + esc(a.detail) + '</span></div>').join('');
   modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + (canG ? ' <button class="btn ghost sm name-edit" data-a="edit-name" data-id="' + s.id + '" aria-label="Alterar o nome do ecrã" title="Alterar o nome">' + ic('pencil') + '</button>' : '') + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
-    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? (s.disk.total - s.disk.free) + ' de ' + s.disk.total + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + s.disk.free + ' GB</span>') : '—') + '</dd></div><div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + '</dd></div>'
-    + '<div style="grid-row:span 2"><dt>Área do PC</dt><dd>' + (canG ? '<select data-a-change="area" data-id="' + s.id + '" aria-label="Área do ecrã do PC onde o player desenha" style="width:auto">' + AREAS.map(f=>'<option value="' + f[0] + '"' + ((s.area || 'inteiro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((AREAS.find(f=>f[0] === (s.area || 'inteiro')) || AREAS[0])[1])) + '<small class="muted" style="display:block;margin-top:6px">' + areaTxt(s) + '</small>' + areaDiagram(s) + '</dd></div>'
+    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? (s.disk.total - s.disk.free) + ' de ' + s.disk.total + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + s.disk.free + ' GB</span>') : '—') + '</dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
-    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
+    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + ajusteCell(s, canG) + areaCell(s, canG) + margemCell(s, canG) + '<div style="grid-column:1/-1"><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
     + '<h3 class="sec-t">Playlist</h3>' + (s.status === 'novo' ? '<p class="hint">Ecrã ainda sem ligação do player: a ordem abaixo é uma simulação do que vai passar quando ele ligar.</p>' : '') + playlistHtml(s) + (s.status === 'novo' ? '' : proofLogHtml(s))
     + '<h3 class="sec-t">Registo recente</h3>' + logsFor(s).map(l=>'<div class="log ' + l[2] + '"><time>' + l[0] + '</time><span>' + esc(l[1]) + '</span></div>').join('')
     + failsHtml(s)
@@ -4439,7 +4438,7 @@ function reopenScreen(id) {
 /* ---------- pré-visualização do ecrã ---------- */
 let pv = null, pvTimer = null;
 function pvStop() {if (pvTimer) {clearInterval(pvTimer); pvTimer = null;}}
-function pvAspect(s) {const m = /(\d+)\s*[×x]\s*(\d+)/.exec(s.res || ''); return m && +m[1] > 0 && +m[2] > 0 ? [+m[1], +m[2]] : [16, 9];}
+function pvAspect(s) {const u = usefulDims(s); return u ? [u.w, u.h] : [16, 9];}
 function pvCalc() {
   const s = screens.find(x=>x.id === pv.id), dr = pv.ver === 'draft' && !!s.draft;
   const h = isNil(pv.h) ? Math.floor(hourNow) : pv.h;
@@ -5298,6 +5297,65 @@ function briModal(id) {
     + '<p class="hint">Fica neste valor, sem seguir o horário, até escolher «Automático».</p></div>'
     + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Guardar</button></div></form>');
 }
+/* ---------- margem oculta (montra, moldura…): parte do painel que não se vê; a «resolução útil» é o que sobra ---------- */
+function cropOf(s) {return Object.assign({t:0, b:0, l:0, r:0}, s.crop || {});}
+function hasCrop(s) {const c = cropOf(s); return !!(c.t || c.b || c.l || c.r);}
+function usefulDims(s) {
+  const d = dimsOf(s.res); if (!d) return null;
+  const c = cropOf(s);
+  return {w:Math.max(1, d.w - c.l - c.r), h:Math.max(1, d.h - c.t - c.b)};
+}
+function cropTxt(s) {
+  if (!hasCrop(s)) return 'Nenhuma';
+  const c = cropOf(s), u = usefulDims(s), p = [];
+  if (c.t)p.push('cima ' + c.t + ' px'); if (c.b)p.push('baixo ' + c.b + ' px'); if (c.l)p.push('esquerda ' + c.l + ' px'); if (c.r)p.push('direita ' + c.r + ' px');
+  return esc(p.join(' · ')) + (u ? '<small style="display:block;margin-top:4px"><b>Resolução útil: ' + u.w + '×' + u.h + '</b></small>' : '');
+}
+/* esboço do painel: preto = parte oculta, amarelo = parte visível (resolução útil) */
+function cropSketch(s, c, W) {
+  const d = dimsOf(s.res) || {w:1920, h:1080}, k = W / Math.max(d.w, d.h), H = Math.max(12, Math.round(d.h * k)), WW = Math.max(12, Math.round(d.w * k)); W = WW;
+  const px = v=>Math.round(v * k), x = px(c.l), y = px(c.t), w = Math.max(6, W - px(c.l) - px(c.r)), hh = Math.max(6, H - px(c.t) - px(c.b));
+  const u = {w:Math.max(1, d.w - c.l - c.r), h:Math.max(1, d.h - c.t - c.b)};
+  const hid = 'repeating-linear-gradient(45deg,#1a1a1a 0 4px,#2b2b2b 4px 8px)';
+  return '<span role="img" aria-label="Esboço do painel: a faixa escura não se vê, a área amarela é a resolução útil ' + u.w + '×' + u.h + '" style="position:relative;display:block;margin-top:8px;width:' + W + 'px;height:' + H + 'px;background:' + hid + ';border:1px solid var(--line,#777);border-radius:4px;box-sizing:content-box;overflow:hidden">'
+    + '<span style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + hh + 'px;background:#ffe651;color:#000;font:600 ' + (WW > 100 ? 12 : 8) + 'px/1.2 system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;outline:2px solid #ffe651">' + (WW < 100 ? '' : hasCrop({crop:c}) ? 'Visível<br>' + u.w + '×' + u.h : 'Todo visível') + '</span></span>'
+    + (WW > 100 ? '<span class="muted" style="display:block;font-size:12px;margin-top:4px">Painel inteiro: ' + d.w + '×' + d.h + ' · zona escura = não se vê (fica a preto)</span>' : '');
+}
+function ajusteCell(s, canG) {return '<div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + '</dd></div>';}
+function areaCell(s, canG) {return '<div><dt>Área do PC</dt><dd>' + (canG ? '<select data-a-change="area" data-id="' + s.id + '" aria-label="Área do ecrã do PC onde o player desenha" style="width:auto">' + AREAS.map(f=>'<option value="' + f[0] + '"' + ((s.area || 'inteiro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((AREAS.find(f=>f[0] === (s.area || 'inteiro')) || AREAS[0])[1])) + '<small class="muted" style="display:block;margin-top:6px">' + areaTxt(s) + '</small>' + areaDiagram(s) + '</dd></div>';}
+function margemCell(s, canG) {return '<div><dt>Margem oculta</dt><dd>' + (hasCrop(s) ? esc(cropParts(s)) : 'Nenhuma') + (canG ? ' <button class="btn sm ghost" data-a="edit-crop" data-id="' + s.id + '">Alterar</button>' : '') + '<small class="muted" style="display:block;margin-top:6px">' + cropNote(s) + '</small>' + cropSketch(s, cropOf(s), 64) + '</dd></div>';}
+function cropParts(s) {
+  const c = cropOf(s), p = [];
+  if (c.t)p.push('cima ' + c.t + ' px'); if (c.b)p.push('baixo ' + c.b + ' px'); if (c.l)p.push('esquerda ' + c.l + ' px'); if (c.r)p.push('direita ' + c.r + ' px');
+  return p.join(' · ');
+}
+function cropNote(s) {
+  const u = usefulDims(s);
+  return hasCrop(s) ? 'Resolução útil: <b>' + (u ? u.w + '×' + u.h : '—') + '</b>. O conteúdo com este tamanho enche o que se vê.' : 'Todo o painel se vê. Use se parte do painel estiver tapada (montra, moldura).';
+}
+function cropModal(id) {
+  const s = screens.find(x=>x.id === id); if (!s) return;
+  const c = cropOf(s), inp = (n, l, v)=>'<div class="field"><label for="cr-' + n + '">' + l + ' (px)</label><input id="cr-' + n + '" name="c' + n + '" type="number" min="0" max="2000" step="1" value="' + v + '" data-a-change="crop-prev"></div>';
+  modal('<form data-form="crop" data-id="' + id + '" novalidate><div class="modal-h"><h2>Margem oculta</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
+    + '<p class="muted" style="margin-bottom:10px">' + esc(s.venue) + ' · ' + esc(s.spot) + ' · painel ' + esc(s.res || '') + '</p>'
+    + '<p class="hint" style="margin-bottom:12px">Use quando parte do painel não se vê (montra, moldura, estrutura). Indique quantos píxeis estão escondidos em cada lado. O que sobra é a <b>resolução útil</b>: o conteúdo feito com esse tamanho enche o que se vê, sem cortes.</p>'
+    + '<div class="grid2">' + inp('t', 'Em cima', c.t) + inp('b', 'Em baixo', c.b) + '</div><div class="grid2">' + inp('l', 'À esquerda', c.l) + inp('r', 'À direita', c.r) + '</div>'
+    + '<div id="crop-sk" data-id="' + id + '">' + cropSketch(s, c, 200) + '</div>'
+    + '<p id="crop-useful" style="margin-top:8px"></p>'
+    + (s.fit === 'preencher' ? '<p class="hint" style="margin-top:8px">Atenção: este ecrã está em «Preencher», que corta as margens do vídeo. Com margem oculta use «Caber».</p>' : '')
+    + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Guardar</button></div></form>');
+  cropPrev(s.id);
+}
+function readCrop(f) {
+  const g = n=>Math.max(0, Math.round(+(f.elements['c' + n] && f.elements['c' + n].value) || 0));
+  return {t:g('t'), b:g('b'), l:g('l'), r:g('r')};
+}
+function cropPrev(id) {
+  const s = screens.find(x=>x.id === id), f = document.querySelector('form[data-form="crop"]'); if (!s || !f) return;
+  const c = readCrop(f), d = dimsOf(s.res), box = document.getElementById('crop-sk'), u = document.getElementById('crop-useful');
+  if (box)box.innerHTML = cropSketch(s, c, 200);
+  if (u && d) u.innerHTML = '<b>Resolução útil: ' + Math.max(0, d.w - c.l - c.r) + '×' + Math.max(0, d.h - c.t - c.b) + '</b>';
+}
 function resModal(id) {
   const s = screens.find(x=>x.id === id); if (!s) return;
   modal('<form data-form="res" data-id="' + id + '" novalidate><div class="modal-h"><h2>Resolução do ecrã</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b"><p class="muted" style="margin-bottom:14px">' + esc(s.venue) + ' · ' + esc(s.spot) + '</p>' + resField(s.res) + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Guardar</button></div></form>');
@@ -6025,7 +6083,7 @@ function sessionLost(msg) {
 function setArr(a, b) {a.length = 0; b.forEach(function(x) {a.push(x);});}
 const sleep = ms=>new Promise(function(r) {setTimeout(r, ms);});
 
-const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri'];
+const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri', 'crop'];
 const CMP_KEYS = ['name', 'client', 'noEnd', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'gmin', 'manual', 'color', 'items', 'pauses'];
 const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'photo', 'notif', 'ui'];
 const emptyBase = ()=>({screens:{}, campaigns:{}, folders:{}, contents:{}, users:{}});
@@ -6514,6 +6572,7 @@ const actions = {
   'period-custom':function() {state.custom = {from:addDays(today, -13), to:today}; state.logLimit = 10; render();},
   'edit-bri':function(t) {if (guard('ecras.gerir'))briModal(t.dataset.id);},
   'edit-res':function(t) {if (guard('ecras.gerir'))resModal(t.dataset.id);},
+  'edit-crop':function(t) {if (guard('ecras.gerir'))cropModal(t.dataset.id);},
   'pick-screens':function() {screensModal();},
   'rs-all':function() {document.querySelectorAll('#modal-root input[type="checkbox"]').forEach(function(i) {i.checked = true;});},
   'rs-none':function() {document.querySelectorAll('#modal-root input[type="checkbox"]').forEach(function(i) {i.checked = false;});},
@@ -6700,6 +6759,7 @@ document.addEventListener('change', function(e) {
     const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
     s.area = t.value; toast('Área de ' + s.id + ': ' + AREAS.find(f=>f[0] === s.area)[1].split(' (')[0] + '. O ecrã atualiza em instantes.'); reopenScreen(s.id);
   }
+  else if (ac === 'crop-prev') {const fm = t.closest('form'); if (fm)cropPrev(fm.dataset.id);}
   else if (ac === 'bri-mode') {const m = t.value === 'manual', a = $('#bri-auto'), b = $('#bri-man'); if (a)a.hidden = m; if (b)b.hidden = !m;}
   else if (ac === 'res') {const c = $('#res-custom'); if (c)c.hidden = t.value !== 'custom';}
   else if (ac === 'utoggle') {const g = t.closest('.vgroup'); if (g)g.querySelectorAll('input[name^="us"]:not([disabled])').forEach(function(i) {i.checked = t.checked;});}
@@ -6908,6 +6968,16 @@ document.addEventListener('submit', function(e) {
     if (mode === 'auto' && o.from === o.to) {err.textContent = 'O início e o fim do dia não podem ser à mesma hora.'; return;}
     s.bri = o; audit('Brilho do ecrã', s.id + ' · ' + (mode === 'manual' ? 'manual ' + o.manual + ' %' : 'automático ' + o.day + ' % / ' + o.night + ' %'));
     closeModal(); toast('Brilho de ' + s.id + (mode === 'manual' ? ': manual a ' + o.manual + ' %.' : ': automático.') + (s.status === 'offline' ? ' Aplica quando o ecrã voltar a ligar.' : ' O ecrã atualiza em instantes.')); render(); screenModal(s.id); return;
+  }
+  if (kind === 'crop') {
+    if (!guard('ecras.gerir')) return;
+    const s = screens.find(x=>x.id === f.dataset.id); if (!s) return;
+    const c = readCrop(f), d = dimsOf(s.res);
+    if (d && (d.w - c.l - c.r < 240 || d.h - c.t - c.b < 240)) {err.textContent = 'A margem é grande demais: a resolução útil tem de ficar com pelo menos 240 px em cada lado.'; return;}
+    if (c.t || c.b || c.l || c.r)s.crop = c; else delete s.crop;
+    const u = usefulDims(s);
+    audit('Margem oculta', s.id + ' · ' + (hasCrop(s) ? 'útil ' + (u ? u.w + '×' + u.h : '') : 'sem margem'));
+    closeModal(); toast('Margem de ' + s.id + (hasCrop(s) ? ': resolução útil ' + (u ? u.w + '×' + u.h : '') + '.' : ' removida.') + (s.status === 'offline' ? ' Aplica quando o ecrã voltar a ligar.' : ' O ecrã atualiza em instantes.')); render(); screenModal(s.id); return;
   }
   if (kind === 'res') {
     if (!guard('ecras.gerir')) return;

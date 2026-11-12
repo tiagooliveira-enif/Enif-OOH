@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '13';
+const VERSION = '14';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -216,10 +216,18 @@ function waitMs(ms) {return new Promise(function(r) {const t = setTimeout(functi
 /* ---------- ecrã de teste (30 s) ---------- */
 /* área do PC onde se desenha: «inteiro» (por defeito) enche a janela; as outras usam o tamanho da resolução do ecrã, num canto ou ao centro, e o resto fica a preto */
 function areaBox() {
-  const sc = (PL && PL.screen) || {}, a = sc.area || 'inteiro', d = dimsOf(sc.res), W = window.innerWidth, H = window.innerHeight;
-  if (a === 'inteiro' || !d) return {on:false, w:W, h:H, x:0, y:0};
-  const w = Math.min(d.w, W), h = Math.min(d.h, H);
-  return {on:true, w:w, h:h, x:a === 'tr' || a === 'br' ? W - w : a === 'c' ? Math.round((W - w) / 2) : 0, y:a === 'bl' || a === 'br' ? H - h : a === 'c' ? Math.round((H - h) / 2) : 0};
+  const sc = (PL && PL.screen) || {}, a = sc.area || 'inteiro', d = dimsOf(sc.res), W = window.innerWidth, H = window.innerHeight, c = sc.crop || null;
+  let w = W, h = H, x = 0, y = 0, on = false, fx = 1, fy = 1;
+  if (a !== 'inteiro' && d) {
+    w = Math.min(d.w, W); h = Math.min(d.h, H); on = true;
+    x = a === 'tr' || a === 'br' ? W - w : a === 'c' ? Math.round((W - w) / 2) : 0; y = a === 'bl' || a === 'br' ? H - h : a === 'c' ? Math.round((H - h) / 2) : 0;
+  } else if (d) {fx = W / d.w; fy = H / d.h;}   // ecrã inteiro: a janela é o painel, a margem escala com ela
+  /* margem oculta: tira ao painel a parte que não se vê; o conteúdo usa só o que sobra («resolução útil») */
+  if (c && (c.t || c.b || c.l || c.r)) {
+    const l = Math.round((c.l || 0) * fx), r = Math.round((c.r || 0) * fx), t = Math.round((c.t || 0) * fy), bt = Math.round((c.b || 0) * fy);
+    x += l; y += t; w = Math.max(1, w - l - r); h = Math.max(1, h - t - bt); on = true;
+  }
+  return {on:on, w:w, h:h, x:x, y:y};
 }
 function applyArea() {
   const b = areaBox();
@@ -288,9 +296,15 @@ async function refresh() {
 }
 /* ---------- reprodução ---------- */
 const dimsOf = function(r) {const m = /(\d+)\s*[×x]\s*(\d+)/.exec(r || ''); return m && +m[1] > 0 && +m[2] > 0 ? {w:+m[1], h:+m[2]} : null;};
+/* resolução útil = resolução do ecrã menos a margem oculta */
+function usefulDims(sc) {
+  const d = dimsOf(sc && sc.res); if (!d) return null;
+  const c = (sc && sc.crop) || {};
+  return {w:Math.max(1, d.w - (c.l || 0) - (c.r || 0)), h:Math.max(1, d.h - (c.t || 0) - (c.b || 0))};
+}
 function fitMode(f) {
   const mode = (PL && PL.screen && PL.screen.fit) || 'caber';
-  const a = f.type === 'HTML5' ? null : dimsOf(f.res), b = dimsOf(PL && PL.screen && PL.screen.res) || {w:window.innerWidth, h:window.innerHeight};
+  const a = f.type === 'HTML5' ? null : dimsOf(f.res), b = usefulDims(PL && PL.screen) || {w:window.innerWidth, h:window.innerHeight};
   if (a) {const d = Math.min(Math.abs(a.h * b.w / a.w - b.h), Math.abs(a.w * b.h / a.h - b.w)); if (d <= FIT_PX) return 'fill';}   // diferença até 10 px: ajusta sem se notar
   return mode === 'preencher' ? 'cover' : mode === 'esticar' ? 'fill' : 'contain';
 }

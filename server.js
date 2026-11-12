@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '13';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '14';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -140,6 +140,17 @@ function cleanBri(b, old) {
   if (out.mode === 'auto' && out.from === out.to) throw bad('O início e o fim do dia não podem ser à mesma hora.');
   return out;
 }
+/* margem oculta: píxeis do painel que não se veem em cada lado; a resolução útil tem de ficar com pelo menos 240 px */
+function cleanCrop(c, res) {
+  if (isNil(c)) return null;
+  if (typeof c !== 'object') throw bad('Margem oculta inválida.');
+  const g = (k, what) => { const n = isNil(c[k]) ? 0 : Math.round(+c[k]); if (!(n >= 0 && n <= 4000)) throw bad('Margem oculta (' + what + ') inválida: use 0 a 4000 px.'); return n; };
+  const out = { t: g('t', 'em cima'), b: g('b', 'em baixo'), l: g('l', 'à esquerda'), r: g('r', 'à direita') };
+  if (!(out.t || out.b || out.l || out.r)) return null;
+  const d = S.dimsOf(res);
+  if (d && (d.w - out.l - out.r < 240 || d.h - out.t - out.b < 240)) throw bad('A margem oculta é grande demais: a resolução útil tem de ficar com pelo menos 240 px em cada lado.');
+  return out;
+}
 function cleanScreen(o, id, old) {
   const loc = o.loc && typeof o.loc === 'object' ? o.loc : {};
   const out = {
@@ -150,8 +161,10 @@ function cleanScreen(o, id, old) {
     onT: optStr(o.onT, 5) || '00:00', offT: optStr(o.offT, 5) || '23:59',
     fit: FITS.indexOf(o.fit) > -1 ? o.fit : ((old && old.fit) || 'caber'),
     area: AREAS.indexOf(o.area) > -1 ? o.area : ((old && old.area) || 'inteiro'),
-    bri: cleanBri(o.bri, old && old.bri)
+    bri: cleanBri(o.bri, old && old.bri),
+    crop: null
   };
+  out.crop = cleanCrop(o.crop, out.res);
   if (loc.poi && typeof loc.poi === 'object' && out.loc.lat !== null && out.loc.lng !== null) {
     out.loc.poi = { r: POI.RADIUS, at: Math.round(num(isNil(loc.poi.at) ? 0 : loc.poi.at, 0, 1e14, 'Data do movimento')) };
     POI.KINDS.forEach(k => { out.loc.poi[k[0]] = Math.round(num(isNil(loc.poi[k[0]]) ? 0 : loc.poi[k[0]], 0, 5000, 'Movimento à volta')); });
@@ -263,7 +276,7 @@ function checkContentScreens(cand, screenIds) {
 /* ---------- sincronização (alterações vindas da interface) ---------- */
 const PL_FIELDS = ['order', 'limit', 'draft'];
 /* campos que mudaram; «share» é opcional e some do documento quando a campanha deixa de partilhar a posição */
-const dv = (o, k) => (k === 'area' && isNil(o[k]) ? 'inteiro' : (k === 'noEnd' ? !!o[k] : o[k]));
+const dv = (o, k) => (k === 'area' && isNil(o[k]) ? 'inteiro' : (k === 'crop' && isNil(o[k]) ? null : (k === 'noEnd' ? !!o[k] : o[k])));
 const diffKeys = (n, old, skip) => Object.keys(n).filter(k => (skip || []).indexOf(k) < 0 && !same(dv(n, k), dv(old, k))).concat(!('share' in n) && !isNil(old.share) ? ['share'] : [], !('gmin' in n) && !isNil(old.gmin) ? ['gmin'] : []);
 function applyOp(user, op) {
   if (!op || typeof op !== 'object') throw bad('Pedido inválido.');
@@ -689,7 +702,7 @@ function playlistFor(scr) {
   }));
   const lv = q1('SELECT reload FROM live WHERE screen=?', scr.id);
   return { playerVersion: PLAYER_VERSION, tz: TZ, generated: Date.now(), reload: lv ? lv.reload : 0, spotGap: S.SPOT_GAP,
-    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', area: scr.area || 'inteiro', bri: scr.bri || null, on: typeof scr.on === 'number' ? scr.on : 0, off: typeof scr.off === 'number' ? scr.off : 24 }, days, files, proof: proof ? { id: proof.t0, files: proof.files.filter(f => files[f]), until: proof.until, serverTime: proof.serverTime } : null };
+    screen: { code: scr.id, venue: scr.venue, spot: scr.spot, res: scr.res, fit: scr.fit || 'caber', area: scr.area || 'inteiro', crop: scr.crop || null, bri: scr.bri || null, on: typeof scr.on === 'number' ? scr.on : 0, off: typeof scr.off === 'number' ? scr.off : 24 }, days, files, proof: proof ? { id: proof.t0, files: proof.files.filter(f => files[f]), until: proof.until, serverTime: proof.serverTime } : null };
 }
 function screenAuth(code, key) {
   const s = getDoc('screens', String(code || '')); if (!s) return null;
