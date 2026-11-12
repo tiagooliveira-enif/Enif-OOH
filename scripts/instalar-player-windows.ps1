@@ -61,6 +61,12 @@ $lnk.TargetPath = "$dir\player.bat"
 $lnk.WindowStyle = 7
 $lnk.Save()
 
+# atalho «Estado Enif» no ambiente de trabalho: abre uma janelinha com o estado do player (a mesma informação da tecla D), sempre no ecrã principal
+$lnk2 = $ws.CreateShortcut("$env:Public\Desktop\Estado Enif.lnk")
+$lnk2.TargetPath = $edge
+$lnk2.Arguments = "--app=$Servidor/player/estado.html --user-data-dir=`"$dir\profile`" --window-position=40,40 --window-size=560,460 --unsafely-treat-insecure-origin-as-secure=$Servidor"
+$lnk2.Save()
+
 # nunca suspender nem desligar o ecrã
 powercfg /change standby-timeout-ac 0
 powercfg /change monitor-timeout-ac 0
