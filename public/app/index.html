@@ -3317,7 +3317,7 @@ let alerts = [];
 const FIT_PX = 10, FIT_MS = 24 * 3600000;   /* os avisos «Ajuste automático» saem 24 h depois de aparecerem */
 const dimsOf = function(res) {const m = /(\d+)\s*[×x]\s*(\d+)/.exec(res || ''); return m && +m[1] > 0 && +m[2] > 0 ? {w:+m[1], h:+m[2]} : null;};
 function fitOf(f, s) {
-  const a = f && f.type !== 'HTML5' ? dimsOf(f.res) : null, b = usefulDims(s);
+  const a = f && f.type !== 'HTML5' ? dimsOf(f.res) : null, b = dimsOf(s.res);   /* a margem oculta não conta para a compatibilidade */
   if (!a || !b) return {k:'livre', ok:true};
   const de = a.w + '×' + a.h, para = b.w + '×' + b.h;
   if (a.w === b.w && a.h === b.h) return {k:'igual', ok:true, de:de, para:para};
@@ -5331,7 +5331,7 @@ function cropParts(s) {
 }
 function cropNote(s) {
   const u = usefulDims(s);
-  return hasCrop(s) ? 'Resolução útil: <b>' + (u ? u.w + '×' + u.h : '—') + '</b>. O conteúdo com este tamanho enche o que se vê.' : 'Todo o painel se vê. Use se parte do painel estiver tapada (montra, moldura).';
+  return hasCrop(s) ? 'Resolução útil: <b>' + (u ? u.w + '×' + u.h : '—') + '</b>. Conteúdo com este tamanho enche o que se vê; com a proporção do ecrã ajusta-se, sem cortes.' : 'Todo o painel se vê. Use se parte do painel estiver tapada (montra, moldura).';
 }
 function cropModal(id) {
   const s = screens.find(x=>x.id === id); if (!s) return;

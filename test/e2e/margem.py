@@ -56,7 +56,7 @@ try:
         ok('sem erros JS no player', not errs)
         put(area='tl', crop={'t': 30, 'b': 0, 'l': 0, 'r': 0}); time.sleep(3)
         pl = call('GET', '/api/player/playlist?code=ECR-001&key=' + key)
-        ok('resolução útil 385×355 já não serve a imagem quadrada (aviso na app, fica de fora)', pl['screen']['crop']['t'] == 30)
+        ok('a margem não conta para a compatibilidade: a imagem quadrada continua a passar', pl['screen']['crop']['t'] == 30 and len(pl['days']) > 0)
         put(area='tl', crop=None)
         # interface
         ap = br.new_context(viewport={'width': 1300, 'height': 900}).new_page(); ap.on('pageerror', lambda e: errs.append(str(e)))

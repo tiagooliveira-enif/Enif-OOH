@@ -151,8 +151,8 @@ console.log('schedule: ok');
 {
   const sc = { id: 'E', res: '763×492', crop: { t: 30, b: 0, l: 0, r: 0 } };
   assert.deepStrictEqual(S.usefulDims(sc), { w: 763, h: 462 });
-  assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '763×462' }, sc).k, 'igual', 'conteúdo à medida da resolução útil enche sem ajustes');
-  assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '763×492' }, sc).ok, false, 'conteúdo do tamanho do painel já não serve (30 px a mais)');
+  assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '1526×984' }, sc).ok, true, 'a margem não conta: o conteúdo com a proporção do ecrã serve');
+  assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '763×492' }, sc).k, 'igual', 'conteúdo do tamanho do painel continua a servir');
   assert.strictEqual(S.fitOf({ type: 'Vídeo', res: '763×492' }, { id: 'E', res: '763×492' }).k, 'igual', 'sem margem tudo como antes');
   console.log('margem oculta: ok');
 }
