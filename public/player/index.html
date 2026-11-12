@@ -141,7 +141,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '14';
+const VERSION = '15';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -302,6 +302,8 @@ function usefulDims(sc) {
   const c = (sc && sc.crop) || {};
   return {w:Math.max(1, d.w - (c.l || 0) - (c.r || 0)), h:Math.max(1, d.h - (c.t || 0) - (c.b || 0))};
 }
+/* onde fica o vídeo quando sobram barras: ao centro, ou encostado à esquerda/cima ou à direita/baixo */
+function alignPos() {const a = (PL && PL.screen && PL.screen.align) || 'centro'; return a === 'inicio' ? '0% 0%' : a === 'fim' ? '100% 100%' : '50% 50%';}
 function fitMode(f) {
   const mode = (PL && PL.screen && PL.screen.fit) || 'caber';
   const a = f.type === 'HTML5' ? null : dimsOf(f.res), b = usefulDims(PL && PL.screen) || {w:window.innerWidth, h:window.innerHeight};
@@ -328,7 +330,7 @@ async function playOne(c, id, secs) {
   }
   cur = {c:c, f:id}; const t0 = Date.now(), fm = fitMode(f); let ok = true, aborted = false, why = ''; lastFrameAt = Date.now();
   if (f.type === 'Vídeo') {
-    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.style.objectFit = fm; v.src = s.url;
+    const v = document.createElement('video'); v.muted = true; v.playsInline = true; v.style.objectFit = fm; v.style.objectPosition = alignPos(); v.src = s.url;
     await new Promise(function(done) {
       let fin = false; const end = function(good, w) {if (fin) return; fin = true; ok = good; if (!good)why = w || ''; done();};
       cancelFn = function() {aborted = true; cancelFn = null; end(true);};
@@ -344,7 +346,7 @@ async function playOne(c, id, secs) {
     await waitMs(Math.max(1, secs || f.dur || 10) * 1000);
     aborted = Date.now() - t0 < Math.max(1, secs || f.dur || 10) * 1000 - 50;
   } else {
-    const im = document.createElement('img'); im.style.objectFit = fm; im.src = s.url;
+    const im = document.createElement('img'); im.style.objectFit = fm; im.style.objectPosition = alignPos(); im.src = s.url;
     await new Promise(function(d) {im.onload = function() {swapIn(im); d();}; im.onerror = function() {ok = false; why = 'a imagem não abriu'; d();};});
     if (ok) {
       await waitMs(Math.max(1, secs || f.dur || 10) * 1000);

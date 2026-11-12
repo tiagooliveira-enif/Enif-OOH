@@ -53,6 +53,20 @@ try:
         ok('ecrã inteiro + 30 px em cima: palco 1280×690 a 30 px do topo', box() == [0, 30, 1280, 690])
         put(area='inteiro', res='385×385', crop=None); time.sleep(5)
         ok('tirar a margem devolve a janela toda', box() == [0, 0, 1280, 720])
+        def objpos(want=None):
+            for _ in range(40):
+                v = pg.evaluate("(()=>{const e=document.querySelector('#stage img, #stage video');return e?getComputedStyle(e).objectPosition:''})()")
+                if v and (want is None or v == want): return v
+                time.sleep(.5)
+            return ''
+        put(area='inteiro', res='385×385', crop=None, align='inicio'); time.sleep(5)
+        ok('alinhamento «esquerda/cima»: o vídeo fica encostado', objpos('0% 0%') == '0% 0%')
+        put(align='centro'); time.sleep(5)
+        ok('alinhamento ao centro (por defeito)', objpos('50% 50%') == '50% 50%')
+        try:
+            put(align='xx'); ok('alinhamento inválido ignorado', call('GET', '/api/player/playlist?code=ECR-001&key=' + key)['screen']['align'] == 'centro')
+        except urllib.error.HTTPError: ok('alinhamento inválido ignorado', True)
+        put(area='inteiro', res='385×385', crop=None)
         ok('sem erros JS no player', not errs)
         put(area='tl', crop={'t': 30, 'b': 0, 'l': 0, 'r': 0}); time.sleep(3)
         pl = call('GET', '/api/player/playlist?code=ECR-001&key=' + key)

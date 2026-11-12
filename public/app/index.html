@@ -5321,7 +5321,8 @@ function cropSketch(s, c, W) {
     + '<span style="position:absolute;left:' + x + 'px;top:' + y + 'px;width:' + w + 'px;height:' + hh + 'px;background:#ffe651;color:#000;font:600 ' + (WW > 100 ? 12 : 8) + 'px/1.2 system-ui,sans-serif;display:flex;align-items:center;justify-content:center;text-align:center;outline:2px solid #ffe651">' + (WW < 100 ? '' : hasCrop({crop:c}) ? 'Visível<br>' + u.w + '×' + u.h : 'Todo visível') + '</span></span>'
     + (WW > 100 ? '<span class="muted" style="display:block;font-size:12px;margin-top:4px">Painel inteiro: ' + d.w + '×' + d.h + ' · zona escura = não se vê (fica a preto)</span>' : '');
 }
-function ajusteCell(s, canG) {return '<div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + '</dd></div>';}
+const ALIGNS = [['centro', 'Ao centro'], ['inicio', 'Encostado à esquerda / cima'], ['fim', 'Encostado à direita / baixo']];
+function ajusteCell(s, canG) {return '<div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + ((s.fit || 'caber') === 'caber' ? '<span class="muted" style="display:block;margin:8px 0 4px;font-size:.85em">Se sobrarem barras, o vídeo fica:</span>' + (canG ? '<select data-a-change="align" data-id="' + s.id + '" aria-label="Alinhamento do vídeo" style="width:auto">' + ALIGNS.map(f=>'<option value="' + f[0] + '"' + ((s.align || 'centro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((ALIGNS.find(f=>f[0] === (s.align || 'centro')) || ALIGNS[0])[1])) : '') + '</dd></div>';}
 function areaCell(s, canG) {return '<div><dt>Área do PC</dt><dd>' + (canG ? '<select data-a-change="area" data-id="' + s.id + '" aria-label="Área do ecrã do PC onde o player desenha" style="width:auto">' + AREAS.map(f=>'<option value="' + f[0] + '"' + ((s.area || 'inteiro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((AREAS.find(f=>f[0] === (s.area || 'inteiro')) || AREAS[0])[1])) + '<small class="muted" style="display:block;margin-top:6px">' + areaTxt(s) + '</small>' + areaDiagram(s) + '</dd></div>';}
 function margemCell(s, canG) {return '<div><dt>Margem oculta</dt><dd>' + (hasCrop(s) ? esc(cropParts(s)) : 'Nenhuma') + (canG ? ' <button class="btn sm ghost" data-a="edit-crop" data-id="' + s.id + '">Alterar</button>' : '') + '<small class="muted" style="display:block;margin-top:6px">' + cropNote(s) + '</small>' + cropSketch(s, cropOf(s), 64) + '</dd></div>';}
 function cropParts(s) {
@@ -6083,7 +6084,7 @@ function sessionLost(msg) {
 function setArr(a, b) {a.length = 0; b.forEach(function(x) {a.push(x);});}
 const sleep = ms=>new Promise(function(r) {setTimeout(r, ms);});
 
-const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri', 'crop'];
+const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri', 'crop', 'align'];
 const CMP_KEYS = ['name', 'client', 'noEnd', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'gmin', 'manual', 'color', 'items', 'pauses'];
 const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'photo', 'notif', 'ui'];
 const emptyBase = ()=>({screens:{}, campaigns:{}, folders:{}, contents:{}, users:{}});
@@ -6752,7 +6753,12 @@ document.addEventListener('change', function(e) {
   else if (ac === 'fit') {
     if (!guard('ecras.gerir')) return;
     const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
-    s.fit = t.value; toast('Ajuste de ' + s.id + ': ' + FITS.find(f=>f[0] === s.fit)[1].split(' (')[0] + '. O ecrã atualiza em instantes.');
+    s.fit = t.value; toast('Ajuste de ' + s.id + ': ' + FITS.find(f=>f[0] === s.fit)[1].split(' (')[0] + '. O ecrã atualiza em instantes.'); reopenScreen(s.id);
+  }
+  else if (ac === 'align') {
+    if (!guard('ecras.gerir')) return;
+    const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
+    s.align = t.value; toast('Alinhamento de ' + s.id + ': ' + ALIGNS.find(f=>f[0] === s.align)[1] + '. O ecrã atualiza em instantes.');
   }
   else if (ac === 'area') {
     if (!guard('ecras.gerir')) return;
