@@ -61,10 +61,44 @@ $lnk.TargetPath = "$dir\player.bat"
 $lnk.WindowStyle = 7
 $lnk.Save()
 
-# atalho «Estado Enif» no ambiente de trabalho: abre uma janelinha com o estado do player (a mesma informação da tecla D), sempre no ecrã principal
+# atalho «Estado Enif» no ambiente de trabalho: abre uma janelinha com o estado do player (a mesma informação da tecla D)
+# e põe-na sempre no ecrã principal (o canto 40,40 é sempre do principal), mesmo que o player esteja noutro ecrã
+$estadoPs1 = @'
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public class EnifJanela {
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc p, IntPtr l);
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint f);
+  public static IntPtr Procura(string parte) {
+    IntPtr r = IntPtr.Zero;
+    EnumWindows(delegate(IntPtr h, IntPtr l) {
+      if (!IsWindowVisible(h)) return true;
+      StringBuilder s = new StringBuilder(256); GetWindowText(h, s, 256);
+      if (s.ToString().Contains(parte)) { r = h; return false; }
+      return true;
+    }, IntPtr.Zero);
+    return r;
+  }
+}
+"@
+Start-Process -FilePath '__EDGE__' -ArgumentList '--app=__SERV__/player/estado.html', '--user-data-dir="__DIR__\profile"', '--window-size=560,460', '--unsafely-treat-insecure-origin-as-secure=__SERV__'
+for ($i = 0; $i -lt 30; $i++) {
+  Start-Sleep -Milliseconds 500
+  $h = [EnifJanela]::Procura('Estado do player Enif')
+  if ($h -ne [IntPtr]::Zero) { [void][EnifJanela]::SetWindowPos($h, [IntPtr]::Zero, 40, 40, 560, 460, 0x0044); break }
+}
+'@
+$estadoPs1 = $estadoPs1.Replace('__EDGE__', $edge).Replace('__SERV__', $Servidor).Replace('__DIR__', $dir)
+Set-Content -Path "$dir\estado.ps1" -Value $estadoPs1 -Encoding UTF8
 $lnk2 = $ws.CreateShortcut("$env:Public\Desktop\Estado Enif.lnk")
-$lnk2.TargetPath = $edge
-$lnk2.Arguments = "--app=$Servidor/player/estado.html --user-data-dir=`"$dir\profile`" --window-position=40,40 --window-size=560,460 --unsafely-treat-insecure-origin-as-secure=$Servidor"
+$lnk2.TargetPath = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
+$lnk2.Arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$dir\estado.ps1`""
+$lnk2.IconLocation = "$edge,0"
 $lnk2.Save()
 
 # nunca suspender nem desligar o ecrã
