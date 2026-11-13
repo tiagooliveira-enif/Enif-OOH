@@ -1020,8 +1020,13 @@ button.crow:hover {
 }
 .clabel strong {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 4px 8px;
+}
+.clabel strong .ell {
+  flex: 0 1 auto;
+  max-width: 100%;
 }
 .clabel small {
   display: block;
