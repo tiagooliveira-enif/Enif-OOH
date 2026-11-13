@@ -2189,6 +2189,66 @@ iframe.prev-media {
 .pl-btns .btn {
   padding: 5px 8px;
 }
+@media (max-width: 700px) {
+  /* playlist no telemóvel: o texto ocupa a largura toda; o estado e as setas passam para uma segunda linha */
+  .pl-item,
+  .pl-ghead {
+    display: grid;
+    grid-template-columns: 26px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "n t t"
+      ". s b";
+    align-items: center;
+    gap: 8px 10px;
+  }
+  .pl-item:not(:has(.pl-n)) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "t t"
+      "s b";
+  }
+  .pl-item > .pl-n,
+  .pl-ghead > .pl-n {
+    grid-area: n;
+    align-self: start;
+  }
+  .pl-item > .grow,
+  .pl-ghead > .grow {
+    grid-area: t;
+  }
+  .pl-item > .pill {
+    grid-area: s;
+    justify-self: start;
+  }
+  .pl-ghead > .gm-ctl {
+    grid-area: s;
+    justify-self: stretch;
+    min-width: 0;
+  }
+  .pl-item > .pl-btns,
+  .pl-ghead > .pl-btns {
+    grid-area: b;
+    justify-self: end;
+  }
+  .pl-item .grow b.ell {
+    white-space: normal;
+  }
+  .pl-ghead > .pl-btns {
+    align-self: end;
+  }
+  .pl-ghead .gm-ctl {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .pl-ghead .gm-ctl > span {
+    font-size: 12px;
+  }
+  .pl-ghead .gm-ctl select {
+    flex: 1;
+    min-width: 0;
+  }
+}
 .pl-cut {
   display: flex;
   align-items: center;
