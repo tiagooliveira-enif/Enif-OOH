@@ -3415,7 +3415,7 @@ const mailStatus = e=>e.events[e.events.length - 1].st;
 const mailSlug = n=>String(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 function mailPill(st) {return '<span class="pill' + (st === 'Enviado' ? ' ok dot' : (st === 'Falhou' ? ' bad' : '')) + '">' + st + '</span>';}
 
-const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', ccal:'new', cmode:'cards', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fitSeen:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
+const state = {ctab:'cal', av:{d:iso(today), v:'all', f:iso(today), t:iso(addDays(today, 14)), h0:10, h1:14}, cq:'', cscr:'all', mailF:{camp:'all', st:'all', from:'', to:''}, csort:'recent', ccal:'new', cmode:'cards', view:'painel', week:0, filter:'todos', q:'', limit:10, cfilter:'todos', period:7, folder:'all', repFile:'all', custom:null, repCamp:'all', repScreens:null, logLimit:10, user:null, loginDrawn:false, dismissed:{}, finalSeen:{}, finalDone:{}, fitSeen:{}, fewMin:3, calOpen:{}, cal:null, setup:false, loginMsg:'', rows:{}, up:null, clean:{used:180, never:60, bin:30}, cview:'lib', idleMin:0};
 
 /* ---------- derived data ---------- */
 /* pausas: intervalos de dias em que a campanha não passa (a pausa vale a partir do dia em que se pausa) */
@@ -4647,6 +4647,7 @@ function ppmHint(x, dur) {
 const normQ = t=>String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
 /* pesquisa de campanhas: nome, cliente, tipo de negócio, local, estado e prioridade (sem distinguir acentos) */
 function campMatch(c, q) {
+  if (state.cscr !== 'all' && !playScreens(c).some(s=>s.id === state.cscr)) return false;
   if (!q) return true;
   const hay = normQ([c.name, c.client, c.sector, c.venues.join(' '), statusOf(c), c.priority, c.id].join(' '));
   return q.split(' ').every(w=>hay.indexOf(w) > -1);
@@ -4668,12 +4669,18 @@ function campRows() {
     }).join('');
     return '<button class="crow" data-a="edit-camp" data-id="' + c.id + '"><span class="clabel"><strong><span class="ell">' + esc(c.name) + '</span>' + (inConf ? '<span class="pill warn">Conflito</span>' : '') + (c.items.length > 1 ? '<span class="pill">Alternam</span>' : '') + (c.share ? '<span class="pill">Posição partilhada</span>' : '') + (st !== 'Ativa' ? '<span class="pill">' + st + '</span>' : '') + '</strong><small>' + (c.sector ? esc(c.sector) + ' · ' : '') + hrsC(c) + ' · ' + modTxt(c.ppm) + ' · ' + playScreens(c).length + (playScreens(c).length === 1 ? ' ecrã' : ' ecrãs') + ' · ' + (c.items.length ? c.items.length + (c.items.length === 1 ? ' vídeo' : ' vídeos') : 'sem conteúdo') + ' · ' + c.priority + '</small></span>' + cells + '</button>';
   }).join('');
-  return rows || '<div class="empty" style="grid-column:1/-1">Nenhuma campanha corresponde à pesquisa.</div>';
+  return rows || '<div class="empty" style="grid-column:1/-1">Nenhuma campanha corresponde à pesquisa ou ao ecrã escolhido.</div>';
+}
+/* filtro por ecrã no calendário de campanhas */
+function scrSel() {
+  if (state.cscr !== 'all' && !screens.some(s=>s.id === state.cscr))state.cscr = 'all';
+  const vs = [...new Set(screens.map(s=>s.venue))].sort((a, b)=>a.localeCompare(b, 'pt'));
+  return '<select data-a-change="cscr" aria-label="Filtrar por ecrã" title="Ver só as campanhas de um ecrã" style="width:auto;max-width:220px;border-radius:999px;padding-left:16px"><option value="all">Todos os ecrãs</option>' + vs.map(v=>'<optgroup label="' + esc(v) + '">' + screens.filter(s=>s.venue === v).map(s=>'<option value="' + esc(s.id) + '"' + (state.cscr === s.id ? ' selected' : '') + '>' + esc(s.id + ' · ' + s.spot) + '</option>').join('') + '</optgroup>').join('') + '</select>';
 }
 function campHint() {return campCount() || (can('campanhas.gerir') ? 'Clique numa campanha para a editar' : 'Clique numa campanha para ver os detalhes');}
 function campCount() {
   const q = normQ(state.cq);
-  if (!q) return '';
+  if (!q && state.cscr === 'all') return '';
   const n = campaigns.filter(c=>campMatch(c, q)).length;
   return n + ' de ' + campaigns.length + (campaigns.length === 1 ? ' campanha' : ' campanhas');
 }
@@ -4787,7 +4794,7 @@ function viewCamp() {
   const banner = G.map(g=>'<div class="banner">' + ic('alert') + '<p><b>Conflito:</b> ' + issueText(g.i) + ' (' + esc(g.venue) + (g.screens.length > 1 ? ', ' + g.screens.length + ' ecrãs' : ', ' + esc(g.screens[0].spot)) + ')</p>' + (can('ecras.ver') ? '<button class="btn sm" data-a="open-screen" data-id="' + g.screens[0].id + '">Ver ecrã</button>' : '') + '</div>').join('');
   const ovB = '';
   const dh = days.map(d=>'<span class="dh' + (dayDiff(d, today) === 0 ? ' today' : '') + '"><span>' + wdShort.format(d).replace('.', '') + '</span><b>' + d.getDate() + '</b></span>').join('');
-  return tabs + banner + ovB + '<div class="card"><div class="card-h camp-h" style="flex-wrap:wrap"><div class="week-nav"><button class="btn sm" data-a="week" data-d="-1" aria-label="Semana anterior">' + ic('left') + '</button><span class="lbl">' + dShort.format(days[0]) + ' – ' + dShort.format(days[6]) + '</span><button class="btn sm" data-a="week" data-d="1" aria-label="Semana seguinte">' + ic('right') + '</button>' + (state.week ? '<button class="btn sm ghost" data-a="week" data-d="0">Hoje</button>' : '') + '</div><button class="btn sm" data-a="ccal" aria-label="Ordem das campanhas" title="Mudar a ordem das campanhas">' + (state.ccal === 'old' ? 'Mais antigas primeiro' : 'Mais recentes primeiro') + '</button><div class="search camp-s" style="flex:0 1 320px;margin-left:auto">' + ic('search') + '<input id="cq" type="search" placeholder="Procurar campanha" value="' + esc(state.cq) + '" aria-label="Procurar campanhas"></div></div>'
+  return tabs + banner + ovB + '<div class="card"><div class="card-h camp-h" style="flex-wrap:wrap"><div class="week-nav"><button class="btn sm" data-a="week" data-d="-1" aria-label="Semana anterior">' + ic('left') + '</button><span class="lbl">' + dShort.format(days[0]) + ' – ' + dShort.format(days[6]) + '</span><button class="btn sm" data-a="week" data-d="1" aria-label="Semana seguinte">' + ic('right') + '</button>' + (state.week ? '<button class="btn sm ghost" data-a="week" data-d="0">Hoje</button>' : '') + '</div><button class="btn sm" data-a="ccal" aria-label="Ordem das campanhas" title="Mudar a ordem das campanhas">' + (state.ccal === 'old' ? 'Mais antigas primeiro' : 'Mais recentes primeiro') + '</button>' + scrSel() + '<div class="search camp-s" style="flex:0 1 320px;margin-left:auto">' + ic('search') + '<input id="cq" type="search" placeholder="Procurar campanha" value="' + esc(state.cq) + '" aria-label="Procurar campanhas"></div></div>'
     + '<div class="cal-wrap"><div class="cal" style="margin-top:10px"><div class="crow chead"><span class="hint" id="cq-n" style="align-self:center;font-size:12px;line-height:1.3;padding-left:20px">' + campHint() + '</span>' + dh + '</div><div id="camp-rows" style="display:contents">' + campRows() + '</div></div></div></div>';
 }
 
@@ -6774,6 +6781,7 @@ document.addEventListener('input', function(e) {
 document.addEventListener('change', function(e) {
   const t = e.target, ac = t.dataset && t.dataset.aChange;
   if (ac === 'av') {const A = state.av, k = {'av-d':'d', 'av-v':'v', 'av-f':'f', 'av-t':'t'}[t.id]; if (k)A[k] = t.value || A[k]; else if (t.id === 'av-h0')A.h0 = +t.value; else if (t.id === 'av-h1')A.h1 = +t.value; render();}
+  else if (ac === 'cscr') {state.cscr = t.value; render();}
   else if (t.id === 'rep-camp') {state.repCamp = t.value; state.repFile = 'all'; state.repScreens = null; state.logLimit = 10; render();}
   else if (t.id === 'rep-file') {state.repFile = t.value; state.logLimit = 10; render();}
   else if (t.id === 'mail-f-camp' || t.id === 'mail-f-st' || t.id === 'mail-f-from' || t.id === 'mail-f-to') {
