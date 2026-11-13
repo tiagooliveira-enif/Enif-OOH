@@ -2661,6 +2661,24 @@ button.avatar {
 .ci-list:not([data-manual]) .ci-pos {
   display: none;
 }
+.ci-onlybtn {
+  margin-left: auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line, rgba(255, 255, 255, .18));
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.field:has(.ci-only-cb:checked) .ci-onlybtn {
+  background: var(--accent, #6c63ff);
+  border-color: transparent;
+  color: #fff;
+}
+.field:has(.ci-only-cb:checked) .ci-row:not(:has(input[name="ci"]:checked)) {
+  display: none;
+}
 .ci-order {
   margin: 4px 0 8px;
 }
@@ -4852,7 +4870,7 @@ function itemsField(c) {
       + '<span class="ci-line ci-pos"><small>Posição</small><input type="number" name="cio_' + f.id + '" min="1" max="99" step="1" value="' + (rank[f.id] || '') + '" aria-label="Posição de ' + esc(f.name) + ' na ordem"></span>'
       + '<span class="ci-line ci-hours"><small>Horas</small>' + ivBox('ci0_' + f.id, 'ci1_' + f.id, (it && it.ivs && it.ivs.length) ? it.ivs : [[it ? it.h0 : null, it ? it.h1 : null]], 'Início da campanha', 'Fim da campanha', ' do vídeo ' + esc(f.name)) + '</span></div></div>';
   }).join('');
-  return '<div class="field"><span class="lab">Conteúdos desta campanha</span><div class="field-inline ci-order"><label for="c-order">Ordem em que alternam</label><select id="c-order" name="order" data-a-change="ci-order"><option value="auto"' + (c.manual ? '' : ' selected') + '>Automática (dia e hora de entrada)</option><option value="manual"' + (c.manual ? ' selected' : '') + '>Manual (defino eu)</option></select></div><div class="checks ci-list"' + (c.manual ? ' data-manual="1"' : '') + '>' + rows + '</div><span class="hint">Escolha os conteúdos e, para cada um, os dias e as horas em que entra e sai. Se deixar em branco, acompanha a campanha. Os vídeos ativos passam alternados, um em cada passagem da campanha.<details class="more-hint"><summary>Ver exemplo e outras regras</summary>Com 5 vídeos e 2 passagens por minuto, o 1.º minuto leva A e B, o 2.º leva C e D, o 3.º leva E e A, e assim por diante. Na ordem automática, entra primeiro quem tem o dia e a hora de entrada mais cedo; na manual, a ordem é a das posições que definir. Quando um sai, os outros continuam. «Vezes/min» é opcional: serve para um vídeo exclusivo ter um ritmo próprio, e esse vídeo não pode partilhar dias e horas com outros.</details></span></div>';
+  return '<div class="field"><span class="lab">Conteúdos desta campanha</span><div class="field-inline ci-order"><label for="c-order">Ordem em que alternam</label><select id="c-order" name="order" data-a-change="ci-order"><option value="auto"' + (c.manual ? '' : ' selected') + '>Automática (dia e hora de entrada)</option><option value="manual"' + (c.manual ? ' selected' : '') + '>Manual (defino eu)</option></select><input type="checkbox" id="ci-only" class="ci-only-cb" hidden><label for="ci-only" class="ci-onlybtn" role="button" title="Mostra só os conteúdos escolhidos nesta campanha, sem ter de percorrer a lista toda">Só os escolhidos</label></div><div class="checks ci-list"' + (c.manual ? ' data-manual="1"' : '') + '>' + rows + '</div><span class="hint">Escolha os conteúdos e, para cada um, os dias e as horas em que entra e sai. Se deixar em branco, acompanha a campanha. Os vídeos ativos passam alternados, um em cada passagem da campanha.<details class="more-hint"><summary>Ver exemplo e outras regras</summary>Com 5 vídeos e 2 passagens por minuto, o 1.º minuto leva A e B, o 2.º leva C e D, o 3.º leva E e A, e assim por diante. Na ordem automática, entra primeiro quem tem o dia e a hora de entrada mais cedo; na manual, a ordem é a das posições que definir. Quando um sai, os outros continuam. «Vezes/min» é opcional: serve para um vídeo exclusivo ter um ritmo próprio, e esse vídeo não pode partilhar dias e horas com outros.</details></span></div>';
 }
 function readItems(fd, ch0, ch1, cs, ce, cv) {
   const items = [], warns = [];
