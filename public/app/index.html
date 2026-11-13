@@ -5355,14 +5355,14 @@ function resField(cur) {
   return '<div class="field"><label for="res-sel">Resolução</label><select id="res-sel" name="res" data-a-change="res"><option value="auto"' + (val === 'auto' ? ' selected' : '') + '>Detetar automaticamente quando o player ligar</option>'
     + RES_PRESETS.map(p=>'<option value="' + p[0] + '"' + (val === p[0] ? ' selected' : '') + '>' + p[0] + ' · ' + p[1] + '</option>').join('')
     + '<option value="custom"' + (val === 'custom' ? ' selected' : '') + '>Outra resolução…</option></select></div>'
-    + '<div class="grid2" id="res-custom"' + (val === 'custom' ? '' : ' hidden') + '><div class="field"><label for="res-w">Largura (px)</label><input id="res-w" name="rw" type="number" min="240" max="15360" value="' + (m[0] || '') + '" placeholder="1920"></div><div class="field"><label for="res-h">Altura (px)</label><input id="res-h" name="rh" type="number" min="240" max="15360" value="' + (m[1] || '') + '" placeholder="1080"></div></div>';
+    + '<div class="grid2" id="res-custom"' + (val === 'custom' ? '' : ' hidden') + '><div class="field"><label for="res-w">Largura (px)</label><input id="res-w" name="rw" type="number" min="64" max="15360" value="' + (m[0] || '') + '" placeholder="1920"></div><div class="field"><label for="res-h">Altura (px)</label><input id="res-h" name="rh" type="number" min="64" max="15360" value="' + (m[1] || '') + '" placeholder="1080"></div></div>';
 }
 function readRes(fd) {
   const m = String(fd.get('res') || 'auto');
   if (m === 'auto') return {v:'auto'};
   if (m === 'custom') {
     const w = Math.round(+fd.get('rw')), h = Math.round(+fd.get('rh'));
-    if (!(w >= 240 && w <= 15360 && h >= 240 && h <= 15360)) return {err:'Indique a largura e a altura entre 240 e 15360 píxeis.'};
+    if (!(w >= 64 && w <= 15360 && h >= 64 && h <= 15360)) return {err:'Indique a largura e a altura entre 64 e 15360 píxeis.'};
     return {v:w + '×' + h};
   }
   return {v:m};
@@ -7078,7 +7078,7 @@ document.addEventListener('submit', function(e) {
     if (!guard('ecras.gerir')) return;
     const s = screens.find(x=>x.id === f.dataset.id); if (!s) return;
     const c = readCrop(f), d = dimsOf(s.res);
-    if (d && (d.w - c.l - c.r < 240 || d.h - c.t - c.b < 240)) {err.textContent = 'A margem é grande demais: a resolução útil tem de ficar com pelo menos 240 px em cada lado.'; return;}
+    if (d && (d.w - c.l - c.r < 64 || d.h - c.t - c.b < 64)) {err.textContent = 'A margem é grande demais: a resolução útil tem de ficar com pelo menos 64 px em cada lado.'; return;}
     if (c.t || c.b || c.l || c.r)s.crop = c; else delete s.crop;
     const u = usefulDims(s);
     audit('Margem oculta', s.id + ' · ' + (hasCrop(s) ? 'útil ' + (u ? u.w + '×' + u.h : '') : 'sem margem'));

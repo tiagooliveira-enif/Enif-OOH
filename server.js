@@ -141,7 +141,7 @@ function cleanBri(b, old) {
   if (out.mode === 'auto' && out.from === out.to) throw bad('O início e o fim do dia não podem ser à mesma hora.');
   return out;
 }
-/* margem oculta: píxeis do painel que não se veem em cada lado; a resolução útil tem de ficar com pelo menos 240 px */
+/* margem oculta: píxeis do painel que não se veem em cada lado; a resolução útil tem de ficar com pelo menos 64 px */
 function cleanCrop(c, res) {
   if (isNil(c)) return null;
   if (typeof c !== 'object') throw bad('Margem oculta inválida.');
@@ -149,7 +149,7 @@ function cleanCrop(c, res) {
   const out = { t: g('t', 'em cima'), b: g('b', 'em baixo'), l: g('l', 'à esquerda'), r: g('r', 'à direita') };
   if (!(out.t || out.b || out.l || out.r)) return null;
   const d = S.dimsOf(res);
-  if (d && (d.w - out.l - out.r < 240 || d.h - out.t - out.b < 240)) throw bad('A margem oculta é grande demais: a resolução útil tem de ficar com pelo menos 240 px em cada lado.');
+  if (d && (d.w - out.l - out.r < 64 || d.h - out.t - out.b < 64)) throw bad('A margem oculta é grande demais: a resolução útil tem de ficar com pelo menos 64 px em cada lado.');
   return out;
 }
 function cleanScreen(o, id, old) {
@@ -728,7 +728,7 @@ function playerApi(req, res, u, body) {
       s.id, now, now, body.c || null, body.f || null, String(body.ver || ''), +body.queue || 0, w, h, dk ? dk.f : null, dk ? dk.t : null);
     if (+body.ack > 0) run('DELETE FROM cmds WHERE screen=? AND id<=?', s.id, +body.ack);
     run('INSERT OR IGNORE INTO beats(screen,minute) VALUES(?,?)', s.id, Math.floor(now / 60000));
-    if (s.res === 'auto' && w && h && w >= 240 && h >= 240) putDoc('screens', s.id, Object.assign({}, s, { res: w + '×' + h }));
+    if (s.res === 'auto' && w && h && w >= 64 && h >= 64) putDoc('screens', s.id, Object.assign({}, s, { res: w + '×' + h }));
     const lv2 = q1('SELECT reload FROM live WHERE screen=?', s.id);
     const pv = proofView(proofRow(s.id));
     return send(res, 200, { ok: true, serverTime: now, reload: lv2 ? lv2.reload : 0, proof: pv ? { id: pv.t0, files: pv.files, until: pv.until, serverTime: now } : null, cmds: q('SELECT id,kind FROM cmds WHERE screen=? ORDER BY id', s.id) });

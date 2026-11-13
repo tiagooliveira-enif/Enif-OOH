@@ -32,8 +32,8 @@ try:
     def put(**k):
         d = dict(scr); d.update(k); call('POST', '/api/sync', {'ops': [{'op': 'put', 'coll': 'screens', 'id': 'ECR-001', 'doc': d}]}, tok)
     try:
-        put(crop={'t': 150, 'b': 0, 'l': 0, 'r': 0}); ok('margem que deixa menos de 240 px é recusada', False)
-    except urllib.error.HTTPError as e: ok('margem que deixa menos de 240 px é recusada', e.code == 400)
+        put(crop={'t': 330, 'b': 0, 'l': 0, 'r': 0}); ok('margem que deixa menos de 64 px é recusada', False)
+    except urllib.error.HTTPError as e: ok('margem que deixa menos de 64 px é recusada', e.code == 400)
     try:
         put(crop={'t': -3, 'b': 0, 'l': 0, 'r': 0}); ok('margem negativa é recusada', False)
     except urllib.error.HTTPError as e: ok('margem negativa é recusada', e.code == 400)
@@ -84,7 +84,7 @@ try:
         ap.click('[data-a=edit-crop]'); time.sleep(.4)
         ap.fill('#cr-t', '5'); ap.fill('#cr-l', '3'); ap.press('#cr-l', 'Tab'); time.sleep(.3)
         ok('a janela mostra a resolução útil a mudar (382×380)', '382×380' in ap.inner_text('#crop-useful'))
-        ap.fill('#cr-t', '200'); ap.click('form[data-form=crop] button[type=submit]'); time.sleep(.5)
+        ap.fill('#cr-t', '330'); ap.click('form[data-form=crop] button[type=submit]'); time.sleep(.5)
         ok('margem grande demais dá erro na janela', 'grande demais' in ap.inner_text('#form-err'))
         ap.fill('#cr-t', '5'); ap.click('form[data-form=crop] button[type=submit]'); time.sleep(2.5)
         ok('a ficha mostra «cima 5 px» e a resolução útil', 'cima 5 px' in ap.inner_text('#modal-root') and '382×380' in ap.inner_text('#modal-root'))
