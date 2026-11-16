@@ -5061,7 +5061,7 @@ const MANUAL = {
    ['Copie para os outros ecrãs do local', 'Se o local tem mais ecrãs, «Copiar esta playlist para os outros ecrãs» poupa trabalho.']]},
   {h:'Juntar um ecrã novo', need:'ecras.gerir', go:1, steps:[
    ['Carregue em «Novo ecrã»', 'No topo da página.'],
-   ['Preencha os dados', 'Local, posição no local, cidade, tipo de ecrã, máximo de campanhas em simultâneo e resolução. Se não souber a resolução, deixe «detetar automaticamente».'],
+   ['Preencha os dados', 'Local, posição no local, cidade, tipo de ecrã, máximo de campanhas em simultâneo e resolução. Se não souber a resolução, deixe «detetar automaticamente». O mínimo é 64 × 64 píxeis, por isso painéis pequenos (por exemplo 288 × 192) também servem.'],
    ['Guarde e anote o código', 'Depois de guardar, a ficha do ecrã mostra o código e a chave do player, na secção «Player». «Copiar comando de instalação» dá o comando para instalar o player no mini PC (o manual de instalação explica o passo a passo). A chave é secreta.'],
    ['Espere pela ligação', 'Quando o player se ligar, o estado passa a Online.']]},
   {h:'Estimar o movimento à volta do ecrã', need:'ecras.gerir', steps:[
@@ -5076,6 +5076,8 @@ const MANUAL = {
   {h:'Manutenção', need:'ecras.gerir', steps:[
    ['Atualizar agora', 'Faz o ecrã mostrar já a programação mais recente. Serve para quando está um cliente à frente do ecrã; no dia a dia o ecrã atualiza-se sozinho.'],
    ['Área do PC', 'Por defeito o player ocupa o ecrã inteiro do PC. Se o painel LED só mostra uma parte do ecrã do PC (por exemplo, o canto superior esquerdo), escolha em «Área do PC» o canto ou o centro: o player passa a desenhar só com o tamanho da resolução do ecrã e deixa o resto do PC a preto.'],
+   ['Margem oculta', 'Se o painel esconde uma faixa do ecrã (por exemplo uma moldura ou uma montra à frente), em «Margem oculta» carregue em «Alterar» e indique quantos píxeis ficam tapados em cima, em baixo, à esquerda e à direita. O player deixa essa faixa a preto e a área visível passa a ser o resto. A compatibilidade dos conteúdos continua a usar a resolução do ecrã, sem contar com a margem.', 'ecras.gerir'],
+   ['Ajuste e alinhamento do vídeo', 'Em «Ajuste do vídeo» escolhe como o conteúdo enche o ecrã e, em «Alinhamento do vídeo», se fica ao centro ou encostado à esquerda/cima ou à direita/baixo.', 'ecras.gerir'],
    ['Reiniciar o player e Teste no ecrã', '«Reiniciar player» reinicia o programa do ecrã. «Teste no ecrã» mostra durante 30 segundos uma imagem de teste, para confirmar a posição e a resolução.'],
    ['Alterar dados', 'Ao lado da resolução, do horário e da localização há o botão «Alterar».'],
    ['Eliminar ecrã', 'Só quando o ecrã já não existir. Pede confirmação.']]}],
@@ -5088,13 +5090,14 @@ const MANUAL = {
    ['Escreva o e-mail do comercial (opcional)', 'Essa pessoa recebe um aviso uma semana antes de a campanha acabar e, no fim, o relatório completo em PDF: totais, gráfico por hora, tabelas por conteúdo, por ecrã e por dia, imagens dos conteúdos e registo de emissão.'],
    ['Marque onde passa', 'Escolha os locais. A campanha passa em todos os ecrãs desses locais onde houver um conteúdo compatível.'],
    ['Defina as datas e as horas', 'Início e Fim, e a janela «Das» e «Até às». Se quiser ajuda, «Sugerir horário com IA» propõe a janela com mais passagem de pessoas.'],
-   ['Escolha a duração e a modalidade', 'Duração do vídeo em segundos e modalidade de passagem: 2× por minuto, 1× por minuto ou 1× a cada 5 minutos (ou «Outra…»). Escolha também a prioridade: Alta garante as passagens por minuto, Normal passa uma vez por volta.'],
+   ['Escolha a duração e a modalidade', 'Duração do vídeo em segundos e modalidade de passagem: 2× por minuto, 1× por minuto ou 1× a cada 5 minutos (ou «Outra…»). Escolha também a prioridade: Alta garante as passagens por minuto, Normal passa uma vez por volta. Numa campanha de prioridade Alta com poucas passagens (por exemplo 1× a cada 5 minutos), a ronda do ecrã pode ficar mais longa para cumprir o pedido; a playlist mostra então «N passagens por volta».'],
    ['Partilhe a posição (opcional)', 'Em «Partilhar a posição no loop» escolha outra campanha para passarem à vez, uma por volta, ocupando só uma posição na playlist.'],
-   ['Escolha os conteúdos', 'Marque os conteúdos da campanha. Para cada um pode definir os dias, as horas e a posição. Se deixar em branco, acompanha a campanha. Fique atento aos avisos amarelos: dizem em que ecrãs o conteúdo não passa ou é ajustado.'],
+   ['Escolha os conteúdos', 'Marque os conteúdos da campanha. Para cada um pode definir os dias, as horas e a posição. Se deixar em branco, acompanha a campanha. Fique atento aos avisos amarelos: dizem em que ecrãs o conteúdo não passa ou é ajustado. Com muitos ficheiros, «Só os escolhidos» mostra apenas os marcados. Quando a data de saída de um conteúdo passa, ele deixa de contar e aparece desmarcado («saiu a…»); ao guardar a campanha, sai de vez da lista.'],
    ['Carregue em «Criar campanha»', 'Confirme no calendário que ela aparece nos dias certos.']]},
   {h:'Acompanhar e alterar', steps:[
    ['Veja o calendário', 'Mostra a semana, com todas as campanhas. Use as setas para mudar de semana e «Hoje» para voltar.'],
    ['Procure uma campanha', 'Escreva o nome, o cliente, o local ou o estado em «Procurar campanha».'],
+   ['Veja só um ecrã', 'No seletor «Todos os ecrãs», ao lado da pesquisa, escolha um ecrã: o calendário mostra apenas as campanhas que passam nesse ecrã. Pode juntar com a pesquisa.'],
    ['Abra uma campanha', 'Carregue nela para ver os detalhes ou, se tiver permissão, para a editar.'],
    ['Avisos de ajuste automático', 'Quando um conteúdo é redimensionado para o ecrã (mesma proporção), a playlist mostra o aviso «Ajuste automático». Sai sozinho 24 horas depois de aparecer. Se quiser tirá-los antes, carregue em «Ocultar avisos de ajuste»; «Mostrar» traz-os de volta.'],
    ['Ignore avisos que não importam', 'Na ficha do ecrã, em «Playlist», os avisos de passagens por minuto e os avisos informativos têm o botão «Ignorar». O aviso desaparece e fica guardado na sua conta; se mudar as campanhas ou as horas, volta a aparecer. «Voltar a mostrar» traz de novo os ignorados. Os conflitos graves, como campanhas que ficam de fora por falta de vagas, não se ignoram.', 'campanhas.gerir'],
