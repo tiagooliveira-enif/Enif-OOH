@@ -3569,6 +3569,9 @@ function itemIvs(c, i) {
 /* janela de um vídeo (do primeiro início ao último fim); serve para ordenar */
 const itemWin = (c, i)=>{const v = itemIvs(c, i); return v.length ? [v[0][0], v[v.length - 1][1]] : [c.h0, c.h0];};
 /* dias efetivos de um vídeo (vazio = acompanha a campanha) */
+/* vídeo cuja data de saída já passou: deixa de contar e sai da seleção da campanha */
+const itemGone = i=>!!(i.d1 && i.d1 < today);
+const liveItems = c=>c.items.filter(i=>!itemGone(i));
 const itemDays = (c, i)=>[(i.d0 && i.d0 > c.start) ? i.d0 : c.start, (i.d1 && i.d1 < c.end) ? i.d1 : c.end];
 /* vídeos ativos numa hora e dia, por ordem de entrada (dia, hora) e depois pela ordem da lista */
 function itemsOn(c, h, d, sc) {
@@ -4453,7 +4456,7 @@ function playlistHtml(s) {
   const blocks = plBlocks(list);
   const mv = function(bi) {return edit ? '<span class="pl-btns"><button class="btn sm ghost" data-a="pl-move" data-id="' + s.id + '" data-i="' + bi + '" data-d="-1" aria-label="Subir na playlist"' + (bi === 0 ? ' disabled' : '') + '>' + ic('up') + '</button><button class="btn sm ghost" data-a="pl-move" data-id="' + s.id + '" data-i="' + bi + '" data-d="1" aria-label="Descer na playlist"' + (bi === blocks.length - 1 ? ' disabled' : '') + '>' + ic('down') + '</button></span>' : '';};
   const row = function(c, num, extra) {
-    const st = plState(c, s, L, h), nv = c.items.length;
+    const st = plState(c, s, L, h), nv = liveItems(c).length;
     return '<div class="pl-item ' + st[0] + '">' + (num ? '<span class="pl-n">' + num + '</span>' : '') + '<span class="grow"><b class="ell" style="display:block">' + esc(c.name) + '</b><small class="muted">' + esc(c.client) + ' · ' + hrsC(c) + ' · ' + c.dur + ' s' + (nv > 1 ? ' · ' + nv + ' vídeos' : '') + (extra || '') + (slot[c.id] ? ' · <span class="pl-slot">' + (slotN[c.id] > 1 ? '' : 'no loop ') + slot[c.id] + '</span>' : '') + '</small></span><span class="pill ' + st[2] + '">' + st[1] + '</span>' + (num ? mv(num - 1) : '') + '</div>';
   };
   blocks.forEach(function(b, bi) {
@@ -4693,7 +4696,7 @@ function campRows() {
       const first = on && (dayDiff(d, c.start) === 0 || i === 0), last = on && (dayDiff(d, c.end) === 0 || i === 6);
       return '<span class="cell' + (dayDiff(d, today) === 0 ? ' todaycol' : '') + (st === 'Terminada' ? ' ended' : '') + '">' + (on ? '<i class="' + (first ? 'first ' : '') + (last ? 'last' : '') + '" style="--bc:var(--c' + c.color + ')"></i>' : '') + '</span>';
     }).join('');
-    return '<button class="crow" data-a="edit-camp" data-id="' + c.id + '"><span class="clabel"><strong><span class="ell">' + esc(c.name) + '</span>' + (inConf ? '<span class="pill warn">Conflito</span>' : '') + (c.items.length > 1 ? '<span class="pill">Alternam</span>' : '') + (c.share ? '<span class="pill">Posição partilhada</span>' : '') + (st !== 'Ativa' ? '<span class="pill">' + st + '</span>' : '') + '</strong><small>' + (c.sector ? esc(c.sector) + ' · ' : '') + hrsC(c) + ' · ' + modTxt(c.ppm) + ' · ' + playScreens(c).length + (playScreens(c).length === 1 ? ' ecrã' : ' ecrãs') + ' · ' + (c.items.length ? c.items.length + (c.items.length === 1 ? ' vídeo' : ' vídeos') : 'sem conteúdo') + ' · ' + c.priority + '</small></span>' + cells + '</button>';
+    return '<button class="crow" data-a="edit-camp" data-id="' + c.id + '"><span class="clabel"><strong><span class="ell">' + esc(c.name) + '</span>' + (inConf ? '<span class="pill warn">Conflito</span>' : '') + (liveItems(c).length > 1 ? '<span class="pill">Alternam</span>' : '') + (c.share ? '<span class="pill">Posição partilhada</span>' : '') + (st !== 'Ativa' ? '<span class="pill">' + st + '</span>' : '') + '</strong><small>' + (c.sector ? esc(c.sector) + ' · ' : '') + hrsC(c) + ' · ' + modTxt(c.ppm) + ' · ' + playScreens(c).length + (playScreens(c).length === 1 ? ' ecrã' : ' ecrãs') + ' · ' + (c.items.length ? liveItems(c).length + (liveItems(c).length === 1 ? ' vídeo' : ' vídeos') : 'sem conteúdo') + ' · ' + c.priority + '</small></span>' + cells + '</button>';
   }).join('');
   return rows || '<div class="empty" style="grid-column:1/-1">Nenhuma campanha corresponde à pesquisa ou ao ecrã escolhido.</div>';
 }
@@ -4865,8 +4868,8 @@ function itemsField(c) {
   const rank = {};
   (c.manual ? c.items : c.items.map(function(i, k) {return {i:i, k:k};}).sort(function(p, q) {const a = itemDays(c, p.i), b = itemDays(c, q.i), x = itemWin(c, p.i), y = itemWin(c, q.i); return (a[0] - b[0]) || (x[0] - y[0]) || (p.k - q.k);}).map(z=>z.i)).forEach(function(i, k) {rank[i.f] = k + 1;});
   const rows = contents.filter(f=>!f.house || c.items.some(i=>i.f === f.id)).map(function(f) {
-    const it = c.items.find(i=>i.f === f.id), fo = f.folder ? folderById(f.folder) : null;
-    return '<div class="ci-row"><label class="ci-main"><input type="checkbox" name="ci" value="' + f.id + '" data-a-change="ci-toggle"' + (it ? ' checked' : '') + '><span class="ell">' + esc(f.name) + '</span>' + (fo ? '<small class="muted">' + esc(fo.name) + '</small>' : '') + '</label>'
+    const it0 = c.items.find(i=>i.f === f.id), gone = !!it0 && itemGone(it0), it = gone ? null : it0, fo = f.folder ? folderById(f.folder) : null;
+    return '<div class="ci-row"><label class="ci-main"><input type="checkbox" name="ci" value="' + f.id + '" data-a-change="ci-toggle"' + (it ? ' checked' : '') + '><span class="ell">' + esc(f.name) + '</span>' + (fo ? '<small class="muted">' + esc(fo.name) + '</small>' : '') + (gone ? '<small class="muted">saiu a ' + iso(it0.d1).split('-').reverse().join('/') + '</small>' : '') + '</label>'
       + '<div class="ci-win"' + (it ? '' : ' hidden') + '>'
       + '<span class="ci-line"><small>Dias</small><input type="date" name="cid0_' + f.id + '" value="' + (it && it.d0 ? iso(it.d0) : '') + '" aria-label="Dia de entrada de ' + esc(f.name) + '"><span>–</span><input type="date" name="cid1_' + f.id + '" value="' + (it && it.d1 ? iso(it.d1) : '') + '" aria-label="Dia de saída de ' + esc(f.name) + '"></span>'
       + '<span class="ci-line"><small title="Quantas vezes por minuto este vídeo passa. Com mais de 1, o vídeo repete-se na ronda com as passagens espaçadas por igual (por exemplo A, B, C, A, D, E, F) e a campanha entra mais vezes por volta. Deixe 1 se não precisar de um ritmo próprio.">Vezes/min</small><input type="number" name="cip_' + f.id + '" min="1" max="12" step="1" value="' + ((it && it.ppm) || 1) + '" aria-label="Passagens por minuto de ' + esc(f.name) + '"></span>'
