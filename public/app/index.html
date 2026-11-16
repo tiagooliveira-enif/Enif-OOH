@@ -4061,6 +4061,8 @@ function checkNotifs() {
   const u = state.user; if (!u) return;
   const n = np(u), now = Date.now(), fresh = [];
   const fd = feed(), live = {}; fd.forEach(function(f) {live[f.id] = 1;}); Object.keys(n.seen).forEach(function(k) {if (!live[k]) delete n.seen[k];});
+  /* o que já foi ignorado ou resolvido deixa de aparecer também na lista de notificações */
+  n.inbox = n.inbox.filter(function(i) {return !state.dismissed[i.id] && !(/^al-/.test(i.id) && !live[i.id]);});
   fd.forEach(function(f) {
     if (n.seen[f.id]) return;
     n.seen[f.id] = now;
