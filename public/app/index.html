@@ -5600,9 +5600,10 @@ function readPlace(fd) {
 }
 function nameModal(id) {
   const s = screens.find(x=>x.id === id); if (!s) return;
-  modal('<form data-form="name" data-id="' + id + '" novalidate><div class="modal-h"><div><h2>Nome do ecrã</h2><p class="muted mono">' + esc(s.id) + ' · o código não muda</p></div><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
+  modal('<form data-form="name" data-id="' + id + '" novalidate><div class="modal-h"><div><h2>Nome e cidade do ecrã</h2><p class="muted mono">' + esc(s.id) + ' · o código não muda</p></div><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
     + '<div class="field"><label for="nm-venue">Local</label><input id="nm-venue" name="venue" list="nm-venues" value="' + esc(s.venue) + '" maxlength="120" autocomplete="off"><datalist id="nm-venues">' + venues.map(v=>'<option value="' + esc(v) + '">').join('') + '</datalist></div>'
     + '<div class="field"><label for="nm-spot">Ponto</label><input id="nm-spot" name="spot" value="' + esc(s.spot) + '" maxlength="120" autocomplete="off"></div>'
+    + '<div class="field"><label for="nm-city">Cidade</label><input id="nm-city" name="city" list="nm-cities" value="' + esc(s.city || '') + '" maxlength="80" autocomplete="off" placeholder="Ex.: Lisboa"><datalist id="nm-cities">' + [...new Set(screens.map(x=>x.city).filter(Boolean).concat(CITIES.map(c=>c[0])))].map(v=>'<option value="' + esc(v) + '">').join('') + '</datalist></div>'
     + '<p class="hint">As campanhas, os conteúdos e o player continuam ligados a este ecrã. Se mudares o Local e houver outros ecrãs no Local antigo, as campanhas desse Local deixam de passar aqui até as associares ao novo.</p>'
     + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Guardar</button></div></form>');
 }
@@ -7093,12 +7094,12 @@ document.addEventListener('submit', function(e) {
   if (kind === 'name') {
     if (!guard('ecras.gerir')) return;
     const s = screens.find(x=>x.id === f.dataset.id); if (!s) return;
-    const venue = String(fd.get('venue') || '').trim(), spot = String(fd.get('spot') || '').trim();
+    const venue = String(fd.get('venue') || '').trim(), spot = String(fd.get('spot') || '').trim(), city = String(fd.get('city') || '').trim();
     if (!venue || !spot) {err.textContent = 'Preencha o Local e o Ponto.'; return;}
     const old = s.venue;
-    if (venue === old && spot === s.spot) {closeModal(); return;}
+    if (venue === old && spot === s.spot && city === (s.city || '')) {closeModal(); return;}
     if (venue !== old && !screens.some(x=>x.id !== s.id && x.venue === old) && campaigns.some(c=>c.venues.indexOf(old) > -1) && !can('campanhas.gerir')) {err.textContent = 'Este Local tem campanhas e só quem gere campanhas o pode renomear.'; return;}
-    s.venue = venue; s.spot = spot;
+    s.venue = venue; s.spot = spot; s.city = city;
     let note = '';
     if (venue !== old) {
       if (!screens.some(x=>x.venue === old)) {   // era o único ecrã desse Local: as campanhas acompanham o novo nome
@@ -7107,7 +7108,7 @@ document.addEventListener('submit', function(e) {
         note = ' As campanhas do Local antigo deixam de passar aqui até as associar ao novo.';
       }
     }
-    toast('Nome do ecrã atualizado.' + note); reopenScreen(s.id); render(); return;
+    toast('Ecrã atualizado.' + note); reopenScreen(s.id); render(); return;
   }
   if (kind === 'place') {
     if (!guard('ecras.gerir')) return;
