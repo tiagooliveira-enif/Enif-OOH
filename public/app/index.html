@@ -2665,7 +2665,7 @@ button.avatar {
   margin-left: auto;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid var(--line, rgba(255, 255, 255, .18));
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.18));
   font-size: 13px;
   cursor: pointer;
   user-select: none;
@@ -3993,7 +3993,7 @@ function suggestions() {
     const g = {};
     screens.forEach(function(s) {
       if (s.status === 'novo') return;
-      const n = playlistOf(s, false).filter(c=>statusOf(c) === 'Ativa').length;
+      const n = playlistOf(s, false).filter(c=>statusOf(c) === 'Ativa' && c.items.length > 0).length;
       if (n >= state.fewMin) return;
       const k = s.venue + '|' + n; (g[k] = g[k] || {venue:s.venue, n:n, screens:[]}).screens.push(s);
     });
