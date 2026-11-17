@@ -4422,13 +4422,18 @@ function trimDraft(s) {
   playlistOf(s, true); playlistOf(s, false);
   if (d.limit === s.limit && d.order.join() === s.order.join())s.draft = null;
 }
+/* avisos «não passa neste ecrã» que já foram ignorados */
+const misfitIgn = s=>campaigns.filter(c=>noFit(c, s) && state.dismissed['iss-' + s.id + '-nofit-' + c.id]).length;
 function screenNotes(s) {
   const out = [];
   const fitOut = [], hideFit = !!state.dismissed['fitoff-' + s.id];
   let nFit = 0;
   campaigns.filter(c=>statusOf(c) !== 'Terminada' && c.venues.indexOf(s.venue) > -1 && c.items.length).forEach(function(c) {
     const fs = c.items.map(i=>fileById(i.f)).filter(Boolean), ok = fs.filter(f=>okFor(f, s));
-    if (!ok.length) {out.push('<div class="pl-warn">' + ic('alert') + '<span><b>«' + esc(c.name) + '» não passa neste ecrã.</b> Nenhum dos conteúdos está associado a este ecrã com a proporção certa (' + esc(resTxt(s)) + '). Acrescente uma versão adequada em Conteúdos.</span></div>'); return;}
+    if (!ok.length) {
+      const nk = 'iss-' + s.id + '-nofit-' + c.id; if (state.dismissed[nk]) return;
+      out.push('<div class="pl-warn">' + ic('alert') + '<span><b>«' + esc(c.name) + '» não passa neste ecrã.</b> Nenhum dos conteúdos está associado a este ecrã com a proporção certa (' + esc(resTxt(s)) + '). Acrescente uma versão adequada em Conteúdos.</span>' + (can('campanhas.gerir') ? '<button class="btn sm ghost" data-a="ign-issue" data-id="' + s.id + '" data-k="' + nk + '">Ignorar</button>' : '') + '</div>'); return;
+    }
     ok.forEach(function(f) {
       const n = fitNote(f, s); if (!n) return;
       const k = s.id + '-' + f.id + '-' + c.id, seen = state.fitSeen[k] || (state.fitSeen[k] = Date.now());
@@ -4452,7 +4457,7 @@ function playlistHtml(s) {
   const stepper = edit ? '<span class="stepper" role="group" aria-label="Máximo de campanhas em simultâneo"><button class="btn sm" data-a="limit" data-id="' + s.id + '" data-d="-1" aria-label="Menos uma campanha">−</button><input class="lim-in" type="number" min="1" max="' + LIM_MAX + '" step="1" value="' + lim + '" data-a-change="limit-input" data-id="' + s.id + '" aria-label="Número máximo de campanhas em simultâneo"><button class="btn sm" data-a="limit" data-id="' + s.id + '" data-d="1" aria-label="Mais uma campanha">+</button></span>' : '<b>' + lim + '</b>';
   const draftBar = s.draft ? '<div class="pl-draft">' + ic('alert') + '<p>Alterações por enviar. O ecrã continua a mostrar a versão anterior.</p><button class="btn sm" data-a="preview" data-id="' + s.id + '">' + ic('eye') + 'Pré-visualizar</button>' + (edit ? '<button class="btn sm primary" data-a="pl-send" data-id="' + s.id + '">' + ic('upload') + 'Enviar para o ecrã</button><button class="btn sm ghost" data-a="pl-discard" data-id="' + s.id + '">Descartar</button>' : '') + '</div>' : '';
   const strip = '<div class="pl-strip"><span>' + (!screenOn(s, h) ? 'Ecrã desligado agora (' + schedTxt(s) + '). Ele ' + untilTxt(s) + '.' : (L.loop.length ? 'Às ' + h + 'h: <b>' + L.loop.length + (L.loop.length === 1 ? ' campanha' : ' campanhas') + '</b> em loop · <b>' + L.cycle + ' s</b> ' + (L.per > 1 ? 'por ronda de ' + L.per + ' voltas (as campanhas que partilham a posição passam à vez)' : 'por volta') + ' · passam <b>' + rateTxt(L) + '</b> por minuto' + (L.spot ? ' · mais o spot da Enif, 1× por volta (' + L.spot.dur + ' s já incluídos)' : (L.spot5 ? ' · ecrã cheio: o spot da Enif passa 1× a cada 5 min (' + L.spot5.dur + ' s)' : '')) : 'Sem campanhas em loop às ' + h + 'h.' + (houseFor(s).length ? ' Passa o spot da Enif.' : ' O ecrã mostra o fundo de espera.'))) + '</span>' + (s.draft ? '' : '<button class="btn sm" data-a="preview" data-id="' + s.id + '" style="margin-left:auto">' + ic('eye') + 'Pré-visualizar o ecrã</button>') + '</div>';
-  const allW = screenIssues(s, true, true), nIgn = allW.filter(i=>i.ign).length;
+  const allW = screenIssues(s, true, true), nIgn = allW.filter(i=>i.ign).length + misfitIgn(s);
   const warns = allW.filter(i=>!i.ign).map(function(i) {
     const fix = edit ? limitFix(i) : 0;
     return '<div class="pl-warn' + (i.sev === 'info' ? ' info' : '') + '">' + ic(i.sev === 'info' && i.kind !== 'adj' ? 'check' : 'alert') + '<span>' + (i.kind === 'adj' ? '<b>Aviso. </b>' : (i.sev === 'info' ? '' : '<b>Conflito. </b>')) + issueText(i) + '</span>' + (fix ? '<button class="btn sm" data-a="limit-set" data-id="' + s.id + '" data-n="' + fix + '">Subir limite para ' + fix + '</button>' : '') + (edit && i.canIgn ? '<button class="btn sm ghost" data-a="ign-issue" data-id="' + s.id + '" data-k="' + esc(i.ik) + '">Ignorar</button>' : '') + '</div>';
