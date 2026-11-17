@@ -3602,7 +3602,7 @@ function winsOf(c, fid) {
   return out.filter(w=>w.b > w.a && w.d1 >= w.d0).sort((x, y)=>x.a - y.a);
 }
 /* troços do dia: em cada troço os mesmos vídeos estão ativos e dividem as passagens da campanha por igual */
-const onAt = (c, d, h, sc)=>c.start <= d && c.end >= d && !pausedOn(c, d) && inIvs(civs(c), h) && (!c.items.length || itemsOn(c, h, d, sc).length > 0);
+const onAt = (c, d, h, sc)=>c.start <= d && c.end >= d && !pausedOn(c, d) && inIvs(civs(c), h) && c.items.length > 0 && itemsOn(c, h, d, sc).length > 0;
 const names = ids=>ids.map(id=>'«' + campById(id).name + '»').join(', ');
 /* horário do ecrã (liga/desliga, no mesmo dia) */
 const sOn = s=>isNil(s.on) ? 0 : s.on, sOff = s=>isNil(s.off) ? 24 : s.off;
@@ -4388,6 +4388,7 @@ function plState(c, s, L, h) {
   const pf = proofOf(s);
   if (pf) return ['off', 'Em pausa (comprovativo)', ''];
   if (noFit(c, s)) return ['off', 'Sem vídeo com esta resolução', 'warn'];
+  if (!c.items.length && statusOf(c) !== 'Pausada') return ['off', 'Sem conteúdo', 'warn'];
   if (statusOf(c) === 'Pausada') return ['off', 'Em pausa', ''];
   if (statusOf(c) === 'Agendada') return ['sched', 'Agendada · ' + dShort.format(c.start), 'accent'];
   if (!screenOn(s, h)) return ['off', 'Ecrã desligado', ''];
