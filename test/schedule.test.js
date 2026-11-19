@@ -44,6 +44,13 @@ l = loop([B], D, 10, scr, hs);
 assert.equal(l.seq[l.seq.length - 1].spot, true); assert.equal(l.spot5, null);
 l = loop([B, C], D, 10, Object.assign({}, scr, { limit: 2 }), hs);
 assert.equal(l.seq.some(e => e.spot), false); assert.ok(l.spot5 && l.spot5.files[0] === 'sp');
+// hora sem campanhas: o ecrã passa só o spot da Enif (se houver um compatível); sem spot fica vazio
+l = loop([], D, 10, scr, hs);
+assert.equal(l.seq.length, 1); assert.equal(l.seq[0].spot, true); assert.deepEqual(l.seq[0].files, ['sp']); assert.equal(l.spot5, null);
+l = loop([mk('X', { h0: 9, h1: 12, items: [{ f: 'x' }] })], D, 13, scr, hs);
+assert.equal(l.seq.length, 1); assert.equal(l.seq[0].spot, true);
+assert.equal(loop([], D, 10).seq.length, 0);
+assert.equal(loop([], D, 22, { id: 'S1', venue: 'V', on: 8, off: 20 }, hs), null);
 // tipo de negócio: campanhas do mesmo tipo não ficam seguidas
 const cs = ['A', 'B', 'C', 'D'].map((n, i) => mk(n, { sector: i < 2 ? 'Cafés' : 'Banca', items: [{ f: 'x' }] }));
 l = loop(cs, D, 10);
