@@ -50,6 +50,7 @@ python3 test/e2e/avisos.py   # aviso «campanha abaixo do contratado» e «Ocupa
 python3 test/e2e/recuperacao.py   # ensaio de recuperar uma cópia de segurança numa pasta nova
 python3 test/e2e/inatividade.py   # a sessão termina por inatividade (aqui 30 s em vez de 15 min)
 python3 test/e2e/limpeza.py   # limpeza de conteúdos sem uso: aviso no painel e «Manter», reciclagem e «Restaurar», prazos
+python3 test/e2e/atualizacao.py   # a página redesenha-se sozinha sem piscar: listas de 10 linhas, «Ver tudo» aberto, scroll e pesquisa (demora ~1 min)
 python3 test/e2e/app.py      # interface real num browser: entrar, páginas, carregar ficheiro, brilho, dois passos, recuperação, telemóvel
 ```
 
