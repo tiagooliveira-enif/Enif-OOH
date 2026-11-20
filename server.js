@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS files(id TEXT PRIMARY KEY, mime TEXT, size INTEGER);
 CREATE TABLE IF NOT EXISTS live(screen TEXT PRIMARY KEY, first_seen INTEGER, last_seen INTEGER, now_c TEXT, now_f TEXT, ver TEXT, queue INTEGER DEFAULT 0, w INTEGER, h INTEGER, reload INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS beats(screen TEXT NOT NULL, minute INTEGER NOT NULL, PRIMARY KEY(screen,minute));
 CREATE TABLE IF NOT EXISTS plays(pid TEXT PRIMARY KEY, screen TEXT, camp TEXT, file TEXT, ts INTEGER, day TEXT, hour INTEGER, dur REAL, ok INTEGER);
-CREATE INDEX IF NOT EXISTS plays_day ON plays(day);
+CREATE INDEX IF NOT EXISTS plays_rep ON plays(day,screen,camp,file,hour,ok,dur);   -- cobre a soma dos Relatórios (sem ir à tabela) e as consultas por dia
+DROP INDEX IF EXISTS plays_day;
 CREATE TABLE IF NOT EXISTS resolved(id TEXT PRIMARY KEY, ts INTEGER);
 CREATE TABLE IF NOT EXISTS cal_read(id TEXT PRIMARY KEY, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, who TEXT, ip TEXT, what TEXT NOT NULL, detail TEXT);
