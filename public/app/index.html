@@ -970,6 +970,7 @@ button.t-row:hover {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--surface-2);
+  background: color-mix(in srgb, var(--surface-2) 40%, transparent);
   color: var(--fg);
   font: inherit;
   text-align: left;
@@ -978,16 +979,16 @@ button.t-row:hover {
 }
 .stile:hover {
   border-color: var(--line-strong);
-  background: var(--surface);
+  background: var(--surface-2);
   transform: translateY(-1px);
 }
 .stile.warn {
   border-color: var(--warn-soft);
-  background: linear-gradient(135deg, var(--warn-soft), transparent 65%), var(--surface-2);
+  background: linear-gradient(135deg, var(--warn-soft), transparent 65%);
 }
 .stile.bad {
   border-color: var(--bad-soft);
-  background: linear-gradient(135deg, var(--bad-soft), transparent 65%), var(--surface-2);
+  background: linear-gradient(135deg, var(--bad-soft), transparent 65%);
 }
 .stile.warn .st-v span {
   color: var(--warn);
