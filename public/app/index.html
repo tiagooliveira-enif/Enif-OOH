@@ -4281,6 +4281,7 @@ function render() {
   else if (v === 'relatorios')el.innerHTML = viewReports();
   else el.innerHTML = viewUsers();
   if (v === 'ecras')drawScreenList();
+  limitRows();   // aplica já o limite de 10 linhas (sem esperar pelo observador, que deixava a lista toda aberta por uns instantes a cada atualização)
   checkNotifs();
 }
 
