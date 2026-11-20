@@ -953,6 +953,121 @@ button.t-row:hover {
   border-top: 1px solid var(--line);
 }
 
+.stiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.stiles .lim-more {
+  grid-column: 1 / -1;
+}
+.stile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-2);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+.stile:hover {
+  border-color: var(--line-strong);
+  background: var(--surface);
+  transform: translateY(-1px);
+}
+.stile.warn {
+  border-color: var(--warn-soft);
+}
+.stile.bad {
+  border-color: var(--bad-soft);
+}
+.stile .st-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.stile .st-n {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stile .dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ok);
+  box-shadow: 0 0 0 3px var(--ok-soft);
+}
+.stile .dot.warn {
+  background: var(--warn);
+  box-shadow: 0 0 0 3px var(--warn-soft);
+}
+.stile .dot.bad {
+  background: var(--bad);
+  box-shadow: 0 0 0 3px var(--bad-soft);
+}
+.stile .st-s {
+  padding-left: 17px;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.stile .st-v {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 17px;
+}
+.stile .st-v b {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+.stile .st-v span {
+  font-size: 12px;
+  color: var(--muted);
+}
+@media (max-width: 460px) {
+  .stiles {
+    gap: 8px;
+  }
+  .stile {
+    padding: 10px 11px;
+    border-radius: 14px;
+  }
+  .stile .st-n {
+    font-size: 13.5px;
+  }
+  .stile .st-s,
+  .stile .st-v {
+    padding-left: 0;
+  }
+  .stile .st-v {
+    margin-top: 6px;
+    flex-wrap: wrap;
+    gap: 2px 6px;
+  }
+  .stile .st-v b {
+    font-size: 20px;
+  }
+}
+@media (max-width: 330px) {
+  .stiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .lim-h {
   display: none !important;
 }
@@ -4359,11 +4474,11 @@ function viewDash() {
     return '<div class="item"><span class="ico ' + (n ? 'ok' : 'warn') + '">' + ic(n ? 'play' : 'alert') + '</span><div class="grow"><div class="title">' + esc(c.name) + '</div><div class="muted">' + esc(c.client) + ' · ' + hrsC(c) + ' · ' + c.dur + ' s · ' + modTxt(c.ppm) + '</div>' + (why ? '<div class="muted"><b>' + (/sem ligação/.test(why) ? 'Sem confirmação:' : 'Não está a passar:') + '</b> ' + why + '</div>' : '') + '</div><div style="text-align:right">' + (n ? '<b>' + n + '</b> <span class="muted">' + (n === 1 ? 'ecrã' : 'ecrãs') + '</span>' : '<span class="pill warn">' + (/ainda não ligaram?/.test(why) ? 'Por ligar' : (/sem ligação/.test(why) ? 'Sem ligação' : 'Parada')) + '</span>') + '<div>' + prioPill(c.priority) + '</div></div></div>';
   }).join('') : '<div class="empty">Nenhuma campanha em reprodução neste momento.</div>';
   const stCls = {online:'ok', atencao:'warn', offline:'bad'};
-  const playScr = screens.length ? screens.map(function(s) {
-    const pl = playingOn(s), st = stCls[s.status] || 'warn';
-    const txt = pl.length ? '<button type="button" class="linklike" data-a="open-screen" data-id="' + s.id + '" title="' + esc(pl.map(c=>c.name).join(' · ')) + '"><b>' + pl.length + (pl.length === 1 ? ' campanha' : ' campanhas') + ' online</b></button>' : '<span class="muted">' + (s.status === 'offline' ? 'Sem ligação' : (s.status === 'novo' ? 'Por emparelhar' : 'Nada a passar neste momento')) + '</span>';
-    return '<div class="item"><span class="ico ' + (pl.length ? 'ok' : st) + '">' + ic(pl.length ? 'play' : (s.status === 'offline' ? 'off' : 'alert')) + '</span><div class="grow"><div class="title">' + esc(s.venue) + ' <span class="muted" style="font-weight:500">· ' + esc(s.spot) + '</span></div></div><div style="text-align:right">' + txt + '</div></div>';
-  }).join('') : '<div class="empty">Ainda não há ecrãs.</div>';
+  const playScr = screens.length ? '<div class="stiles">' + screens.map(function(s) {
+    const pl = playingOn(s), dot = pl.length ? 'ok' : (s.status === 'offline' ? 'bad' : 'warn');
+    const val = pl.length ? '<div class="st-v"><b>' + pl.length + '</b><span>' + (pl.length === 1 ? 'campanha online' : 'campanhas online') + '</span></div>' : '<div class="st-v"><span>' + (s.status === 'offline' ? 'Sem ligação' : (s.status === 'novo' ? 'Por emparelhar' : 'Nada a passar agora')) + '</span></div>';
+    return '<button type="button" class="stile ' + (pl.length ? '' : dot) + '" data-a="open-screen" data-id="' + s.id + '"' + (pl.length ? ' title="' + esc(pl.map(c=>c.name).join(' · ')) + '"' : '') + '><span class="st-h"><i class="dot ' + dot + '"></i><span class="st-n">' + esc(s.venue) + '</span></span><span class="st-s">' + esc(s.spot) + '</span>' + val + '</button>';
+  }).join('') + '</div>' : '<div class="empty">Ainda não há ecrãs.</div>';
   const playing = byScr ? playScr : playCamp;
   const playTog = '<div class="seg" role="group" aria-label="Ver por"><button type="button" data-a="play-view" data-m="camp" aria-pressed="' + (!byScr) + '">Por campanha</button><button type="button" data-a="play-view" data-m="screen" aria-pressed="' + byScr + '">Por ecrã</button></div>';
   const sg = suggestions(), cRep = can('relatorios.ver');
@@ -7216,7 +7331,7 @@ document.addEventListener('submit', function(e) {
 });
 
 /* ---------- listas compridas: 10 linhas e o botão «Ver tudo» ---------- */
-const LIM = 10, LIM_ROWS = ['item', 'crow', 'ni', 'log', 'pl-item', 'pl-warn'], limOpen = new Set();
+const LIM = 10, LIM_ROWS = ['item', 'crow', 'ni', 'log', 'pl-item', 'pl-warn', 'stile'], limOpen = new Set();
 function limitRows() {
   const groups = [];
   document.querySelectorAll('tbody').forEach(function(tb) {
