@@ -5279,8 +5279,8 @@ const MANUAL = {
    ['Mude os ecrãs permitidos', '«Ecrãs permitidos» muda os ecrãs onde o ficheiro pode passar. Tem de ficar pelo menos um.', 'conteudos.gerir'],
    ['Veja onde está a ser usado', 'As etiquetas por baixo do nome mostram as campanhas que usam o ficheiro. O «×» retira-o dessa campanha.']]},
   {h:'Limpeza automática', steps:[
-   ['Quando um conteúdo é apagado', 'Um conteúdo que não está em nenhuma campanha ativa, agendada ou em pausa (nem é spot da Enif) é apagado 180 dias depois de a última campanha acabar, ou 60 dias depois de carregado se nunca foi usado.'],
-   ['Aviso e «Manter»', '30 dias antes aparece um aviso no Painel e a etiqueta «Sem uso» no ficheiro. «Manter» dá mais 180 dias.', 'conteudos.gerir'],
+   ['Quando um conteúdo é apagado', 'Um conteúdo que não está em nenhuma campanha ativa, agendada ou em pausa (nem é spot da Enif) vai para a reciclagem passado o prazo definido: por defeito 180 dias depois de a última campanha acabar, ou 60 dias depois de carregado se nunca foi usado. O administrador muda os dias nos dois campos, no fundo da página Conteúdos (no mínimo 7 dias). Na reciclagem fica 30 dias e ainda pode ser restaurado.'],
+   ['Aviso e «Manter»', 'Nos 30 dias antes de ser apagado (ou desde logo, se o prazo for mais curto) aparece um aviso no Painel e a etiqueta «Sem uso» no ficheiro. «Manter» dá mais tantos dias como o prazo depois da última campanha.', 'conteudos.gerir'],
    ['Reciclagem', 'Apagado o prazo, o ficheiro vai para a «Reciclagem» durante 30 dias, onde «Restaurar» o devolve à biblioteca. Depois é apagado de vez; os relatórios das campanhas terminadas mantêm-se.', 'conteudos.gerir'],
    ['Mudar os prazos', 'O administrador altera os dias na barra por cima da biblioteca.', 'admin']]}],
   tips:[['A associação de um conteúdo a uma campanha faz-se na própria campanha, onde define as datas.'], ['Prefira vídeo MP4 (H.264) e confira o espaço do servidor no topo da página.']]},
@@ -5349,7 +5349,7 @@ function backBar() {
 }
 function cleanCfg() {
   const cG = can('conteudos.gerir');
-  const cfg = cG && isAdm() ? '<div class="few-ctl" style="margin:0;padding:0;border:0;gap:6px"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="30" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used" style="width:56px"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="14" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" style="width:56px" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado.</span></div>' : '';
+  const cfg = cG && isAdm() ? '<div class="few-ctl" style="margin:0;padding:0;border:0;gap:6px"><label for="cl-used">Apagar sem uso:</label><input id="cl-used" type="number" min="7" max="1000" step="1" value="' + state.clean.used + '" data-a-change="clean-cfg" data-k="used" style="width:56px"><span>dias após a última campanha;</span><input id="cl-never" type="number" min="7" max="1000" step="1" value="' + state.clean.never + '" data-a-change="clean-cfg" data-k="never" style="width:56px" aria-label="Dias para apagar se nunca usado"><span>dias se nunca usado.</span></div>' : '';
   const v = state.cview, b = (k, t, n)=>'<button class="seg-b" data-a="cview" data-v="' + k + '" aria-pressed="' + (v === k) + '">' + t + ' <b>' + n + '</b></button>';
   const bottom = '<div class="tools" style="margin-top:18px"><div class="seg sm" role="group" aria-label="Limpeza de conteúdos">' + b('exp', 'A expirar', expiring().length) + b('bin', 'Reciclagem', binList().length) + '</div>' + cfg + '</div>';
   return bottom;

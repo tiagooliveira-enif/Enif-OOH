@@ -418,6 +418,8 @@ async function main() {
     ok('fica só o nome, para os relatórios antigos', tomb.gone === true && tomb.name === 'lx-novo.png' && !tomb.screens);
     r = await call('POST', '/api/clean', { used: 90, never: 30 }, adm);
     ok('o administrador muda os prazos', r.s === 200 && r.j.used === 90);
+    r = await call('POST', '/api/clean', { used: 15, never: 15 }, adm);
+    ok('aceita prazos curtos (15 dias)', r.s === 200 && r.j.used === 15 && r.j.never === 15 && (await call('POST', '/api/clean', { used: 6, never: 15 }, adm)).s === 400);
     await call('POST', '/api/clean', { used: 180, never: 60 }, adm);
     await sync(top, [{ op: 'del', coll: 'campaigns', id: 'CL1' }, { op: 'del', coll: 'campaigns', id: 'CL2' }]);
   }

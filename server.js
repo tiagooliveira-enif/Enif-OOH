@@ -1132,7 +1132,7 @@ const router = async (req, res) => {
   if (p === '/api/clean' && m === 'POST') {
     const user = needUser(req, u); if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
     const b = await readJson(req), used = Math.round(+b.used), never = Math.round(+b.never);
-    if (!(used >= 30 && used <= 1000) || !(never >= 14 && never <= 1000)) throw bad('Indique entre 30 e 1000 dias (14 e 1000 se nunca foi usado).');
+    if (!(used >= 7 && used <= 1000) || !(never >= 7 && never <= 1000)) throw bad('Indique entre 7 e 1000 dias.');
     putDoc('settings', 'clean', { used, never, bin: CLEAN_DEF.bin }); audit(user, 'Alterou a limpeza de conteúdos', used + ' dias após a última campanha · ' + never + ' dias se nunca usado', ipOf(req));
     return send(res, 200, cleanCfg());
   }
