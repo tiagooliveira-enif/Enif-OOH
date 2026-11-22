@@ -24,6 +24,11 @@ $edge = $cands | Where-Object { $_ -and (Test-Path $_) } | Select-Object -First 
 if (-not $edge) { throw 'Não encontrei o Microsoft Edge nem o Google Chrome neste PC. Instala o Edge (https://www.microsoft.com/edge) e corre este comando outra vez.' }
 Write-Host "Navegador encontrado: $edge"
 
+# sem o pop-up «Traduzir esta página» (o navegador oferece-o quando o idioma do Windows não é o da página)
+foreach ($pol in 'HKLM:\SOFTWARE\Policies\Microsoft\Edge', 'HKLM:\SOFTWARE\Policies\Google\Chrome') {
+  try { New-Item -Path $pol -Force | Out-Null; Set-ItemProperty -Path $pol -Name TranslateEnabled -Value 0 -Type DWord } catch { Write-Host "Aviso: não consegui desligar a tradução automática em $pol." }
+}
+
 $dir = 'C:\EnifPlayer'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $url = "$Servidor/player/?code=$Codigo&key=$Chave"
