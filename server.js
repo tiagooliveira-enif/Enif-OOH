@@ -132,7 +132,7 @@ function authUser(req, u) {
 }
 function needUser(req, u) { const user = authUser(req, u); if (!user) throw new HttpError(401, 'Sessão expirada. Entre outra vez.'); return user; }
 function need(user, perm) { if (!A.can(user, perm)) throw new HttpError(403, 'Não tem permissão para esta ação.'); }
-const loginLimit = A.limiter(8, 10 * 60 * 1000);
+const loginLimit = A.limiter(4, 10 * 60 * 1000);
 function newSession(userId) {
   const token = crypto.randomBytes(32).toString('hex');
   run('INSERT INTO sessions(token,user,exp) VALUES(?,?,?)', token, userId, Date.now() + IDLE_MS);

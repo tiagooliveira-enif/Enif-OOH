@@ -79,7 +79,7 @@ async function main() {
   let st = (await call('GET', '/api/state', undefined, adm)).j;
   ok('estado: admin, sem ecrãs, sem campanhas', st.me.admin && st.screens.length === 0 && st.campaigns.length === 0 && st.users.length === 1);
   ok('a palavra-passe nunca sai do servidor', !JSON.stringify(st).includes('segredo1') && !JSON.stringify(st).includes('hash') && !('pass' in st.users[0]));
-  for (let i = 0; i < 8; i++) await call('POST', '/api/login', { email: 'lim@x.pt', pass: 'x' });
+  for (let i = 0; i < 4; i++) await call('POST', '/api/login', { email: 'lim@x.pt', pass: 'x' });
   ok('demasiadas tentativas são travadas', (await call('POST', '/api/login', { email: 'lim@x.pt', pass: 'x' })).s === 429);
 
   // ---- utilizadores e permissões

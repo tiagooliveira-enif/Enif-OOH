@@ -3627,7 +3627,7 @@ function securityHtml() {
     secItem(true, 'Palavras-passe guardadas cifradas', 'Ninguém, nem o programador, consegue lê-las.', 'Ativo')
     + secItem(true, 'Só o administrador cria contas e muda palavras-passe dos outros', 'Os outros utilizadores não podem mudar a própria palavra-passe nem criar contas.', 'Ativo')
     + secItem(true, 'Permissões verificadas pelo servidor', 'Quem não tem permissão é travado pelo servidor, não só escondido na página.', 'Ativo')
-    + secItem(true, 'Bloqueio após 8 tentativas falhadas', 'Depois de 8 erros seguidos, a entrada fica bloqueada 10 minutos. Experimente no ecrã de entrada.', 'Ativo')
+    + secItem(true, 'Bloqueio após 4 tentativas falhadas', 'Depois de 4 erros seguidos, a entrada fica bloqueada 10 minutos. Experimente no ecrã de entrada.', 'Ativo')
     + secItem(true, 'Recuperação da palavra-passe só para o administrador', 'O código é enviado para o e-mail de recuperação. Os outros pedem ao administrador.', 'Ativo')
     + secItem(!!me.twoFA, 'Verificação em dois passos', state.smtpReady ? 'Além da palavra-passe, pede um código enviado por e-mail.' : 'Precisa do envio de e-mail configurado no servidor (ficheiro enif-config.json).', me.twoFA ? 'Ligada' : (state.smtpReady ? 'Recomendado' : 'Falta o e-mail'))
     + secItem(backups.length > 0, 'Cópias de segurança', backups.length ? 'Última cópia ' + bkAgo() + ' (' + backups[0].mb + ' MB). Automáticas todas as noites, às 03h30.' : 'Ainda não há cópias. A primeira é feita esta noite, ou já com «Fazer cópia agora».', backups.length ? 'Ativo' : 'Por fazer')

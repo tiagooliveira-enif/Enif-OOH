@@ -30,7 +30,7 @@ Variáveis opcionais: `PORT` (8080), `DATA_DIR`, `TZ_NAME` (Europe/Lisbon), `MAX
 
 ## Segurança
 
-- Palavras-passe guardadas com scrypt; sessões de 30 dias; 8 tentativas falhadas bloqueiam o e-mail 10 minutos.
+- Palavras-passe guardadas com scrypt; sessões de 30 dias; 4 tentativas falhadas bloqueiam o e-mail 10 minutos.
 - **Só o administrador** muda palavras-passe (a sua e as dos outros) e recupera a sua por e-mail (código de 6 dígitos, 15 minutos, 5 tentativas). Os outros utilizadores pedem ao administrador.
 - **Verificação em dois passos** (opcional, por e-mail): ao entrar, pede um código enviado para o e-mail de recuperação. Se ficar sem acesso, `node server.js --reset-admin` desliga-a.
 - Mudar o e-mail de recuperação exige confirmar um código enviado para o **novo** e-mail.
