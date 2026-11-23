@@ -3615,6 +3615,12 @@ const bkAgo = function() {
 function secItem(ok, title, detail, tag) {
   return '<div class="item sec-item"><span class="ico ' + (ok ? 'ok' : 'warn') + '">' + ic(ok ? 'check' : 'alert') + '</span><div class="grow"><div class="title">' + title + '</div><div class="muted">' + detail + '</div></div><span class="pill ' + (ok ? 'ok' : 'warn') + '">' + tag + '</span></div>';
 }
+function devicesHtml() {
+  const L = state.devices || [];
+  return '<div class="item acct-item"><div class="grow"><div class="title">Dispositivos de confiança</div><div class="muted">Nestes navegadores não pedimos o código durante 30 dias desde a última entrada. ' + (L.length ? '' : 'Ainda não há nenhum: ao entrar, marque «Confiar neste dispositivo».') + '</div>'
+    + L.map(d=>'<div class="muted" style="margin-top:6px"><b>' + esc(d.label || 'Navegador') + '</b>' + (d.id === TID ? ' <span class="pill ok">este dispositivo</span>' : '') + ' · última entrada ' + esc(mailWhen(d.last)) + ' <button class="btn sm" data-a="dev-remove" data-id="' + esc(d.id) + '">Remover</button></div>').join('') + '</div>'
+    + (L.length ? '<button class="btn sm" data-a="dev-clear">Remover todos</button>' : '') + '</div>';
+}
 function securityHtml() {
   const me = state.user; if (!me || !me.admin) return '';
   const chk =
@@ -3632,6 +3638,7 @@ function securityHtml() {
     + '<div class="item acct-item"><div class="grow"><div class="title">Palavra-passe</div><div class="muted">Só o administrador a pode mudar. Para os outros utilizadores, use «Editar» na lista acima: não precisa de saber a palavra-passe anterior.</div></div><button class="btn sm" data-a="my-pass">Mudar a minha palavra-passe</button></div>'
     + '<div class="item acct-item"><div class="grow"><div class="title">E-mail de recuperação</div><div class="muted">Se perder a palavra-passe, o código é enviado para aqui. Um novo e-mail só passa a valer depois de confirmar um código enviado para lá.</div><div class="field-inline" style="margin-top:8px;flex-wrap:wrap"><input id="sec-rec" type="email" value="' + esc(rec) + '" aria-label="E-mail de recuperação" style="max-width:320px"><button class="btn sm" data-a="rec-save">Confirmar por e-mail</button></div></div></div>'
     + '<div class="item acct-item"><div class="grow"><div class="title">Verificação em dois passos</div><div class="muted">Está ' + (me.twoFA ? '<b>ligada</b>: ao entrar, pedimos um código enviado para ' + esc(rec) + '.' : '<b>desligada</b>. Recomendamos ligar.') + '</div></div><button class="btn sm' + (me.twoFA ? '' : ' primary') + '" data-a="twofa-toggle">' + (me.twoFA ? 'Desligar' : 'Ligar') + '</button></div>'
+    + (me.twoFA ? devicesHtml() : '')
     + '</div></div>';
   const bk = '<div class="card"><div class="card-h"><h2>' + ic('download') + 'Cópias de segurança</h2><button class="btn sm" data-a="backup-now">Fazer cópia agora</button></div><div class="card-b">'
     + backups.slice(0, 5).map(b=>'<div class="item"><div class="grow"><div class="title">' + esc(mailWhen(b.t)) + '</div><div class="muted">' + b.mb + ' MB · ' + (b.auto ? 'automática' : 'feita pelo administrador') + '</div></div><span class="pill ok dot">Concluída</span></div>').join('')
@@ -3672,7 +3679,7 @@ function loginStep(step) {
       ;
   } else if (step === 'twofa') {
     body = '<h1>Verificação em dois passos</h1><p class="muted">Enviámos um código de 6 dígitos para o seu e-mail.</p>'
-      + '<form data-form="twofa" novalidate style="margin-top:18px"><div class="field"><label for="tf-code">Código</label><input id="tf-code" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div><p class="err" id="form-err" role="alert"></p><button class="btn primary" type="submit">Confirmar</button> <button type="button" class="btn" data-a="login-back">Cancelar</button></form>'
+      + '<form data-form="twofa" novalidate style="margin-top:18px"><div class="field"><label for="tf-code">Código</label><input id="tf-code" name="code" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div><label class="row-check" style="margin:0 0 12px"><input type="checkbox" name="remember" id="tf-rem"><span class="grow">Confiar neste dispositivo durante 30 dias <small class="muted" style="display:block">Neste navegador não voltamos a pedir o código. Não use em computadores partilhados.</small></span></label><p class="err" id="form-err" role="alert"></p><button class="btn primary" type="submit">Confirmar</button> <button type="button" class="btn" data-a="login-back">Cancelar</button></form>'
       ;
   }
   $('#login').innerHTML = '<div class="card login-card">' + LOGIN_BRAND + body + '</div>';
@@ -6346,6 +6353,8 @@ function toast(msg) {
 /* ---------- ligação ao servidor ---------- */
 let TOKEN = null;
 try {TOKEN = localStorage.getItem('enif.token');} catch (e) {/* sem ação */}
+let TRUST = null, TID = null; try {TRUST = localStorage.getItem('enif.trust'); TID = localStorage.getItem('enif.tid');} catch (e) {/* sem ação */}
+function setTrust(t, id) {TRUST = t || null; TID = id || null; try {if (t) {localStorage.setItem('enif.trust', t); localStorage.setItem('enif.tid', id || '');} else {localStorage.removeItem('enif.trust'); localStorage.removeItem('enif.tid');}} catch (e) {/* sem ação */}}
 function setToken(t) {TOKEN = t; try {if (t)localStorage.setItem('enif.token', t); else localStorage.removeItem('enif.token');} catch (e) {/* sem ação */}}
 function ApiError(m, st) {this.message = m; this.status = st;}
 ApiError.prototype = Object.create(Error.prototype);
@@ -6473,7 +6482,7 @@ function applyState(st) {
     return c;
   }));
   setArr(contents, st.contents.map(function(f) {if (f.type === 'Imagem')f.url = '/media/' + f.id + '?t=' + tk; else if (f.type === 'Vídeo' || f.type === 'HTML5')f.src = '/media/' + f.id + '?t=' + tk; return f;}));
-  state.smtpReady = !!st.smtpReady; state.serverDisk = st.serverDisk || null; state.backupDisk = st.backupDisk || null;
+  state.devices = st.devices || []; state.smtpReady = !!st.smtpReady; state.serverDisk = st.serverDisk || null; state.backupDisk = st.backupDisk || null;
   setArr(auditLog, (st.auditLog || [])); setArr(backups, (st.backups || [])); setArr(emailLog, (st.emailLog || []));
   setArr(folders, st.folders);
   setArr(bin, st.bin || []); state.clean = st.clean || state.clean;
@@ -6514,6 +6523,7 @@ async function enter() {
 async function doLogin(kind, fd, err) {
   const body = {email:String(fd.get('email') || '').trim(), pass:String(fd.get('pass') || '')};
   if (kind === 'setup')body.name = String(fd.get('name') || '').trim();
+  if (kind === 'login' && TRUST)body.trust = TRUST;
   if (!body.email || !body.pass) {err.textContent = 'Indique o e-mail e a palavra-passe.'; return;}
   try {
     const r = await api('POST', kind === 'setup' ? '/api/setup' : '/api/login', body);
@@ -6589,9 +6599,16 @@ const actions = {
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) {toast('Indique um e-mail válido.'); return;}
     api('POST', '/api/me/recovery', {email:v}).then(function(r) {recModal(r.ch, v);}).catch(function(e) {toast(e.message);});
   },
+  'dev-remove':function(el) {
+    const id = el.dataset.id;
+    api('POST', '/api/me/devices/remove', {id:id}).then(function() {if (id === TID)setTrust(null); toast('Dispositivo removido: da próxima vez pede o código.'); return poll(true);}).catch(function(e) {toast(e.message);});
+  },
+  'dev-clear':function() {
+    api('POST', '/api/me/devices/clear', {}).then(function() {setTrust(null); toast('Todos os dispositivos removidos.'); return poll(true);}).catch(function(e) {toast(e.message);});
+  },
   'twofa-toggle':function() {
     const me = state.user, on = !me.twoFA;
-    api('POST', '/api/me/twofa', {on:on}).then(function() {toast(on ? 'Verificação em dois passos ligada. Na próxima entrada pedimos um código.' : 'Verificação em dois passos desligada.'); return poll(true);}).catch(function(e) {toast(e.message);});
+    api('POST', '/api/me/twofa', {on:on}).then(function() {if (!on)setTrust(null);toast(on ? 'Verificação em dois passos ligada. Na próxima entrada pedimos um código.' : 'Verificação em dois passos desligada.'); return poll(true);}).catch(function(e) {toast(e.message);});
   },
   'backup-now':function() {
     toast('A fazer a cópia…');
@@ -7119,7 +7136,7 @@ document.addEventListener('submit', function(e) {
   if (kind === 'login' || kind === 'setup') {doLogin(kind, fd, err); return;}
   if (kind === 'twofa') {
     const r = state.l2; if (!r) {renderLogin(); return;}
-    api('POST', '/api/login/code', {ch:r.ch, code:String(fd.get('code') || '').trim()}).then(function(j) {state.l2 = null; setToken(j.token); return enter();}).catch(function(e) {
+    api('POST', '/api/login/code', {ch:r.ch, code:String(fd.get('code') || '').trim(), remember:!!fd.get('remember')}).then(function(j) {state.l2 = null; if (j.trust)setTrust(j.trust, j.tid); setToken(j.token); return enter();}).catch(function(e) {
       if (/Demasiadas|expirou|apagado|Peça um novo/.test(e.message)) {state.l2 = null; renderLogin(); toast(e.message); return;}
       err.textContent = e.message;});
     return;

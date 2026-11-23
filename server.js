@@ -24,6 +24,8 @@ PRAGMA journal_mode=WAL;
 CREATE TABLE IF NOT EXISTS docs(coll TEXT NOT NULL, id TEXT NOT NULL, json TEXT NOT NULL, seq INTEGER NOT NULL, PRIMARY KEY(coll,id));
 CREATE TABLE IF NOT EXISTS secrets(coll TEXT NOT NULL, id TEXT NOT NULL, a TEXT, b TEXT, PRIMARY KEY(coll,id));
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, user TEXT NOT NULL, exp INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS trusted(id TEXT PRIMARY KEY, user TEXT NOT NULL, hash TEXT NOT NULL, label TEXT, created INTEGER, last INTEGER, exp INTEGER);
+CREATE INDEX IF NOT EXISTS trusted_hash ON trusted(hash);
 CREATE TABLE IF NOT EXISTS files(id TEXT PRIMARY KEY, mime TEXT, size INTEGER);
 CREATE TABLE IF NOT EXISTS live(screen TEXT PRIMARY KEY, first_seen INTEGER, last_seen INTEGER, now_c TEXT, now_f TEXT, ver TEXT, queue INTEGER DEFAULT 0, w INTEGER, h INTEGER, reload INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS beats(screen TEXT NOT NULL, minute INTEGER NOT NULL, PRIMARY KEY(screen,minute));
@@ -118,6 +120,28 @@ function newSession(userId) {
   run('DELETE FROM sessions WHERE exp<?', Date.now());
   return token;
 }
+/* dispositivos de confiança: quem tem a verificação em dois passos e entra com «Confiar neste dispositivo» fica 30 dias sem código nesse navegador.
+   O servidor só guarda a impressão (SHA-256) do identificador secreto, nunca o identificador; cada utilização renova os 30 dias. */
+const TRUST_MS = 30 * 864e5, TRUST_MAX = 20;
+function deviceLabel(req) {
+  const ua = String(req.headers['user-agent'] || '');
+  const br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Navegador';
+  const so = /iPhone|iPad/.test(ua) ? 'iPhone/iPad' : /Android/.test(ua) ? 'Android' : /Windows/.test(ua) ? 'Windows' : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : '';
+  return br + (so ? ' em ' + so : '');
+}
+function newTrust(userId, req) {
+  const token = crypto.randomBytes(32).toString('hex'), id = crypto.randomBytes(8).toString('hex'), now = Date.now();
+  run('DELETE FROM trusted WHERE exp<?', now);
+  run('INSERT INTO trusted(id,user,hash,label,created,last,exp) VALUES(?,?,?,?,?,?,?)', id, userId, sha(token), deviceLabel(req), now, now, now + TRUST_MS);
+  q('SELECT id FROM trusted WHERE user=? ORDER BY last DESC', userId).slice(TRUST_MAX).forEach(r => run('DELETE FROM trusted WHERE id=?', r.id));
+  return { trust: token, tid: id };
+}
+function trustOk(userId, token) {                               // devolve o id do dispositivo se o identificador é válido para este utilizador
+  if (typeof token !== 'string' || token.length < 32 || token.length > 200) return null;
+  const r = q1('SELECT id FROM trusted WHERE hash=? AND user=? AND exp>?', sha(token), userId, Date.now()); if (!r) return null;
+  run('UPDATE trusted SET last=?, exp=? WHERE id=?', Date.now(), Date.now() + TRUST_MS, r.id); return r.id;
+}
+const trustList = userId => q('SELECT id,label,created,last FROM trusted WHERE user=? AND exp>? ORDER BY last DESC', userId, Date.now());
 const userCount = () => q1("SELECT COUNT(*) n FROM docs WHERE coll='users'").n;
 const validEmail = e => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e);
 
@@ -371,7 +395,7 @@ function applyOp(user, op) {
     if (!(n.admin && n.active) && others === 0) throw bad('Tem de existir pelo menos um administrador ativo.');
     putDoc('users', id, n);
     if (pass) { const h = A.hashPassword(pass); setSecret('users', id, h.salt, h.hash); }
-    if (!self && (pass || !n.active || (old && !same(old.perms, n.perms)) || (old && old.admin !== n.admin))) run('DELETE FROM sessions WHERE user=?', id);
+    if (!self && (pass || !n.active || (old && !same(old.perms, n.perms)) || (old && old.admin !== n.admin))) { run('DELETE FROM sessions WHERE user=?', id); run('DELETE FROM trusted WHERE user=?', id); }
     if (!old) audit(user, 'Criou o utilizador', n.name);
     else if (!self || pass) audit(user, 'Atualizou o utilizador', n.name + (pass ? ' (palavra-passe redefinida pelo administrador)' : ''));
   } else throw bad('Coleção desconhecida.');
@@ -665,7 +689,7 @@ function buildState(user) {
   const st = {
     idleMin: IDLE_MS / 60000, me: publicUser(user), now: S.lisbonNow(TZ), serverTime: Date.now(), tz: TZ,
     screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: contentsView(), bin: docs('bin').filter(f => !f.gone), clean: cleanCfg(), folders: docs('folders'),
-    users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady()
+    users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady(), devices: user.twoFA ? trustList(user.id) : []
   };
   if (user.admin) {
     st.auditLog = q('SELECT ts,who,ip,what,detail FROM audit ORDER BY id DESC LIMIT 300').map(a => ({ t: a.ts, who: a.who, what: a.what, detail: a.detail }));
@@ -914,7 +938,7 @@ const codeText = (code, why, min) => 'Olá,\n\n' + why + '\n\nCódigo: ' + code 
 const ipOf = req => String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
 const minPass = p => { if (String(p || '').length < 10) throw bad('A palavra-passe precisa de pelo menos 10 caracteres.'); return String(p); };
 function setPassword(userId, pass) {
-  const h = A.hashPassword(pass); setSecret('users', userId, h.salt, h.hash); run('DELETE FROM sessions WHERE user=?', userId);
+  const h = A.hashPassword(pass); setSecret('users', userId, h.salt, h.hash); run('DELETE FROM sessions WHERE user=?', userId); run('DELETE FROM trusted WHERE user=?', userId);
 }
 
 /* ---------- registo de envios ao comercial (imutável; só se acrescentam passos) ---------- */
@@ -1035,19 +1059,19 @@ const router = async (req, res) => {
     const user = docs('users').find(x => x.email === email), sc = user && secret('users', user.id);
     if (!user || !A.checkPassword(String(b.pass || ''), sc && sc.a, sc && sc.b)) { loginLimit.fail(email); audit('—', 'Tentativa de entrada falhada', email || '(sem e-mail)', ip); throw new HttpError(401, 'E-mail ou palavra-passe incorretos.'); }
     const err = accessError(user); if (err) throw new HttpError(403, err);
-    if (user.twoFA) {                                                            // segundo passo: código enviado por e-mail
+    if (user.twoFA && !trustOk(user.id, b.trust)) {                              // segundo passo: código enviado por e-mail (dispensado num dispositivo de confiança)
       const ch = newChallenge('login', user.id, 10 * 60 * 1000);
       await mailCode(user.recovery || user.email, 'O seu código de entrada no Enif DOOH', codeText(ch.code, 'Pediram para entrar na sua conta do Enif DOOH.', 10));
       return send(res, 200, { step: 'code', ch: ch.id });
     }
-    loginLimit.ok(email); audit(user, 'Entrou', '', ip);
+    loginLimit.ok(email); audit(user, user.twoFA ? 'Entrou (dispositivo de confiança)' : 'Entrou', '', ip);
     return send(res, 200, { token: newSession(user.id) });
   }
   if (p === '/api/login/code' && m === 'POST') {
     const b = await readJson(req), c = checkChallenge(b.ch, 'login', b.code), user = getDoc('users', c.user);
     if (!user || accessError(user)) throw new HttpError(403, 'Esta conta não pode entrar.');
-    run('DELETE FROM chal WHERE id=?', c.id); loginLimit.ok(user.email); audit(user, 'Entrou (com código por e-mail)', '', ipOf(req));
-    return send(res, 200, { token: newSession(user.id) });
+    run('DELETE FROM chal WHERE id=?', c.id); loginLimit.ok(user.email); audit(user, 'Entrou (com código por e-mail)', b.remember ? 'e passou a confiar neste dispositivo' : '', ipOf(req));
+    return send(res, 200, Object.assign({ token: newSession(user.id) }, b.remember ? newTrust(user.id, req) : {}));
   }
   if (p === '/api/forgot' && m === 'POST') {                                      // a resposta é igual para qualquer e-mail
     const b = await readJson(req), email = String(b.email || '').trim().toLowerCase(), ip = ipOf(req);
@@ -1083,9 +1107,14 @@ const router = async (req, res) => {
     if (p === '/api/me/twofa') {
       const on = !!b.on;
       if (on && !smtpReady()) throw new HttpError(503, 'O envio de e-mail ainda não está configurado no servidor. Sem isso não é possível ligar a verificação em dois passos.');
-      save({ twoFA: on }); audit(user, on ? 'Ligou a verificação em dois passos' : 'Desligou a verificação em dois passos', '', ipOf(req));
+      save({ twoFA: on }); if (!on) run('DELETE FROM trusted WHERE user=?', user.id); audit(user, on ? 'Ligou a verificação em dois passos' : 'Desligou a verificação em dois passos', '', ipOf(req));
       return send(res, 200, { ok: true });
     }
+    if (p === '/api/me/devices/remove') {
+      const r = run('DELETE FROM trusted WHERE id=? AND user=?', String(b.id || ''), user.id);
+      audit(user, 'Retirou a confiança a um dispositivo', '', ipOf(req)); return send(res, 200, { ok: true });
+    }
+    if (p === '/api/me/devices/clear') { run('DELETE FROM trusted WHERE user=?', user.id); audit(user, 'Retirou a confiança a todos os dispositivos', '', ipOf(req)); return send(res, 200, { ok: true }); }
     if (p === '/api/me/recovery') {                                                // o novo e-mail só vale depois de confirmado com um código lá enviado
       const to = String(b.email || '').trim().toLowerCase(); if (!validEmail(to)) throw bad('Indique um e-mail válido.');
       const ch = newChallenge('recovery', user.id, 15 * 60 * 1000, { to });

@@ -26,6 +26,32 @@ async function main() {
   let r = await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'segredo1' });
   ok('o administrador inicial entra', r.s === 200 && r.j.token);
   let adm = r.j.token;
+  // ---- dispositivos de confiança (verificação em dois passos): 30 dias sem código só no navegador já verificado
+  {
+    const crypto = require('node:crypto');
+    const uid = db.prepare("SELECT id FROM docs WHERE coll='users' AND json LIKE '%tiago@enif.pt%'").get().id;
+    const setTwo = on => { const d = JSON.parse(db.prepare("SELECT json FROM docs WHERE coll='users' AND id=?").get(uid).json); d.twoFA = on; db.prepare("UPDATE docs SET json=? WHERE coll='users' AND id=?").run(JSON.stringify(d), uid); };
+    const put = (tok, exp, user) => db.prepare('INSERT INTO trusted(id,user,hash,label,created,last,exp) VALUES(?,?,?,?,?,?,?)').run('t' + Math.random(), user || uid, crypto.createHash('sha256').update(tok).digest('hex'), 'Teste', Date.now(), Date.now(), exp);
+    const T1 = 'a'.repeat(64), T2 = 'b'.repeat(64), T3 = 'c'.repeat(64);
+    setTwo(true); put(T1, Date.now() + 5 * 864e5); put(T2, Date.now() - 1000); put(T3, Date.now() + 5 * 864e5, 'outro-utilizador');
+    const lg = tr => call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'segredo1', trust: tr });
+    let x = await lg(T1);
+    ok('2FA ligada + dispositivo de confiança válido: entra sem código', x.s === 200 && x.j.token);
+    const nova = db.prepare('SELECT exp FROM trusted WHERE hash=?').get(crypto.createHash('sha256').update(T1).digest('hex')).exp;
+    ok('cada entrada renova os 30 dias', Math.abs(nova - (Date.now() + 30 * 864e5)) < 10000);
+    x = await lg(T2); ok('dispositivo expirado: pede o código (não dá sessão)', !(x.j && x.j.token));
+    x = await lg(T3); ok('identificador de outro utilizador não serve', !(x.j && x.j.token));
+    x = await lg('d'.repeat(64)); ok('identificador desconhecido não serve', !(x.j && x.j.token));
+    x = await lg(undefined); ok('sem identificador: pede o código', !(x.j && x.j.token));
+    x = await call('POST', '/api/me/devices/clear', {}, r.j.token);
+    ok('«remover todos» apaga os dispositivos do utilizador', x.s === 200 && db.prepare('SELECT COUNT(*) n FROM trusted WHERE user=?').get(uid).n === 0);
+    x = await lg(T1); ok('depois de retirada a confiança o identificador deixa de servir', !(x.j && x.j.token));
+    put(T1, Date.now() + 864e5);
+    await call('POST', '/api/me/twofa', { on: false }, r.j.token);
+    ok('desligar a verificação apaga os dispositivos', db.prepare('SELECT COUNT(*) n FROM trusted WHERE user=?').get(uid).n === 0);
+    setTwo(false);
+    r = await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'segredo1' });
+  }
   // ---- a sessão termina por inatividade (15 minutos); só quem usa a página a prolonga
   {
     const exp = t => db.prepare('SELECT exp FROM sessions WHERE token=?').get(t).exp;
