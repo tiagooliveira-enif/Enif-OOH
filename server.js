@@ -70,15 +70,18 @@ const setSecret = (coll, id, a, b) => run('INSERT INTO secrets(coll,id,a,b) VALU
 /* ---------- http ---------- */
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const bad = (msg) => new HttpError(400, msg);
+/* política de conteúdos das páginas: só este servidor, mais as fontes Google e as bibliotecas de PDF (cdnjs); nada de plugins, nem de ser embutido noutra página */
+const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 const send = (res, code, body, type = 'application/json; charset=utf-8', extra = {}) => {
-  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' }, extra));
+  const https = res.req && String(res.req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
+  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' }, /html/.test(type) ? { 'Content-Security-Policy': CSP } : {}, https ? { 'Strict-Transport-Security': 'max-age=15552000' } : {}, extra));
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 };
 function readJson(req, limit = 3e6) {
   return new Promise((ok, ko) => {
     let n = 0; const b = [];
     req.on('data', c => { n += c.length; if (n > limit) { ko(new HttpError(413, 'Pedido demasiado grande')); req.destroy(); } else b.push(c); });
-    req.on('end', () => { try { ok(b.length ? JSON.parse(Buffer.concat(b).toString('utf8')) : {}); } catch (e) { ko(bad('JSON inválido')); } });
+    req.on('end', () => { try { const j = b.length ? JSON.parse(Buffer.concat(b).toString('utf8')) : {}; if (j === null || typeof j !== 'object') throw new Error('x'); ok(j); } catch (e) { ko(bad('JSON inválido')); } });
     req.on('error', ko);
   });
 }

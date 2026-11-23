@@ -26,6 +26,10 @@ async function main() {
   let r = await call('POST', '/api/login', { email: 'tiago@enif.pt', pass: 'segredo1' });
   ok('o administrador inicial entra', r.s === 200 && r.j.token);
   let adm = r.j.token;
+  // ---- endurecimento: corpo inválido não dá erro 500; páginas com política de conteúdos
+  ok('login com corpo «null» dá erro 400, não 500', (await call('POST', '/api/login', null)).s === 400);
+  { const h = await fetch(base + '/app/'); ok('a página traz Content-Security-Policy sem permitir ser embutida', /frame-ancestors 'none'/.test(h.headers.get('content-security-policy') || '') && !/Strict-Transport/.test([...h.headers.keys()].join()));
+    const h2 = await fetch(base + '/app/', { headers: { 'X-Forwarded-Proto': 'https' } }); ok('atrás de HTTPS acrescenta HSTS', !!h2.headers.get('strict-transport-security')); }
   // ---- dispositivos de confiança (verificação em dois passos): 30 dias sem código só no navegador já verificado
   {
     const crypto = require('node:crypto');
