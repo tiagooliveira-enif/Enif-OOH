@@ -210,6 +210,11 @@ async function main() {
   ok('falhas ≥ 5 % → atenção e alerta', st.screens[0].status === 'atencao' && st.alerts.some(a => a.id.startsWith('fail-')));
   r = await call('GET', `/api/plays?from=${today}&to=${today}`, undefined, top);
   ok('relatório agrega por hora', r.s === 200 && r.j.rows.length === 1 && r.j.rows[0].n === 12 && r.j.rows[0].bad === 0 || r.j.rows.reduce((a, x) => a + x.n, 0) === 12);
+  { const raw = db.prepare("SELECT SUM(ok) n, COUNT(*)-SUM(ok) bad, ROUND(SUM(CASE WHEN ok=1 THEN dur ELSE 0 END)) sec FROM plays WHERE day=? AND screen='ECR-001'").get(today);
+    const ag = r.j.rows.reduce((a, x) => ({ n: a.n + x.n, bad: a.bad + x.bad, sec: a.sec + x.sec }), { n: 0, bad: 0, sec: 0 });
+    ok('os totais por hora dão o mesmo que somar as passagens uma a uma', raw.n === ag.n && raw.bad === ag.bad && raw.sec === ag.sec);
+    const gz = await fetch(base + `/api/plays?from=${today}&to=${today}`, { headers: { Authorization: 'Bearer ' + top, 'Accept-Encoding': 'gzip' } });
+    ok('respostas grandes seguem comprimidas quando o navegador aceita', gz.headers.get('content-encoding') === 'gzip' || (await gz.clone().text()).length < 1024); }
   ok('relatório com filtros', (await call('GET', `/api/plays?from=${today}&to=${today}&camp=XX`, undefined, top)).j.rows.length === 0);
   ok('relatório exige permissão', (await call('GET', `/api/plays?from=${today}&to=${today}`, undefined, tcn)).s === 403);
   ok('período inválido recusado', (await call('GET', '/api/plays?from=x&to=y', undefined, top)).s === 400);

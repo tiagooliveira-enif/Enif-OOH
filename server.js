@@ -1,7 +1,7 @@
 'use strict';
 const isNil = v => v === null || v === undefined;
 /* Enif OOH – servidor. Sem dependências: só Node 22.13+. */
-const http = require('node:http'), fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto');
+const http = require('node:http'), fs = require('node:fs'), path = require('node:path'), crypto = require('node:crypto'), zlib = require('node:zlib');
 const { DatabaseSync } = require('node:sqlite');
 const S = require('./lib/schedule');
 const MAIL = require('./lib/mail'), REPORT = require('./lib/report');
@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS beats(screen TEXT NOT NULL, minute INTEGER NOT NULL, 
 CREATE TABLE IF NOT EXISTS plays(pid TEXT PRIMARY KEY, screen TEXT, camp TEXT, file TEXT, ts INTEGER, day TEXT, hour INTEGER, dur REAL, ok INTEGER);
 CREATE INDEX IF NOT EXISTS plays_rep ON plays(day,screen,camp,file,hour,ok,dur);   -- cobre a soma dos Relatórios (sem ir à tabela) e as consultas por dia
 DROP INDEX IF EXISTS plays_day;
+CREATE TABLE IF NOT EXISTS plays_agg(screen TEXT, camp TEXT, file TEXT, day TEXT, hour INTEGER, n INTEGER, bad INTEGER, sec REAL, PRIMARY KEY(day,screen,camp,file,hour)) WITHOUT ROWID;   -- totais por hora: os Relatórios somam esta tabela (pequena), não milhões de passagens
 CREATE TABLE IF NOT EXISTS resolved(id TEXT PRIMARY KEY, ts INTEGER);
 CREATE TABLE IF NOT EXISTS cal_read(id TEXT PRIMARY KEY, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS audit(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, who TEXT, ip TEXT, what TEXT NOT NULL, detail TEXT);
@@ -43,6 +44,9 @@ CREATE TABLE IF NOT EXISTS alert_mail(id TEXT PRIMARY KEY, ts INTEGER NOT NULL, 
 CREATE TABLE IF NOT EXISTS proof_log(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, t0 INTEGER NOT NULL, files TEXT NOT NULL, secs INTEGER NOT NULL, who TEXT);
 `);
 try { db.exec('ALTER TABLE plays ADD COLUMN why TEXT'); } catch (e) { /* já existe */ }
+if (!db.prepare('SELECT 1 x FROM plays_agg LIMIT 1').get()) {                    // primeira vez: junta as passagens que já existem (uma só vez)
+  db.exec("INSERT INTO plays_agg(screen,camp,file,day,hour,n,bad,sec) SELECT screen,camp,file,day,hour,SUM(ok),COUNT(*)-SUM(ok),SUM(CASE WHEN ok=1 THEN dur ELSE 0 END) FROM plays GROUP BY day,screen,camp,file,hour");
+}
 for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const q1 = (sql, ...a) => db.prepare(sql).get(...a);
@@ -82,8 +86,11 @@ function cspOfHtml(buf, key) {
 }
 const send = (res, code, body, type = 'application/json; charset=utf-8', extra = {}) => {
   const https = res.req && String(res.req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
-  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' }, extra['Content-Security-Policy'] ? {} : (/html/.test(type) && res.cspKey ? { 'Content-Security-Policy': cspOfHtml(body, res.cspKey) } : (/html/.test(type) ? { 'Content-Security-Policy': cspFor([]) } : {})), https ? { 'Strict-Transport-Security': 'max-age=15552000' } : {}, extra));
-  res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
+  let out = typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body);
+  const zip = out.length > 1024 && /json|html|javascript|css|svg|csv|text\/plain/.test(type) && res.req && /\bgzip\b/.test(String(res.req.headers['accept-encoding'] || '')) && !extra['Content-Encoding'];   // respostas grandes (relatórios, a própria página) seguem comprimidas: 5 a 10 vezes mais pequenas
+  if (zip) out = zlib.gzipSync(out, { level: 4 });
+  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' }, extra['Content-Security-Policy'] ? {} : (/html/.test(type) && res.cspKey ? { 'Content-Security-Policy': cspOfHtml(body, res.cspKey) } : (/html/.test(type) ? { 'Content-Security-Policy': cspFor([]) } : {})), zip ? { 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' } : {}, https ? { 'Strict-Transport-Security': 'max-age=15552000' } : {}, extra));
+  res.end(out);
 };
 function readJson(req, limit = 3e6) {
   return new Promise((ok, ko) => {
@@ -780,6 +787,7 @@ function playerApi(req, res, u, body) {
         if (x.c === '__proof') { got.push(x.pid); return; }                          // comprovativo: confirma a receção mas não conta nos relatórios
         const ts = Math.min(+x.ts || Date.now(), Date.now() + 60000), ln = S.lisbonNow(TZ, new Date(ts));
         const r = run('INSERT OR IGNORE INTO plays(pid,screen,camp,file,ts,day,hour,dur,ok,why) VALUES(?,?,?,?,?,?,?,?,?,?)', String(x.pid).slice(0, 80), s.id, String(x.c || '').slice(0, 80), String(x.f || '').slice(0, 80), ts, ln.date, ln.h, +x.dur || 0, x.ok ? 1 : 0, x.ok ? null : String(x.why || '').slice(0, 60) || null);
+        if (Number(r.changes)) run('INSERT INTO plays_agg(screen,camp,file,day,hour,n,bad,sec) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(day,screen,camp,file,hour) DO UPDATE SET n=n+excluded.n, bad=bad+excluded.bad, sec=sec+excluded.sec', s.id, String(x.c || '').slice(0, 80), String(x.f || '').slice(0, 80), ln.date, ln.h, x.ok ? 1 : 0, x.ok ? 0 : 1, x.ok ? (+x.dur || 0) : 0);
         saved += Number(r.changes); got.push(x.pid);
       });
       db.exec('COMMIT');
@@ -858,7 +866,7 @@ function playsApi(res, u, user) {
   const camp = u.searchParams.get('camp'); if (camp) { where += ' AND camp=?'; args.push(camp); }
   const scr = (u.searchParams.get('screens') || '').split(',').filter(Boolean).slice(0, 500);
   if (scr.length) { where += ` AND screen IN (${scr.map(() => '?').join(',')})`; args.push(...scr); }
-  const rows = q(`SELECT screen s, camp c, file f, day d, hour h, SUM(ok) n, COUNT(*)-SUM(ok) bad, ROUND(SUM(CASE WHEN ok=1 THEN dur ELSE 0 END)) sec FROM plays WHERE ${where} GROUP BY screen,camp,file,day,hour`, ...args);
+  const rows = q(`SELECT screen s, camp c, file f, day d, hour h, SUM(n) n, SUM(bad) bad, ROUND(SUM(sec)) sec FROM plays_agg WHERE ${where} GROUP BY screen,camp,file,day,hour`, ...args);
   send(res, 200, { rows, now: S.lisbonNow(TZ) });
 }
 
@@ -966,7 +974,7 @@ const dayDiff = (a, b) => Math.round((new Date(a + 'T00:00:00Z') - new Date(b + 
 
 async function finalReportPdf(c) {
   const scrs = docs('screens').filter(s => c.venues.indexOf(s.venue) > -1);
-  const rows = scrs.length ? q(`SELECT screen s, camp c, file f, day d, hour h, SUM(ok) n, COUNT(*)-SUM(ok) bad, ROUND(SUM(CASE WHEN ok=1 THEN dur ELSE 0 END)) sec FROM plays WHERE day>=? AND day<=? AND screen IN (${scrs.map(() => '?').join(',')}) GROUP BY screen,camp,file,day,hour`, c.start, c.end, ...scrs.map(s => s.id)) : [];
+  const rows = scrs.length ? q(`SELECT screen s, camp c, file f, day d, hour h, SUM(n) n, SUM(bad) bad, ROUND(SUM(sec)) sec FROM plays_agg WHERE day>=? AND day<=? AND screen IN (${scrs.map(() => '?').join(',')}) GROUP BY screen,camp,file,day,hour`, c.start, c.end, ...scrs.map(s => s.id)) : [];
   const files = {}, tmp = fs.mkdtempSync(path.join(require('node:os').tmpdir(), 'enif-pdf-'));
   try {
     const ids = [...new Set(rows.filter(r => r.c === c.id).map(r => r.f))];
