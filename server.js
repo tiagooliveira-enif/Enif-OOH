@@ -71,10 +71,18 @@ const setSecret = (coll, id, a, b) => run('INSERT INTO secrets(coll,id,a,b) VALU
 class HttpError extends Error { constructor(code, msg) { super(msg); this.code = code; } }
 const bad = (msg) => new HttpError(400, msg);
 /* política de conteúdos das páginas: só este servidor, mais as fontes Google e as bibliotecas de PDF (cdnjs); nada de plugins, nem de ser embutido noutra página */
-const CSP = "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+const cspFor = hashes => "default-src 'self'; script-src 'self' " + hashes.map(h => "'sha256-" + h + "'").join(' ') + " https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
+/* os scripts escritos dentro da página só correm se a sua impressão digital (SHA-256) estiver na política: um script injetado por alguém não corre */
+const CSP_CACHE = new Map();
+function cspOfHtml(buf, key) {
+  const m = fs.statSync(key).mtimeMs, c = CSP_CACHE.get(key); if (c && c.m === m) return c.v;
+  const hs = [], re = /<script(?![^>]*\ssrc=)[^>]*>([\s\S]*?)<\/script>/gi; let x;
+  const txt = buf.toString('utf8'); while ((x = re.exec(txt))) hs.push(crypto.createHash('sha256').update(x[1], 'utf8').digest('base64'));
+  const v = cspFor(hs); CSP_CACHE.set(key, { m, v }); return v;
+}
 const send = (res, code, body, type = 'application/json; charset=utf-8', extra = {}) => {
   const https = res.req && String(res.req.headers['x-forwarded-proto'] || '').split(',')[0].trim() === 'https';
-  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' }, /html/.test(type) ? { 'Content-Security-Policy': CSP } : {}, https ? { 'Strict-Transport-Security': 'max-age=15552000' } : {}, extra));
+  res.writeHead(code, Object.assign({ 'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'X-Frame-Options': 'DENY' }, extra['Content-Security-Policy'] ? {} : (/html/.test(type) && res.cspKey ? { 'Content-Security-Policy': cspOfHtml(body, res.cspKey) } : (/html/.test(type) ? { 'Content-Security-Policy': cspFor([]) } : {})), https ? { 'Strict-Transport-Security': 'max-age=15552000' } : {}, extra));
   res.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
 };
 function readJson(req, limit = 3e6) {
@@ -92,6 +100,7 @@ function serveStatic(res, rel) {
   if (!f.startsWith(root + path.sep)) throw new HttpError(403, 'Proibido');
   let p = f; if (fs.existsSync(p) && fs.statSync(p).isDirectory()) p = path.join(p, 'index.html');
   if (!fs.existsSync(p)) throw new HttpError(404, 'Não encontrado');
+  res.cspKey = p;
   send(res, 200, fs.readFileSync(p), MIME[path.extname(p)] || 'application/octet-stream');
 }
 

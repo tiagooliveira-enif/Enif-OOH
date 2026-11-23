@@ -28,6 +28,7 @@ async function main() {
   let adm = r.j.token;
   // ---- endurecimento: corpo inválido não dá erro 500; páginas com política de conteúdos
   ok('login com corpo «null» dá erro 400, não 500', (await call('POST', '/api/login', null)).s === 400);
+  { const c = (await fetch(base + '/app/')).headers.get('content-security-policy') || ''; ok('scripts: só os da própria página (impressão digital), sem unsafe-inline', /script-src 'self' 'sha256-[A-Za-z0-9+/=]+'/.test(c) && !/script-src[^;]*unsafe-inline/.test(c)); }
   { const h = await fetch(base + '/app/'); ok('a página traz Content-Security-Policy sem permitir ser embutida', /frame-ancestors 'none'/.test(h.headers.get('content-security-policy') || '') && !/Strict-Transport/.test([...h.headers.keys()].join()));
     const h2 = await fetch(base + '/app/', { headers: { 'X-Forwarded-Proto': 'https' } }); ok('atrás de HTTPS acrescenta HSTS', !!h2.headers.get('strict-transport-security')); }
   // ---- dispositivos de confiança (verificação em dois passos): 30 dias sem código só no navegador já verificado
