@@ -9,7 +9,6 @@ Guia curto do que convém fazer de vez em quando para a plataforma continuar sau
 | Uma vez por semana | Olhar para o Painel (ecrãs online), a página Utilizadores → Segurança (cópias e disco) e o Registo de auditoria (tentativas falhadas) | 3 min |
 | Todos os meses | Ensaiar a cópia externa (secção 1) | 5 min |
 | Todos os 3 meses | Atualizar o Windows dos ecrãs (secção 3) | ~30 min por PC |
-| Uma vez | Ligar a monitorização do servidor (secção 2) | 5 min |
 | Em 31/12 e 01/01 | Confirmar que os ecrãs continuam online (secção 4) | 2 min |
 
 ## 1. Ensaiar a cópia de segurança externa
@@ -22,7 +21,7 @@ No servidor, como `root`:
 python3 /opt/enif-ooh/scripts/ensaiar-recuperacao.py
 ```
 
-Pede a palavra de cifra (a que guardaste fora do servidor), descarrega a cópia mais recente para uma pasta temporária, verifica-a e apaga-a. **Não mexe nos dados reais.** Deve acabar com «CERTA: a palavra de cifra guardada abre a cópia…».
+Pede a palavra de cifra (a que escolheste ao configurar a cópia externa e guardaste fora do servidor: gestor de palavras-passe ou cópia em papel; nunca a escrevas no chat), descarrega a cópia mais recente para uma pasta temporária, verifica-a e apaga-a. **Não mexe nos dados reais.** Deve acabar com «CERTA: a palavra de cifra guardada abre a cópia…».
 
 Se disser «ERRADA» ou «a cópia externa ainda não está configurada»: a cópia externa não está a funcionar. Configura-a com `python3 /opt/enif-ooh/scripts/configurar-backblaze.py` e volta a ensaiar.
 
@@ -30,16 +29,7 @@ Para recuperar de verdade (servidor perdido), os passos estão no README, secç�
 
 ## 2. Aviso se o servidor cair
 
-Hoje só dás por isso quando abres a app ou um ecrã fica offline. Um serviço gratuito avisa-te por e-mail.
-
-1. Cria uma conta grátis em **uptimerobot.com**.
-2. **Add New Monitor** → tipo **HTTP(s)**.
-3. Nome: `Enif DOOH`. URL: `https://enifdooh.pt/api/status`.
-4. Intervalo: **5 minutos**.
-5. Em «Alert contacts» escolhe o teu e-mail.
-6. Guarda. Para testar, o serviço tem um botão de teste; ou desliga o servidor um minuto fora de horas.
-
-Se o servidor deixar de responder durante uns minutos, recebes um e-mail. Quando voltar, recebes outro.
+Já está feito desde 28/10: o **UptimeRobot** vigia `https://enifdooh.pt/health` de 5 em 5 minutos e avisa por e-mail se o servidor deixar de responder. Nada a fazer; só convém confirmar, de vez em quando, que o e-mail de aviso continua a ser o certo.
 
 ## 3. Atualizações do Windows nos ecrãs (de 3 em 3 meses)
 
