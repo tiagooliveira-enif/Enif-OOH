@@ -17,9 +17,23 @@ def ask(texto, secreto=False):
         if v:
             return v
         print('   (ficou vazio, escreva outra vez)')
-bucket = ask('Nome do bucket do Backblaze (completo): ')
-kid = ask('keyID da chave de aplicação: ')
-key = ask('applicationKey (não aparece nada ao escrever): ', True)
+PASTA = os.environ.get('PASTA_B2', 'enif')   # pasta dentro do bucket; para recomeçar com outra palavra de cifra, usar outra (ex.: PASTA_B2=enif-2)
+bucket = kid = key = ''
+if os.path.exists(CONF):                       # já configurado: pode aproveitar o bucket e a chave do Backblaze e mudar só a palavra de cifra
+    import configparser
+    cp = configparser.ConfigParser(); cp.read(CONF)
+    try:
+        kid, key = cp['b2']['account'], cp['b2']['key']; bucket = cp['b2crypt']['remote'].split(':', 1)[1].split('/')[0]
+    except KeyError:
+        bucket = kid = key = ''
+    if bucket and kid and key:
+        r = input('Já existe uma configuração (bucket «%s»). Aproveitar o bucket e a chave do Backblaze e pedir só a nova palavra de cifra? [S/n] ' % bucket).strip().lower()
+        if r in ('n', 'nao', 'não'):
+            bucket = kid = key = ''
+if not (bucket and kid and key):
+    bucket = ask('Nome do bucket do Backblaze (completo): ')
+    kid = ask('keyID da chave de aplicação: ')
+    key = ask('applicationKey (não aparece nada ao escrever): ', True)
 while True:
     p1 = ask('Palavra de cifra, mínimo 12 caracteres (guarde-a também fora do servidor!): ', True)
     p2 = ask('Repita a palavra de cifra: ', True)
@@ -27,8 +41,10 @@ while True:
         break
     print('   (as palavras não são iguais ou têm menos de 12 caracteres; escreva outra vez)')
 obs = subprocess.run(['rclone', 'obscure', '-'], input=p1, capture_output=True, text=True, check=True).stdout.strip()
+if os.path.exists(CONF):
+    shutil.copy2(CONF, CONF + '.antiga')           # guarda a configuração anterior, por segurança
 with open(CONF, 'w') as f:
-    f.write('[b2]\ntype = b2\naccount = %s\nkey = %s\n\n[b2crypt]\ntype = crypt\nremote = b2:%s/enif\npassword = %s\nfilename_encryption = standard\ndirectory_name_encryption = true\n' % (kid, key, bucket, obs))
+    f.write('[b2]\ntype = b2\naccount = %s\nkey = %s\n\n[b2crypt]\ntype = crypt\nremote = b2:%s/%s\npassword = %s\nfilename_encryption = standard\ndirectory_name_encryption = true\n' % (kid, key, bucket, PASTA, obs))
 os.chmod(CONF, 0o600)
 env = dict(os.environ, RCONF=CONF, RCLONE_CONFIG=CONF)
 print('A testar a ligação (envia e lê um ficheiro de teste cifrado) ...')
