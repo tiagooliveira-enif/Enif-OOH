@@ -38,6 +38,11 @@ assert.equal(loop([mk('N', { items: [{ f: 'x' }] })], D, 10, scr, { contents: [f
 // proporção incompatível não passa; ajuste ≤10px passa
 assert.equal(S.fitOf({ res: '1080×1920' }, scr).ok, false);
 assert.equal(S.fitOf({ res: '1920×1075' }, scr).k, 'ajuste');
+// «Esticar»: qualquer proporção serve (o player estica); sem «Esticar» continua incompatível
+assert.equal(S.fitOf({ res: '1080×1920' }, Object.assign({}, scr, { fit: 'esticar' })).ok, true);
+assert.equal(S.fitOf({ res: '1080×1920' }, Object.assign({}, scr, { fit: 'esticar' })).k, 'estica');
+assert.equal(S.fitOf({ res: '1080×1920' }, Object.assign({}, scr, { fit: 'caber' })).ok, false);
+assert.equal(S.fitOf({ res: '1920×1075' }, Object.assign({}, scr, { fit: 'esticar' })).k, 'ajuste');
 // spot: ecrã com folga leva o spot no fim da volta; ecrã cheio leva spot5
 const hs = { contents: ctx.contents.concat([file('sp', { house: true })]) };
 l = loop([B], D, 10, scr, hs);

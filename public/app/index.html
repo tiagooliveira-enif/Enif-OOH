@@ -3541,6 +3541,7 @@ function fitOf(f, s) {
   const d = Math.min(Math.abs(a.h * b.w / a.w - b.h), Math.abs(a.w * b.h / a.h - b.w)), r = Math.round(d);
   if (d < 0.5) return {k:'escala', ok:true, de:de, para:para};
   if (r <= FIT_PX) return {k:'ajuste', ok:true, px:Math.max(1, r), de:de, para:para};
+  if (s.fit === 'esticar') return {k:'estica', ok:true, px:r, de:de, para:para};   /* «Esticar»: qualquer proporção serve, o player estica o conteúdo ao ecrã */
   return {k:'incomp', ok:false, px:r, de:de, para:para};
 }
 /* o conteúdo passa neste ecrã: foi associado a ele e a proporção serve */
@@ -3548,6 +3549,7 @@ const okFor = (f, s)=>!f || !s || ((!f.screens || f.screens.indexOf(s.id) > -1) 
 function fitNote(f, s) {
   const x = fitOf(f, s);
   if (x.k === 'escala') return 'redimensionado de ' + x.de + ' para ' + x.para + ' (mesma proporção)';
+  if (x.k === 'estica') return 'esticado de ' + x.de + ' para ' + x.para + ' (a imagem fica deformada, como pedido em «Esticar»)';
   if (x.k === 'ajuste') return 'ajustado de ' + x.de + ' para ' + x.para + ': a proporção diferia ' + x.px + ' px e foi corrigida';
   return '';
 }
@@ -5451,7 +5453,7 @@ function screenPick(name, f, chosen) {
     const list = by[v], okL = list.filter(x=>fitOf(f, x).ok);
     return '<div class="vgroup"><label class="vhead"><input type="checkbox" data-a-change="utoggle"' + (okL.length && okL.every(x=>chosen.indexOf(x.id) > -1) ? ' checked' : '') + (okL.length ? '' : ' disabled') + '><b>' + esc(v) + '</b><span class="muted">' + list.length + (list.length === 1 ? ' ecrã' : ' ecrãs') + '</span></label>'
       + list.map(function(x) {
-        const t = fitOf(f, x), tag = t.k === 'igual' ? 'Mesma resolução' : (t.k === 'escala' ? 'Redimensiona' : (t.k === 'ajuste' ? 'Ajusta ' + t.px + ' px' : (t.k === 'incomp' ? 'Proporção diferente' : '')));
+        const t = fitOf(f, x), tag = t.k === 'igual' ? 'Mesma resolução' : (t.k === 'escala' ? 'Redimensiona' : (t.k === 'ajuste' ? 'Ajusta ' + t.px + ' px' : (t.k === 'incomp' ? 'Proporção diferente' : (t.k === 'estica' ? 'Estica (deforma)' : ''))));
         return '<label class="srow"><input type="checkbox" name="' + name + '" value="' + x.id + '"' + (chosen.indexOf(x.id) > -1 && t.ok ? ' checked' : '') + (t.ok ? '' : ' disabled') + '><span>' + esc(x.spot) + ' <small class="muted">' + esc(resTxt(x)) + '</small></span>' + (tag ? '<span class="pill' + (t.ok ? '' : ' warn') + '">' + tag + '</span>' : '') + '<span class="mono muted">' + x.id + '</span></label>';
       }).join('') + '</div>';
   }).join('') + '</div>';
