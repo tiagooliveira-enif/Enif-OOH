@@ -5136,7 +5136,7 @@ function campModal(id) {
   const ex = id ? campById(id) : null;
   const ro = !can('campanhas.gerir');
   if (!ex && ro) return;
-  const c = ex || {name:'', client:'', venues:[], start:today, end:addDays(today, 14), h0:10, h1:14, ppm:1, priority:'Normal', dur:10, items:[]};
+  const c = ex || {name:'', client:'', venues:[], start:today, end:addDays(today, 14), h0:7, h1:24, ppm:1, priority:'Normal', dur:10, items:[]};
   modal('<form data-form="campaign" data-id="' + (ex ? ex.id : '') + '" novalidate><div class="modal-h"><h2>' + (ex ? (ro ? 'Campanha' : 'Editar campanha') : 'Nova campanha') + '</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><fieldset class="fs"' + (ro ? ' disabled' : '') + '><div class="modal-b">'
     + '<div class="grid2"><div class="field"><label for="c-name">Nome da campanha</label><input id="c-name" name="name" value="' + esc(c.name) + '" placeholder="Ex.: Verão Algarve"></div><div class="field"><label for="c-client">Cliente</label><input id="c-client" name="client" value="' + esc(c.client) + '" placeholder="Ex.: Sol Tours"></div></div>'
     + pauseNote(ex) + secField(c)
