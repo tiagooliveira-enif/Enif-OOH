@@ -281,7 +281,8 @@ function cleanCampaign(o, id, old) {
 function cleanUserDoc(o, id, old) {
   const out = {
     id, name: str(o.name, 120, 'Nome'), email: str(o.email, 160, 'E-mail').toLowerCase(), admin: !!o.admin,
-    perms: Array.isArray(o.perms) ? o.perms.filter(p => A.PERMS.indexOf(p) > -1) : [], until: o.until || null, active: o.active !== false
+    perms: Array.isArray(o.perms) ? o.perms.filter(p => A.PERMS.indexOf(p) > -1) : [], until: o.until || null, active: o.active !== false,
+    mfa: !!o.mfa                                                          // verificação em dois passos exigida pelo administrador (a pessoa não a pode desligar)
   };
   if (!out.name) throw bad('Indique o nome.');
   if (!validEmail(out.email)) throw bad('Indique um e-mail válido.');
@@ -410,9 +411,11 @@ function applyOp(user, op) {
     const pass = typeof d.pass === 'string' ? d.pass : '';
     if (!old && pass.length < 6) throw bad('A palavra-passe precisa de pelo menos 6 caracteres.');
     if (pass && pass.length < 6) throw bad('A palavra-passe precisa de pelo menos 6 caracteres.');
+    if (n.mfa && !(old && old.mfa) && !smtpReady()) throw new HttpError(503, 'O envio de e-mail ainda não está configurado no servidor. Sem isso não é possível exigir a verificação em dois passos.');
     const others = docs('users').filter(u => u.id !== id && u.admin && u.active && !accessError(u)).length;
     if (!(n.admin && n.active) && others === 0) throw bad('Tem de existir pelo menos um administrador ativo.');
     putDoc('users', id, n);
+    if (old && old.mfa !== n.mfa) { run('DELETE FROM trusted WHERE user=?', id); audit(user, n.mfa ? 'Passou a exigir a verificação em dois passos a' : 'Deixou de exigir a verificação em dois passos a', n.name); }
     if (pass) { const h = A.hashPassword(pass); setSecret('users', id, h.salt, h.hash); }
     if (!self && (pass || !n.active || (old && !same(old.perms, n.perms)) || (old && old.admin !== n.admin))) { run('DELETE FROM sessions WHERE user=?', id); run('DELETE FROM trusted WHERE user=?', id); }
     if (!old) audit(user, 'Criou o utilizador', n.name);
@@ -708,7 +711,7 @@ function buildState(user) {
   const st = {
     idleMin: IDLE_MS / 60000, me: publicUser(user), now: S.lisbonNow(TZ), serverTime: Date.now(), tz: TZ,
     screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: contentsView(), bin: docs('bin').filter(f => !f.gone), clean: cleanCfg(), folders: docs('folders'),
-    users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady(), devices: user.twoFA ? trustList(user.id) : []
+    users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady(), devices: (user.twoFA || user.mfa) ? trustList(user.id) : []
   };
   if (user.admin) {
     st.auditLog = q('SELECT ts,who,ip,what,detail FROM audit ORDER BY id DESC LIMIT 300').map(a => ({ t: a.ts, who: a.who, what: a.what, detail: a.detail }));
@@ -1079,12 +1082,12 @@ const router = async (req, res) => {
     const user = docs('users').find(x => x.email === email), sc = user && secret('users', user.id);
     if (!user || !A.checkPassword(String(b.pass || ''), sc && sc.a, sc && sc.b)) { loginLimit.fail(email); audit('—', 'Tentativa de entrada falhada', email || '(sem e-mail)', ip); throw new HttpError(401, 'E-mail ou palavra-passe incorretos.'); }
     const err = accessError(user); if (err) throw new HttpError(403, err);
-    if (user.twoFA && !trustOk(user.id, b.trust)) {                              // segundo passo: código enviado por e-mail (dispensado num dispositivo de confiança)
+    if ((user.twoFA || user.mfa) && !trustOk(user.id, b.trust)) {                              // segundo passo: código enviado por e-mail (dispensado num dispositivo de confiança)
       const ch = newChallenge('login', user.id, 10 * 60 * 1000);
       await mailCode(user.recovery || user.email, 'O seu código de entrada no Enif DOOH', codeText(ch.code, 'Pediram para entrar na sua conta do Enif DOOH.', 10));
       return send(res, 200, { step: 'code', ch: ch.id });
     }
-    loginLimit.ok(email); audit(user, user.twoFA ? 'Entrou (dispositivo de confiança)' : 'Entrou', '', ip);
+    loginLimit.ok(email); audit(user, (user.twoFA || user.mfa) ? 'Entrou (dispositivo de confiança)' : 'Entrou', '', ip);
     return send(res, 200, { token: newSession(user.id) });
   }
   if (p === '/api/login/code' && m === 'POST') {
@@ -1126,6 +1129,7 @@ const router = async (req, res) => {
     }
     if (p === '/api/me/twofa') {
       const on = !!b.on;
+      if (!on && user.mfa) throw bad('A verificação em dois passos é obrigatória para a sua conta. Só um administrador a pode retirar.');
       if (on && !smtpReady()) throw new HttpError(503, 'O envio de e-mail ainda não está configurado no servidor. Sem isso não é possível ligar a verificação em dois passos.');
       save({ twoFA: on }); if (!on) run('DELETE FROM trusted WHERE user=?', user.id); audit(user, on ? 'Ligou a verificação em dois passos' : 'Desligou a verificação em dois passos', '', ipOf(req));
       return send(res, 200, { ok: true });

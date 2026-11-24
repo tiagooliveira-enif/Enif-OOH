@@ -3623,13 +3623,14 @@ function devicesHtml() {
 }
 function securityHtml() {
   const me = state.user; if (!me || !me.admin) return '';
+  const tfa = !!(me.twoFA || me.mfa);
   const chk =
     secItem(true, 'Palavras-passe guardadas cifradas', 'Ninguém, nem o programador, consegue lê-las.', 'Ativo')
     + secItem(true, 'Só o administrador cria contas e muda palavras-passe dos outros', 'Os outros utilizadores não podem mudar a própria palavra-passe nem criar contas.', 'Ativo')
     + secItem(true, 'Permissões verificadas pelo servidor', 'Quem não tem permissão é travado pelo servidor, não só escondido na página.', 'Ativo')
     + secItem(true, 'Bloqueio após 4 tentativas falhadas', 'Depois de 4 erros seguidos, a entrada fica bloqueada 10 minutos. Experimente no ecrã de entrada.', 'Ativo')
     + secItem(true, 'Recuperação da palavra-passe só para o administrador', 'O código é enviado para o e-mail de recuperação. Os outros pedem ao administrador.', 'Ativo')
-    + secItem(!!me.twoFA, 'Verificação em dois passos', state.smtpReady ? 'Além da palavra-passe, pede um código enviado por e-mail.' : 'Precisa do envio de e-mail configurado no servidor (ficheiro enif-config.json).', me.twoFA ? 'Ligada' : (state.smtpReady ? 'Recomendado' : 'Falta o e-mail'))
+    + secItem(tfa, 'Verificação em dois passos', state.smtpReady ? 'Além da palavra-passe, pede um código enviado por e-mail.' : 'Precisa do envio de e-mail configurado no servidor (ficheiro enif-config.json).', tfa ? 'Ligada' : (state.smtpReady ? 'Recomendado' : 'Falta o e-mail'))
     + secItem(backups.length > 0, 'Cópias de segurança', backups.length ? 'Última cópia ' + bkAgo() + ' (' + backups[0].mb + ' MB). Automáticas todas as noites, às 03h30.' : 'Ainda não há cópias. A primeira é feita esta noite, ou já com «Fazer cópia agora».', backups.length ? 'Ativo' : 'Por fazer')
     + secItem(location.protocol === 'https:', 'Ligação segura (HTTPS)', location.protocol === 'https:' ? 'A ligação a esta página é cifrada, com certificado automático.' : 'Obrigatória antes de abrir à internet. Faz-se na fase do servidor.', location.protocol === 'https:' ? 'Ativo' : 'Por fazer')
     + secItem(true, 'Teste de segurança', 'Feito em 23/11/2026: acessos sem sessão, permissões, ficheiros fora das pastas, injeções e limites; Mozilla Observatory sem falhas e SSL Labs A+. Um teste feito por terceiros só será preciso se o acesso passar a ser aberto a clientes ou ao público.', 'Feito');
@@ -3637,8 +3638,8 @@ function securityHtml() {
   const acc = '<div class="card"><div class="card-h"><h2>' + ic('users') + 'A minha conta de administrador</h2></div><div class="card-b">'
     + '<div class="item acct-item"><div class="grow"><div class="title">Palavra-passe</div><div class="muted">Só o administrador a pode mudar. Para os outros utilizadores, use «Editar» na lista acima: não precisa de saber a palavra-passe anterior.</div></div><button class="btn sm" data-a="my-pass">Mudar a minha palavra-passe</button></div>'
     + '<div class="item acct-item"><div class="grow"><div class="title">E-mail de recuperação</div><div class="muted">Se perder a palavra-passe, o código é enviado para aqui. Um novo e-mail só passa a valer depois de confirmar um código enviado para lá.</div><div class="field-inline" style="margin-top:8px;flex-wrap:wrap"><input id="sec-rec" type="email" value="' + esc(rec) + '" aria-label="E-mail de recuperação" style="max-width:320px"><button class="btn sm" data-a="rec-save">Confirmar por e-mail</button></div></div></div>'
-    + '<div class="item acct-item"><div class="grow"><div class="title">Verificação em dois passos</div><div class="muted">Está ' + (me.twoFA ? '<b>ligada</b>: ao entrar, pedimos um código enviado para ' + esc(rec) + '.' : '<b>desligada</b>. Recomendamos ligar.') + '</div></div><button class="btn sm' + (me.twoFA ? '' : ' primary') + '" data-a="twofa-toggle">' + (me.twoFA ? 'Desligar' : 'Ligar') + '</button></div>'
-    + (me.twoFA ? devicesHtml() : '')
+    + '<div class="item acct-item"><div class="grow"><div class="title">Verificação em dois passos</div><div class="muted">Está ' + (tfa ? '<b>ligada</b>' + (me.mfa ? ' (exigida na sua conta por outro administrador)' : '') + ': ao entrar, pedimos um código enviado para ' + esc(rec) + '.' : '<b>desligada</b>. Recomendamos ligar.') + '</div></div><button class="btn sm' + (tfa ? '' : ' primary') + '" data-a="twofa-toggle"' + (me.mfa ? ' disabled' : '') + '>' + (tfa ? 'Desligar' : 'Ligar') + '</button></div>'
+    + (tfa ? devicesHtml() : '')
     + '</div></div>';
   const bk = '<div class="card"><div class="card-h"><h2>' + ic('download') + 'Cópias de segurança</h2><button class="btn sm" data-a="backup-now">Fazer cópia agora</button></div><div class="card-b">'
     + backups.slice(0, 5).map(b=>'<div class="item"><div class="grow"><div class="title">' + esc(mailWhen(b.t)) + '</div><div class="muted">' + b.mb + ' MB · ' + (b.auto ? 'automática' : 'feita pelo administrador') + '</div></div><span class="pill ok dot">Concluída</span></div>').join('')
@@ -4433,7 +4434,7 @@ function viewUsers() {
     const ai = accessInfo(u);
     const areas = u.admin ? 'Acesso total' : PERMS.filter(g=>g[1].some(p=>u.perms.indexOf(p[0]) > -1)).map(g=>g[0]).join(', ') || 'Só o painel';
     return '<div class="item u-item">' + avatarHtml(u) + '<div class="grow"><div class="title">' + esc(u.name) + (u === state.user ? ' <span class="muted" style="font-weight:500">(você)</span>' : '') + '</div><div class="muted mono">' + esc(u.email) + '</div><div class="muted" style="margin-top:4px">' + esc(areas) + '</div></div>'
-      + '<div class="u-side" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="pill accent">' + roleName(u) + '</span><span class="pill ' + ai.c + '">' + ai.t + '</span><button class="btn sm" data-a="edit-user" data-id="' + u.id + '">Editar</button></div></div>';
+      + '<div class="u-side" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="pill accent">' + roleName(u) + '</span><span class="pill ' + ai.c + '">' + ai.t + '</span>' + (u.mfa ? '<span class="pill ok">2 passos</span>' : '') + '<button class="btn sm" data-a="edit-user" data-id="' + u.id + '">Editar</button></div></div>';
   }).join('');
   return '<div class="note">' + ic('alert') + '<p>Só o administrador cria e altera contas; mais ninguém tem esta secção. Cada pessoa só entra com os dados que o administrador lhe der.</p></div>'
     + '<div class="card"><div class="card-b">' + rows + '</div></div>' + securityHtml();
@@ -4452,6 +4453,7 @@ function userModal(id) {
     + '<div class="grid2"><div class="field"><label for="u-role">Perfil</label><select id="u-role" name="role" data-a-change="role"' + (self ? ' disabled' : '') + '>' + ['Administrador', 'Operador', 'Só consulta', 'Personalizado'].map(r=>'<option' + (r === role ? ' selected' : '') + '>' + r + '</option>').join('') + '</select></div>'
     + '<div class="field"><label for="u-until">Acesso válido até</label><input id="u-until" name="until" type="date" value="' + (u.until ? iso(u.until) : '') + '"></div></div>'
     + '<div class="field"><span class="lab">O que pode fazer</span><div class="perms" id="perms">' + PERMS.map(g=>'<div class="pgroup"><b>' + g[0] + '</b>' + g[1].map(p=>'<label><input type="checkbox" name="perm" value="' + p[0] + '"' + ((u.admin || u.perms.indexOf(p[0]) > -1) ? ' checked' : '') + (u.admin ? ' disabled' : '') + '>' + p[1] + '</label>').join('') + '</div>').join('') + '</div></div>'
+    + '<label class="row-check" style="margin-bottom:12px"><input type="checkbox" name="mfa"' + (u.mfa ? ' checked' : '') + '><span class="grow">Exigir verificação em dois passos <small class="muted" style="display:block">Ao entrar, esta pessoa tem de introduzir um código enviado para o seu e-mail (pode confiar no dispositivo durante 30 dias). Ela não o consegue desligar.</small></span></label>'
     + '<label class="row-check"><input type="checkbox" name="active"' + (u.active ? ' checked' : '') + (self ? ' disabled' : '') + '>Conta ativa</label>'
     + '<p class="hint" style="margin-top:10px">Para quem só substitui nas férias, indique a data em «Acesso válido até». Depois dessa data a conta deixa de entrar.</p><p class="err" id="form-err" role="alert"></p></div>'
     + '<div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">' + (ex ? 'Guardar alterações' : 'Criar utilizador') + '</button></div></form>');
@@ -6382,7 +6384,7 @@ const sleep = ms=>new Promise(function(r) {setTimeout(r, ms);});
 
 const SCR_KEYS = ['venue', 'city', 'spot', 'type', 'res', 'limit', 'order', 'draft', 'loc', 'on', 'off', 'onT', 'offT', 'fit', 'area', 'bri', 'crop', 'align'];
 const CMP_KEYS = ['name', 'client', 'noEnd', 'venues', 'sector', 'sales', 'start', 'end', 'h0', 'h1', 'ivs', 'ppm', 'dur', 'priority', 'share', 'gmin', 'manual', 'color', 'items', 'pauses'];
-const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'photo', 'notif', 'ui'];
+const USR_KEYS = ['name', 'email', 'admin', 'perms', 'until', 'active', 'mfa', 'photo', 'notif', 'ui'];
 const emptyBase = ()=>({screens:{}, campaigns:{}, folders:{}, contents:{}, users:{}});
 let base = emptyBase();
 function serDoc(coll, o) {
@@ -6608,6 +6610,7 @@ const actions = {
   },
   'twofa-toggle':function() {
     const me = state.user, on = !me.twoFA;
+    if (me.mfa) {toast('A verificação em dois passos é obrigatória para a sua conta.'); return;}
     api('POST', '/api/me/twofa', {on:on}).then(function() {if (!on)setTrust(null);toast(on ? 'Verificação em dois passos ligada. Na próxima entrada pedimos um código.' : 'Verificação em dois passos desligada.'); return poll(true);}).catch(function(e) {toast(e.message);});
   },
   'backup-now':function() {
@@ -7188,7 +7191,7 @@ document.addEventListener('submit', function(e) {
     const admin = role === 'Administrador';
     const act = ex && ex === state.user ? true : !isNil(fd.get('active'));
     const untilV = String(fd.get('until') || '');
-    const data = {name:name, email:email, admin:admin, perms:admin ? ALL_PERMS.slice() : fd.getAll('perm').filter(p=>ALL_PERMS.indexOf(p) > -1), until:untilV ? parseISO(untilV) : null, active:act};
+    const data = {name:name, email:email, admin:admin, perms:admin ? ALL_PERMS.slice() : fd.getAll('perm').filter(p=>ALL_PERMS.indexOf(p) > -1), until:untilV ? parseISO(untilV) : null, active:act, mfa:!isNil(fd.get('mfa'))};
     const others = users.filter(x=>x !== ex && x.admin && x.active).length;
     if (!(data.admin && data.active) && others === 0) {err.textContent = 'Tem de existir pelo menos um administrador ativo.'; return;}
     let tgt = ex;

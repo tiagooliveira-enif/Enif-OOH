@@ -105,6 +105,25 @@ async function main() {
   await sync(adm, [op('users', 'uvw', { until: plus(10) }, ['until'])]);
   const tvw3 = await tok('vw@x.pt');
   ok('só consulta altera a própria foto e preferências', (await sync(tvw3, [op('users', 'uvw', { photo: 'data:image/jpeg;base64,AAAA', notif: { x: 1 } }, ['photo', 'notif'])])).s === 200);
+  // ---- verificação em dois passos exigida pelo administrador
+  {
+    const crypto = require('node:crypto');
+    ok('exigir 2 passos sem e-mail configurado no servidor é recusado com explicação', (await sync(adm, [op('users', 'uvw', { mfa: true }, ['mfa'])])).s === 503);
+    const d = JSON.parse(db.prepare("SELECT json FROM docs WHERE coll='users' AND id='uvw'").get().json); d.mfa = true;
+    db.prepare("UPDATE docs SET json=? WHERE coll='users' AND id='uvw'").run(JSON.stringify(d));
+    let x = await call('POST', '/api/login', { email: 'vw@x.pt', pass: 'abcdef' });
+    ok('utilizador com 2 passos exigidos não entra só com a palavra-passe', !(x.j && x.j.token));
+    const T = 'e'.repeat(64);
+    db.prepare('INSERT INTO trusted(id,user,hash,label,created,last,exp) VALUES(?,?,?,?,?,?,?)').run('tm1', 'uvw', crypto.createHash('sha256').update(T).digest('hex'), 'Teste', Date.now(), Date.now(), Date.now() + 864e5);
+    x = await call('POST', '/api/login', { email: 'vw@x.pt', pass: 'abcdef', trust: T });
+    ok('...mas entra num dispositivo de confiança', x.s === 200 && x.j.token);
+    ok('não consegue desligar a exigência', [400, 403].includes((await call('POST', '/api/me/twofa', { on: false }, x.j.token)).s));
+    ok('nem pela sincronização', (await sync(x.j.token, [op('users', 'uvw', { mfa: false }, ['mfa'])])).s === 200 && JSON.parse(db.prepare("SELECT json FROM docs WHERE coll='users' AND id='uvw'").get().json).mfa === true);
+    ok('o administrador vê a marca na lista', (await call('GET', '/api/state', undefined, adm)).j.users.find(u => u.id === 'uvw').mfa === true);
+    ok('o administrador retira a exigência e os dispositivos de confiança desaparecem', (await sync(adm, [op('users', 'uvw', { mfa: false }, ['mfa'])])).s === 200 && db.prepare("SELECT COUNT(*) n FROM trusted WHERE user='uvw'").get().n === 0);
+    x = await call('POST', '/api/login', { email: 'vw@x.pt', pass: 'abcdef' });
+    ok('sem a exigência volta a entrar só com a palavra-passe', x.s === 200 && x.j.token);
+  }
   ok('só consulta não se dá permissões', (await sync(tvw3, [op('users', 'uvw', { perms: ['ecras.gerir'] }, ['perms'])])).s === 200 && (await call('GET', '/api/state', undefined, adm)).j.users.find(u => u.id === 'uvw').perms.indexOf('ecras.gerir') < 0);
   ok('foto removida com null', (await sync(tvw3, [op('users', 'uvw', { photo: null }, ['photo'])])).s === 200 && !(await call('GET', '/api/state', undefined, adm)).j.users.find(u => u.id === 'uvw').photo);
   ok('foto inválida recusada', (await sync(tvw3, [op('users', 'uvw', { photo: 'http://x/y.png' }, ['photo'])])).s === 400);
