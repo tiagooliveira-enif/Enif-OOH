@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'enif-'));
 process.env.DATA_DIR = tmp; process.env.ADMIN_NAME = 'Tiago'; process.env.ADMIN_EMAIL = 'Tiago@Enif.pt'; process.env.ADMIN_PASS = 'segredo1'; process.env.PORT = '0';
-const { server, db, underReset, cleanSweep, alertMailTick, weeklyMailTick, weeklyText } = require('../server');
+const { server, db, underReset, cleanSweep, alertMailTick, alertPushTick, weeklyMailTick, weeklyText } = require('../server');
 const S = require('../lib/schedule');
 
 let passed = 0;
@@ -428,6 +428,46 @@ async function main() {
     await sync(adm, [op('users', st0.me.id, Object.assign({}, st0.me, { notif: { types: { alert: { app: true, email: true, sms: false } } } }), ['notif'])]);
     db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now(), 'ECR-001');
     await alertMailTick(fake);
+  }
+
+  // ---- avisos push ao computador (chegam com a página fechada e sem sessão)
+  {
+    const crypto = require('node:crypto'), WP = require('../lib/webpush');
+    const ua = crypto.createECDH('prime256v1'); ua.generateKeys();
+    const mkSub = () => ({ endpoint: 'https://fcm.googleapis.com/fcm/send/' + crypto.randomBytes(8).toString('hex'), keys: { p256dh: WP.b64u(ua.getPublicKey()), auth: WP.b64u(crypto.randomBytes(16)) } });
+    ok('a chave pública dos avisos push só se pede com sessão', (await call('GET', '/api/push/key')).s === 401 && WP.unb64u((await call('GET', '/api/push/key', undefined, adm)).j.key).length === 65);
+    ok('a chave dos avisos push fica sempre a mesma', (await call('GET', '/api/push/key', undefined, adm)).j.key === (await call('GET', '/api/push/key', undefined, adm)).j.key);
+    ok('sem sessão não se guarda subscrição push', (await call('POST', '/api/push/subscribe', { sub: mkSub() })).s === 401);
+    ok('quem não é administrador não recebe avisos push', (await call('POST', '/api/push/subscribe', { sub: mkSub() }, top)).s === 403);
+    ok('endereço de push que não é de um serviço conhecido é recusado', (await call('POST', '/api/push/subscribe', { sub: { endpoint: 'https://evil.example/x', keys: mkSub().keys } }, adm)).s === 400);
+    ok('chaves de push inválidas são recusadas', (await call('POST', '/api/push/subscribe', { sub: { endpoint: mkSub().endpoint, keys: { p256dh: 'abc', auth: 'def' } } }, adm)).s === 400);
+    const sub = mkSub(), nSubs = () => db.prepare('SELECT COUNT(*) n FROM push_subs').get().n;
+    ok('o administrador ativa os avisos neste computador', (await call('POST', '/api/push/subscribe', { sub, label: 'Chrome em macOS' }, adm)).s === 200 && nSubs() === 1);
+    ok('ativar outra vez o mesmo computador não o duplica', (await call('POST', '/api/push/subscribe', { sub, label: 'Chrome em macOS' }, adm)).s === 200 && nSubs() === 1);
+    const got = [], fake = async (user, payload) => { got.push(payload); return 1; }, mine = () => got.filter(x => /ECR-001/.test(x.title));
+    db.prepare('DELETE FROM alert_push').run(); db.prepare("DELETE FROM docs WHERE coll='settings' AND id='pushinit'").run(); db.prepare("DELETE FROM resolved WHERE id LIKE 'off-%'").run();
+    db.prepare('UPDATE live SET first_seen=?, last_seen=? WHERE screen=?').run(Date.now() - 3 * 3600000, Date.now() - 40 * 60000, 'ECR-001');
+    await alertPushTick(fake);
+    ok('na primeira vez não avisa o que já estava aberto (só regista)', got.length === 0 && db.prepare('SELECT COUNT(*) n FROM alert_push').get().n > 0);
+    db.prepare("DELETE FROM alert_push WHERE id LIKE 'off-%'").run(); db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now(), 'ECR-001'); await alertPushTick(fake);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 20 * 60000, 'ECR-001');
+    await alertPushTick(fake);
+    ok('ecrã sem ligação há mais de 15 min: um aviso push, com o ecrã e o link da app', mine().length === 1 && /sem ligação/i.test(mine()[0].title) && mine()[0].url === '/app/' && /^al-off-/.test(mine()[0].tag));
+    await alertPushTick(fake);
+    ok('o mesmo problema não repete o aviso push', mine().length === 1);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now(), 'ECR-001');
+    await alertPushTick(fake);
+    ok('quando o ecrã volta, chega o aviso de resolvido', mine().length === 2 && /^Resolvido/.test(mine()[1].title));
+    const st1 = (await call('GET', '/api/state', undefined, adm)).j;
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now() - 50 * 60000, 'ECR-001');
+    await sync(adm, [op('users', st1.me.id, Object.assign({}, st1.me, { notif: { types: { alert: { app: false, email: true, sms: false } } } }), ['notif'])]);
+    await alertPushTick(fake);
+    ok('com «Computador» desligado nesse tipo, não há aviso push', mine().length === 2);
+    await sync(adm, [op('users', st1.me.id, Object.assign({}, st1.me, { notif: { types: { alert: { app: true, email: true, sms: false } } } }), ['notif'])]);
+    db.prepare('UPDATE live SET last_seen=? WHERE screen=?').run(Date.now(), 'ECR-001'); await alertPushTick(fake);
+    db.prepare('DELETE FROM resolved').run();
+    ok('quem desativa o computador deixa de ter subscrição', (await call('POST', '/api/push/unsubscribe', { endpoint: sub.endpoint }, adm)).s === 200 && nSubs() === 0);
+    ok('o teste de aviso push responde mesmo sem computadores ativos', (await call('POST', '/api/push/test', {}, adm)).j.sent === 0);
   }
 
   // ---- limpeza de conteúdos sem uso

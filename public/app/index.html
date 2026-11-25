@@ -4375,6 +4375,78 @@ function deskNotify(title, body, tag) {
   try {if (permState() === 'granted') {new Notification(title, {body:body, tag:tag || 'enif', icon:'icon-192.png'}); return true;}} catch (e) {/* sem ação */}
   return false;
 }
+
+/* ---------- avisos push: chegam ao computador mesmo com a página fechada e sem sessão iniciada ---------- */
+state.push = state.push || 'unknown';
+let pushChecking = false, pushHealed = false;
+const pushSupported = ()=>'serviceWorker' in navigator && 'PushManager' in window && typeof Notification !== 'undefined';
+function pushLabel() {
+  const ua = navigator.userAgent;
+  const b = /Edg\//.test(ua) ? 'Edge' : (/Firefox\//.test(ua) ? 'Firefox' : (/Chrome\//.test(ua) ? 'Chrome' : (/Safari\//.test(ua) ? 'Safari' : 'Navegador')));
+  const o = /Windows/.test(ua) ? 'Windows' : (/Mac OS X/.test(ua) ? 'macOS' : (/Android/.test(ua) ? 'Android' : (/Linux/.test(ua) ? 'Linux' : '')));
+  return b + (o ? ' em ' + o : '');
+}
+function pushBlock() {
+  const u = state.user, s = state.push || 'unknown';
+  if (!u || !u.admin) return '<p class="nsec">Avisos com a página fechada</p><p class="hint">Só o administrador recebe estes avisos.</p>';
+  const pill = {unknown:['warn', 'A verificar…'], busy:['warn', 'A ativar…'], on:['ok', 'Ativos neste computador'], off:['warn', 'Desligados neste computador'], denied:['bad', 'Bloqueados pelo browser'], unsupported:['warn', 'Este browser não permite']}[s] || ['warn', 'A verificar…'];
+  const btn = s === 'off' ? '<button class="btn sm primary" data-a="push-on">Ativar neste computador</button>' : (s === 'on' ? '<button class="btn sm" data-a="push-test">Enviar teste</button><button class="btn sm ghost" data-a="push-off">Desativar</button>' : '');
+  const hint = s === 'denied' ? 'O browser bloqueou os avisos desta página. Desbloqueie-os nas definições do site (o cadeado ao lado do endereço) e volte aqui.'
+    : (s === 'unsupported' ? 'Este browser não suporta avisos com a página fechada. Use o Chrome, o Edge ou o Safari mais recentes.'
+      : 'Recebe os avisos importantes (ecrã sem ligação, campanha abaixo do contratado, disco e cópia de segurança) neste computador, mesmo sem a Enif aberta e sem sessão iniciada. O browser tem de estar a correr (pode estar minimizado). Cada computador ativa-se à parte.');
+  return '<p class="nsec">Avisos com a página fechada</p><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><span class="pill ' + pill[0] + ' dot">' + pill[1] + '</span>' + btn + '</div><p class="hint" style="margin-top:8px">' + hint + '</p>';
+}
+const pushRedraw = ()=>{if (state.notifTab === 'pref' && document.querySelector('#modal-root .ntabs'))notifModal('pref');};
+const b64uBytes = s=>{const r = atob((s + '='.repeat((4 - s.length % 4) % 4)).replace(/-/g, '+').replace(/_/g, '/')), a = new Uint8Array(r.length); for (let i = 0; i < r.length; i++)a[i] = r.charCodeAt(i); return a;};
+async function pushRefresh() {
+  const before = state.push;
+  if (!pushSupported()) state.push = 'unsupported';
+  else if (Notification.permission === 'denied') state.push = 'denied';
+  else {
+    try {
+      const reg = await navigator.serviceWorker.getRegistration(), sub = reg ? await reg.pushManager.getSubscription() : null;
+      state.push = sub ? 'on' : 'off';
+      if (sub && !pushHealed && state.user && state.user.admin) {pushHealed = true; api('POST', '/api/push/subscribe', {sub:sub.toJSON(), label:pushLabel()}).catch(function() {/* sem ação */});}   // se o servidor perdeu o registo, volta a guardá-lo
+    } catch (e) {state.push = 'off';}
+  }
+  return state.push !== before;
+}
+function pushSync() {
+  if (pushChecking) return;
+  pushChecking = true;
+  pushRefresh().then(function(changed) {pushChecking = false; if (changed)pushRedraw();}, function() {pushChecking = false;});
+}
+async function pushEnable() {
+  state.push = 'busy'; pushRedraw();
+  try {
+    if (Notification.permission !== 'granted') {
+      const p = await Notification.requestPermission();
+      if (p !== 'granted') {state.push = p === 'denied' ? 'denied' : 'off'; pushRedraw(); return;}
+    }
+    const reg = await navigator.serviceWorker.register('sw.js'); await navigator.serviceWorker.ready;
+    const key = (await api('GET', '/api/push/key')).key;
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && sub.options && sub.options.applicationServerKey && b64uBytes(key).join() !== new Uint8Array(sub.options.applicationServerKey).join()) {await sub.unsubscribe(); sub = null;}
+    if (!sub)sub = await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:b64uBytes(key)});
+    await api('POST', '/api/push/subscribe', {sub:sub.toJSON(), label:pushLabel()});
+    state.push = 'on'; pushHealed = true; toast('Avisos ativados neste computador.');
+  } catch (e) {state.push = 'off'; toast('Não foi possível ativar os avisos: ' + e.message);}
+  pushRedraw();
+}
+async function pushDisable() {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration(), sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (sub) {const ep = sub.endpoint; await sub.unsubscribe(); await api('POST', '/api/push/unsubscribe', {endpoint:ep});}
+    state.push = 'off'; toast('Avisos desativados neste computador.');
+  } catch (e) {toast('Não foi possível desativar: ' + e.message);}
+  pushRedraw();
+}
+async function pushTest() {
+  try {
+    const r = await api('POST', '/api/push/test', {});
+    toast(r.sent ? 'Aviso de teste enviado. Deve aparecer daqui a uns segundos.' : 'O servidor não conseguiu enviar o teste. Desative e volte a ativar os avisos neste computador.');
+  } catch (e) {toast(e.message);}
+}
 const unesc = t=>t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
 function feed() {
   const out = [];
@@ -4450,12 +4522,13 @@ function notifModal(tab) {
       return '<div class="ni' + (i.read ? '' : ' new') + '"><span class="ico ' + (i.type === 'alert' || i.type === 'start' || i.type === 'end' || i.type === 'vend' ? 'warn' : (i.type === 'final' ? 'ok' : (i.type === 'mail' ? (/^Falha/.test(i.title) ? 'warn' : 'ok') : 'ia'))) + '">' + ic(ico) + '</span><div class="grow"><div class="title">' + esc(i.title) + '</div><div class="muted">' + esc(i.text) + '</div><div class="chips"><span class="pill">' + fmtWhen(i.t) + '</span>' + i.ch.map(c=>'<span class="pill accent">' + NCH.find(x=>x[0] === c)[1] + '</span>').join('') + '</div></div></div>';
     }).join('') : '<div class="empty">Sem notificações por agora. Escolha em «Preferências» o que quer receber.</div>';
   } else if (T === 'pref') {
-    const ps = permState();
+    const ps = permState(); pushSync();
     const st = ps === 'granted' ? '<span class="pill ok dot">Ativas neste computador</span>' : (ps === 'denied' ? '<span class="pill bad dot">Bloqueadas pelo browser</span>' : (ps === 'unsupported' ? '<span class="pill warn dot">Este browser não permite</span>' : '<span class="pill warn dot">Ainda não ativadas</span>'));
     body = '<p class="nsec" style="margin-top:0">Notificações do computador</p><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">' + st
       + (ps === 'default' ? '<button class="btn sm primary" data-a="notif-enable">Ativar</button>' : '')
       + '<button class="btn sm" data-a="notif-test">Enviar teste</button></div>'
       + (ps === 'denied' || ps === 'unsupported' ? '<p class="hint" style="margin-top:8px">Sem esta permissão, os avisos «Computador» ficam só no sino. Pode ativá-la nas definições do site no browser.</p>' : '')
+      + pushBlock()
       + '<p class="nsec">Onde quer receber</p><div class="grid2"><div class="field"><label for="n-email">E-mail</label><input id="n-email" type="email" value="' + esc(n.email || '') + '" data-a-change="notif-contact" data-k="email" placeholder="nome@empresa.pt"></div></div>'
       + '<p class="nsec">O que quer receber</p><table class="nt"><thead><tr><th></th>' + NCH.map(c=>'<th>' + c[1] + '</th>').join('') + '</tr></thead><tbody>'
       + NT.filter(x=>can(x[2])).map(x=>'<tr><td>' + x[1] + '</td>' + NCH.map(c=>'<td><input type="checkbox" aria-label="' + esc(x[1]) + ' · ' + c[1] + '" data-a-change="notif-pref" data-t="' + x[0] + '" data-c="' + c[0] + '"' + (n.types[x[0]][c[0]] ? ' checked' : '') + '></td>').join('') + '</tr>').join('')
@@ -5406,6 +5479,7 @@ const MANUAL = {
    ['Trate do que precisa de atenção', 'Em «Precisa de atenção» aparecem os alertas: ecrãs sem sinal, disco quase cheio, conflitos na playlist. Carregue em «Ver ecrã» para abrir o ecrã em causa. No telemóvel mostra os 3 mais importantes; «Ver todos os ecrãs» abre os restantes.', 'ecras.ver'],
    ['Perceba o aviso «abaixo do contratado»', 'Quando uma campanha passa menos de 90 % das passagens previstas nas últimas 24 h, aparece um alerta com a causa principal (por exemplo, um ecrã sem sinal). Carregue em «Ver campanha» ou «Ver ecrã». Um ecrã sem internet não conta: continua a passar e guarda as passagens, e só depois de voltar e as enviar é que a plataforma faz a conta e, se ficou mesmo abaixo, avisa. Este aviso é só interno: não aparece nos relatórios.', 'campanhas.ver'],
    ['Receba os avisos importantes por e-mail', 'O administrador recebe um e-mail quando um ecrã fica sem ligação há 15 minutos ou mais, uma campanha fica quase sem passagens, o disco está quase cheio ou a cópia de segurança falha, e outro quando o problema se resolve. Às segundas-feiras às 8h recebe também um resumo da semana (ecrãs, alertas, campanhas, disco e cópias). Escolha em «Notificações > Preferências» (coluna E-mail).', 'admin'],
+   ['Receba avisos no computador, mesmo com a página fechada', 'Em «Notificações > Preferências», em «Avisos com a página fechada», carregue em «Ativar neste computador» e permita as notificações no browser. Os avisos importantes (ecrã sem ligação, campanha abaixo do contratado, disco e cópia de segurança) passam a aparecer no ecrã do computador, mesmo sem sessão iniciada e sem a Enif aberta; o browser só tem de estar a correr (pode estar minimizado). Ative em cada computador onde os quer receber; «Desativar» retira-o. Se desligar «Computador» num tipo de aviso, esse tipo deixa de chegar. Só o administrador recebe estes avisos.', 'admin'],
    ['Dê o alerta como resolvido', 'Depois de tratar do problema, carregue em «Marcar como resolvido» para o alerta sair da lista.', 'alertas.resolver'],
    ['Confira o que está no ar', 'Em «A reproduzir agora» vê o que passa neste momento. «Por campanha» mostra cada campanha e em quantos ecrãs passa; «Por ecrã» mostra cada ecrã num cartão, com a bolinha de estado (verde, amarela ou vermelha) e o número de campanhas que estão a passar. Os ecrãs com problema vêm primeiro: sem ligação, por emparelhar e nada a passar agora. Com 6 ou mais ecrãs abre sozinho em «Por ecrã», e pode mudar quando quiser.'],
    ['Veja o Calendário', 'O cartão «Calendário» lê só os eventos com a palavra definida (por exemplo «SPOTS DIGITAIS»). Quando faltam 48 horas exatas para um evento aparece «Verificar Evento». Carregue em + para ver os detalhes e em «Lida» para o aviso desaparecer.'],
@@ -6935,6 +7009,9 @@ const actions = {
       if (r && r.then)r.then(function() {notifModal('pref');}, function() {notifModal('pref');});
     } catch (e) {notifModal('pref');}
   },
+  'push-on':function() {pushEnable();},
+  'push-off':function() {pushDisable();},
+  'push-test':function() {pushTest();},
   'notif-test':async function() {
     const n = np(state.user), now = Date.now(), ch = [];
     const d = deskNotify('Enif DOOH', 'Notificação de teste. Está tudo a funcionar.', 'teste-' + now);

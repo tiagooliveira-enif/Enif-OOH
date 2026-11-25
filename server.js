@@ -6,7 +6,7 @@ const { DatabaseSync } = require('node:sqlite');
 const S = require('./lib/schedule');
 const MAIL = require('./lib/mail'), REPORT = require('./lib/report');
 const A = require('./lib/auth');
-const M = require('./lib/media'), CAL = require('./lib/calendar'), POI = require('./lib/poi');
+const M = require('./lib/media'), CAL = require('./lib/calendar'), POI = require('./lib/poi'), WP = require('./lib/webpush');
 
 const PORT = +process.env.PORT || 8080;
 const DATA = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -41,6 +41,8 @@ CREATE TRIGGER IF NOT EXISTS audit_no_delete BEFORE DELETE ON audit BEGIN SELECT
 CREATE TABLE IF NOT EXISTS cmds(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, kind TEXT NOT NULL, ts INTEGER NOT NULL);
 CREATE TABLE IF NOT EXISTS proofs(screen TEXT PRIMARY KEY, files TEXT NOT NULL, t0 INTEGER NOT NULL, secs INTEGER NOT NULL, who TEXT);
 CREATE TABLE IF NOT EXISTS alert_mail(id TEXT PRIMARY KEY, ts INTEGER NOT NULL, title TEXT, screen TEXT, closed INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS push_subs(id TEXT PRIMARY KEY, user TEXT NOT NULL, endpoint TEXT NOT NULL, p256dh TEXT NOT NULL, auth TEXT NOT NULL, label TEXT, created INTEGER, last INTEGER);
+CREATE TABLE IF NOT EXISTS alert_push(id TEXT PRIMARY KEY, ts INTEGER NOT NULL, title TEXT, screen TEXT, closed INTEGER DEFAULT 0);
 CREATE TABLE IF NOT EXISTS proof_log(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, t0 INTEGER NOT NULL, files TEXT NOT NULL, secs INTEGER NOT NULL, who TEXT);
 `);
 try { db.exec('ALTER TABLE plays ADD COLUMN why TEXT'); } catch (e) { /* já existe */ }
@@ -702,6 +704,52 @@ async function alertMailTick(send) {
   run('DELETE FROM alert_mail WHERE closed=1 AND ts<?', now - 90 * 864e5);
   return { sent };
 }
+/* ---------- avisos push (chegam ao computador mesmo com a página fechada e sem sessão iniciada) ----------
+   Os mesmos avisos importantes dos e-mails vão, cifrados, ao navegador de cada administrador que ligou os avisos nas
+   Preferências (um registo por computador, tabela push_subs). Quem tem a coluna «Computador» desligada nesse tipo não recebe.
+   Chaves VAPID criadas na primeira vez e guardadas na base de dados (incluídas nas cópias de segurança). */
+function vapidKeys() {
+  let r = secret('settings', 'vapid');
+  if (!r) { const k = WP.newVapid(); setSecret('settings', 'vapid', k.priv, k.pub); r = { a: k.priv, b: k.pub }; }
+  return { priv: r.a, pub: r.b };
+}
+const pushSubject = () => { const a = docs('users').find(u => u.admin && u.active !== false && /@/.test(mailTo(u))); return a ? 'mailto:' + mailTo(a) : 'https://enifdooh.pt'; };
+const wantsPush = (u, kind) => { const t = u.notif && u.notif.types && u.notif.types[kind]; return !t || t.app !== false; };
+let pushLib = null;                                                                // só os testes trocam isto
+async function pushToUser(user, payload) {
+  let sent = 0;
+  for (const sub of q('SELECT * FROM push_subs WHERE user=?', user.id)) {
+    const r = await WP.send(sub, payload, vapidKeys(), pushSubject(), pushLib ? { lib: pushLib, allowAny: true } : {});
+    if (r.ok) { sent++; run('UPDATE push_subs SET last=? WHERE id=?', Date.now(), sub.id); }
+    else if (r.gone) run('DELETE FROM push_subs WHERE id=?', sub.id);               // o navegador já não quer avisos: esquece-o
+    else console.error('Aviso push não enviado:', r.status || r.error);
+  }
+  return sent;
+}
+async function alertPushTick(send) {
+  try {
+    const go = send || pushToUser, now = Date.now(), cur = importantAlerts(), curIds = new Set(cur.map(a => a.id));
+    const admins = docs('users').filter(u => u.admin && u.active !== false), first = !getDoc('settings', 'pushinit');
+    let sent = 0;
+    const tell = async (kind, payload) => { for (const u of admins.filter(x => wantsPush(x, kind))) { try { sent += await go(u, payload); } catch (e) { console.error('Aviso push falhou:', e.message); } } };
+    for (const a of cur) {
+      if (q1('SELECT 1 FROM alert_push WHERE id=?', a.id)) continue;
+      const cap = q1('SELECT COUNT(*) n FROM alert_push WHERE ts>?', now - 864e5).n >= MAIL_DAILY_MAX;
+      run('INSERT INTO alert_push(id,ts,title,screen) VALUES(?,?,?,?)', a.id, now, a.title, a.screen || null);
+      if (first || cap) continue;                                                  // na primeira vez só regista o que já estava aberto (não avisa tudo de uma vez)
+      await tell(mailKind(a), { title: a.title + (a.screen ? ' · ' + a.screen : ''), body: String(a.detail || '').slice(0, 300), tag: 'al-' + a.id, url: '/app/' });
+    }
+    for (const r of q('SELECT * FROM alert_push WHERE closed=0')) {
+      if (curIds.has(r.id)) continue;
+      const manual = !!q1('SELECT 1 FROM resolved WHERE id=?', r.id);
+      if (!first && !manual && !/^backup-/.test(r.id)) await tell(/^under-/.test(r.id) ? 'under' : 'alert', { title: 'Resolvido: ' + r.title + (r.screen ? ' · ' + r.screen : ''), body: 'Este problema deixou de existir.', tag: 'enif-ok-' + r.id, url: '/app/' });
+      run('UPDATE alert_push SET closed=1 WHERE id=?', r.id);
+    }
+    if (first) putDoc('settings', 'pushinit', { at: now });
+    run('DELETE FROM alert_push WHERE closed=1 AND ts<?', now - 90 * 864e5);
+    return { sent };
+  } catch (e) { console.error('Avisos push:', e.message); return { sent: 0 }; }
+}
 function contentsView() {
   const cfg = cleanCfg(), camps = docs('campaigns'), today = S.lisbonNow(TZ).date;
   return docs('contents', true).map(f => { const e = contentExpiry(f, camps, today, cfg); return e ? Object.assign({}, f, { exp: e }) : f; });
@@ -1049,6 +1097,7 @@ async function tick(force) {
     const cr = getDoc('settings', 'cleanrun');
     if (!cr || cr.day !== today) { cleanSweep(today); putDoc('settings', 'cleanrun', { day: today }); }
     await alertMailTick();
+    await alertPushTick();
     await weeklyMailTick();
     await calRefresh(false);
     q('SELECT screen FROM proofs WHERE t0+secs*1000<=?', Date.now()).forEach(x => proofEnd(x.screen, null, false));
@@ -1229,6 +1278,28 @@ const router = async (req, res) => {
     try { await MAIL.send(cfg, { to, subject: 'Teste de notificações – Enif DOOH', text: 'Olá,\n\nEste é um e-mail de teste da plataforma Enif DOOH. Se o recebeu, os avisos por e-mail estão a funcionar.\n\nEnif DOOH' }); } catch (e) { throw new HttpError(502, 'Não foi possível enviar o e-mail: ' + e.message); }
     return send(res, 200, { ok: true, to });
   }
+  if (p === '/api/push/key' && m === 'GET') { const user = needUser(req, u); return send(res, 200, { key: vapidKeys().pub, admin: !!user.admin }); }
+  if (p === '/api/push/subscribe' && m === 'POST') {                               // «Ativar neste computador»: guarda o endereço que o navegador criou
+    const user = needUser(req, u), b = await readJson(req), s0 = b && b.sub || {}, k = s0.keys || {};
+    if (!user.admin) throw new HttpError(403, 'Só o administrador recebe estes avisos.');
+    if (!WP.allowedEndpoint(s0.endpoint) || WP.unb64u(k.p256dh || '').length !== 65 || WP.unb64u(k.auth || '').length !== 16) throw bad('O navegador enviou uma subscrição que não é válida.');
+    const id = sha(String(s0.endpoint)).slice(0, 32), label = String(b.label || '').replace(/[<>]/g, '').slice(0, 80) || 'Computador';
+    run('INSERT INTO push_subs(id,user,endpoint,p256dh,auth,label,created,last) VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET user=excluded.user, p256dh=excluded.p256dh, auth=excluded.auth, label=excluded.label', id, user.id, s0.endpoint, k.p256dh, k.auth, label, Date.now(), null);
+    run('DELETE FROM push_subs WHERE user=? AND id NOT IN (SELECT id FROM push_subs WHERE user=? ORDER BY created DESC LIMIT 10)', user.id, user.id);
+    audit(user, 'Ativou os avisos push num computador', label, ipOf(req)); return send(res, 200, { ok: true });
+  }
+  if (p === '/api/push/unsubscribe' && m === 'POST') {
+    const user = needUser(req, u), b = await readJson(req);
+    run('DELETE FROM push_subs WHERE id=? AND user=?', sha(String(b.endpoint || '')).slice(0, 32), user.id);
+    audit(user, 'Desativou os avisos push num computador', '', ipOf(req)); return send(res, 200, { ok: true });
+  }
+  if (p === '/api/push/test' && m === 'POST') {                                    // «Enviar teste» nos computadores do próprio utilizador
+    const user = needUser(req, u), last = testMailAt.get('push-' + user.id) || 0;
+    if (Date.now() - last < 5000) throw new HttpError(429, 'Espere uns segundos antes de enviar outro teste.');
+    testMailAt.set('push-' + user.id, Date.now());
+    const n = await pushToUser(user, { title: 'Enif DOOH', body: 'Aviso de teste. Está tudo a funcionar.', tag: 'teste-' + Date.now(), url: '/app/' });
+    return send(res, 200, { ok: true, sent: n });
+  }
   if (p === '/api/poi' && m === 'POST') {
     const user = needUser(req, u); need(user, 'ecras.gerir'); const b = await readJson(req);
     const lat = num(b.lat, -90, 90, 'Latitude'), lng = num(b.lng, -180, 180, 'Longitude');
@@ -1318,4 +1389,4 @@ if (require.main === module) {
   });
 }
 const underReset = () => { underCache = { at: 0, list: [] }; };
-module.exports = { weeklyMailTick, weeklyText, alertMailTick, cleanSweep, underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
+module.exports = { weeklyMailTick, weeklyText, alertMailTick, alertPushTick, vapidKeys, setPushLib: l => { pushLib = l; }, cleanSweep, underReset, server, db, playlistFor, buildState, tick, backupNow, sendToSales, finalReportPdf };
