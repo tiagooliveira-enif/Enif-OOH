@@ -9,7 +9,7 @@ if os.geteuid() != 0:
 cp = configparser.ConfigParser(); cp.read(CONF)
 if 'b2' not in cp or 'b2crypt' not in cp:
     sys.exit('A cópia externa ainda não está configurada (falta %s).' % CONF)
-palavra = getpass.getpass('Palavra de cifra, tal como a guardou fora do servidor (não aparece nada): ')
+palavra = getpass.getpass('Palavra de cifra, tal como a guardou fora do servidor (não aparece nada): ').strip()   # igual ao configurar-backblaze.py, que também apara espaços (palavras coladas costumam trazer um espaço no fim)
 if not palavra:
     sys.exit('Ficou vazia.')
 obs = subprocess.run(['rclone', 'obscure', '-'], input=palavra, capture_output=True, text=True, check=True).stdout.strip()
