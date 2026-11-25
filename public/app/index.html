@@ -4372,7 +4372,7 @@ function np(u) {
 }
 const permState = function() {try {return typeof Notification === 'undefined' ? 'unsupported' : Notification.permission;} catch (e) {return 'unsupported';}};
 function deskNotify(title, body, tag) {
-  try {if (permState() === 'granted') {new Notification(title, {body:body, tag:tag || 'enif'}); return true;}} catch (e) {/* sem ação */}
+  try {if (permState() === 'granted') {new Notification(title, {body:body, tag:tag || 'enif', icon:'icon-192.png'}); return true;}} catch (e) {/* sem ação */}
   return false;
 }
 const unesc = t=>t.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
@@ -6937,7 +6937,7 @@ const actions = {
   },
   'notif-test':async function() {
     const n = np(state.user), now = Date.now(), ch = [];
-    const d = deskNotify('Enif DOOH', 'Notificação de teste. Está tudo a funcionar.', 'teste');
+    const d = deskNotify('Enif DOOH', 'Notificação de teste. Está tudo a funcionar.', 'teste-' + now);
     if (d)ch.push('computador');
     if (n.email || state.user.email) {
       try {await api('POST', '/api/notif/test', {}); n.sent.unshift({ch:'email', to:n.email || state.user.email, title:'Notificação de teste', t:now}); ch.push('e-mail');}
