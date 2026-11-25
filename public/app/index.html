@@ -3413,6 +3413,27 @@ button.avatar {
     display: flex;
     width: 100%;
   }
+  #view > .tools:has(> .seg[aria-label="Vista dos conteúdos"]) {
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px 10px;
+  }
+  #view > .tools:has(> .seg[aria-label="Vista dos conteúdos"]) > .hint {
+    grid-column: 1/-1;
+  }
+  #view > .tools:has(> .seg[aria-label="Vista dos conteúdos"]) > span:not(.hint) {
+    display: none;
+  }
+  #view > .tools > .seg[aria-label="Vista dos conteúdos"] {
+    width: auto;
+  }
+  #view > .tools > .seg[aria-label="Vista dos conteúdos"] button {
+    flex: 0 0 auto;
+    padding-inline: 14px;
+  }
+  #view > .tools:has(> .seg[aria-label="Vista dos conteúdos"]) .field-inline > .lab {
+    display: none;
+  }
   #view > .tools > .seg button {
     flex: 1 1 0;
     padding-inline: 6px;
@@ -5569,7 +5590,7 @@ function viewContentBase() {
   }).join('');
   return upBanner() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
     + '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Tipo de conteúdo">' + chips + '</div><div class="tools c-tools-r">' + newBtn + '<label class="field-inline" for="c-folder"><select id="c-folder" data-a-change="folderSel" aria-label="Pasta" style="width:auto">' + fopts + '</select></label>' + folderBtns + '</div></div>'
-    + '<div class="tools" style="margin-top:0"><span class="hint" style="margin:0">' + shownC.length + (shownC.length === 1 ? ' ficheiro' : ' ficheiros') + ' · ' + fmtBytes(shownC.reduce((a, x)=>a + sizeBytes(x.size), 0)) + ' · armazenamento do servidor: ' + diskInfo().pct.toFixed(0) + ' % usado (' + fmtBytes(diskInfo().free) + ' livres)</span><span style="flex:1"></span><div class="seg sm" role="group" aria-label="Vista dos conteúdos"><button class="seg-b" data-a="cmode" data-m="cards" aria-pressed="' + (state.cmode !== 'list') + '">Cartões</button><button class="seg-b" data-a="cmode" data-m="list" aria-pressed="' + (state.cmode === 'list') + '">Lista</button></div><label class="field-inline" for="c-sort"><span class="lab">Ordenar</span><select id="c-sort" data-a-change="csort" style="width:auto"><option value="recent"' + (state.csort === 'recent' ? ' selected' : '') + '>Mais recentes</option><option value="size"' + (state.csort === 'size' ? ' selected' : '') + '>Maior tamanho</option></select></label></div>'
+    + '<div class="tools" style="margin-top:0"><span class="hint" style="margin:0">' + shownC.length + (shownC.length === 1 ? ' ficheiro' : ' ficheiros') + ' · ' + fmtBytes(shownC.reduce((a, x)=>a + sizeBytes(x.size), 0)) + ' · armazenamento do servidor: ' + diskInfo().pct.toFixed(0) + ' % usado (' + fmtBytes(diskInfo().free) + ' livres)</span><span style="flex:1"></span><div class="seg sm" role="group" aria-label="Vista dos conteúdos"><button class="seg-b" data-a="cmode" data-m="cards" aria-pressed="' + (state.cmode !== 'list') + '">Cartões</button><button class="seg-b" data-a="cmode" data-m="list" aria-pressed="' + (state.cmode === 'list') + '">Lista</button></div><label class="field-inline" for="c-sort"><span class="lab">Ordenar</span><select id="c-sort" aria-label="Ordenar" data-a-change="csort" style="width:auto"><option value="recent"' + (state.csort === 'recent' ? ' selected' : '') + '>Mais recentes</option><option value="size"' + (state.csort === 'size' ? ' selected' : '') + '>Maior tamanho</option></select></label></div>'
     + (diskInfo().pct >= 80 ? '<div class="banner">' + ic('alert') + '<p><b>Armazenamento quase cheio:</b> ' + diskInfo().pct.toFixed(0) + ' % usado. Apague conteúdos que já não usa ou aumente o espaço do servidor.</p></div>' : '')
     + houseCard() + (tiles && state.cmode === 'list' ? '<div class="card"><div class="scroll-x"><table class="tbl tbl-cont"><thead><tr><th>Conteúdo</th><th>Campanhas</th><th class="cl-hide">Ecrãs</th><th class="cl-hide">Pasta</th><th class="cl-hide">Validade</th></tr></thead><tbody>' + rowsL.join('') + '</tbody></table></div></div>' : (tiles ? '<div class="gallery">' + tiles + '</div>' : '<div class="card"><div class="card-b empty">Sem conteúdos nesta seleção.</div></div>'));
 }
