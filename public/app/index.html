@@ -1560,14 +1560,21 @@ iframe.prev-media {
 .tile-acts .tile-del:hover {
   background: color-mix(in srgb, var(--bad, #c0392b) 10%, transparent);
 }
-@media (max-width: 700px) {
+.tile-acts {
+  container-type: inline-size;
+}
+.tile-acts .btn.sm {
+  white-space: nowrap;
+}
+@container (max-width: 340px) {
+  .tile-acts > .btn.sm[data-a="toggle-house"] {
+    margin-right: 100%;
+  }
   .tile-acts {
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
   }
-  .tile-acts .btn.sm {
-    padding: 5px 9px;
-    white-space: nowrap;
-  }
+}
+@container (max-width: 250px) {
   .tile-acts .tile-del .tx {
     display: none;
   }
