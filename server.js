@@ -630,7 +630,12 @@ const wantsMail = (u, kind) => { const t = u.notif && u.notif.types && u.notif.t
 const mailTo = u => String((u.notif && u.notif.email) || u.email || '').trim();
 const MAIL_OFF_MIN = 15, MAIL_DAILY_MAX = 30;
 const testMailAt = new Map();
-function importantAlerts() {
+let impCache = { ts: 0, v: null };
+function importantAlerts(fresh) {                                                      // e-mail e push pedem-no no mesmo minuto: calcula uma vez
+  if (!fresh && impCache.v && Date.now() - impCache.ts < 20000) return impCache.v;
+  const v = importantAlerts0(); impCache = { ts: Date.now(), v }; return v;
+}
+function importantAlerts0() {
   const ln = S.lisbonNow(TZ), out = [];
   screenViews(false).alerts.forEach(a => {
     if (/^off-/.test(a.id)) { if ((a.min || 0) >= MAIL_OFF_MIN) out.push(a); }
@@ -685,7 +690,7 @@ async function alertMailTick(send) {
   const admins = docs('users').filter(u => u.admin && u.active !== false && /@/.test(mailTo(u)));
   if (!admins.length) return { sent: 0 };
   const go = send || ((addr, subject, text) => MAIL.send(cfg, { to: addr, subject, text }));
-  const now = Date.now(), cur = importantAlerts(), curIds = new Set(cur.map(a => a.id)); let sent = 0;
+  const now = Date.now(), cur = importantAlerts(!!send), curIds = new Set(cur.map(a => a.id)); let sent = 0;
   const mail = async (kind, subject, text) => { const to = admins.filter(u => wantsMail(u, kind)).map(mailTo); for (const addr of to) { try { await go(addr, subject, text); } catch (e) { console.error('E-mail de alerta falhou:', e.message); return false; } } return true; };   // sem destinatários também conta como tratado
   for (const a of cur) {
     if (q1('SELECT 1 FROM alert_mail WHERE id=?', a.id)) continue;
@@ -728,7 +733,7 @@ async function pushToUser(user, payload) {
 }
 async function alertPushTick(send) {
   try {
-    const go = send || pushToUser, now = Date.now(), cur = importantAlerts(), curIds = new Set(cur.map(a => a.id));
+    const go = send || pushToUser, now = Date.now(), cur = importantAlerts(!!send), curIds = new Set(cur.map(a => a.id));
     const admins = docs('users').filter(u => u.admin && u.active !== false), first = !getDoc('settings', 'pushinit');
     let sent = 0;
     const tell = async (kind, payload) => { for (const u of admins.filter(x => wantsPush(x, kind))) { try { sent += await go(u, payload); } catch (e) { console.error('Aviso push falhou:', e.message); } } };
