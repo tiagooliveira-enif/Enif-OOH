@@ -1481,16 +1481,34 @@ iframe.prev-media {
 }
 .seg.ut {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   max-width: 100%;
-  overflow-x: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 .seg.ut button {
-  flex: 1 0 auto;
+  flex: 0 0 auto;
+  padding: 8px 18px;
+  border: 1px solid var(--edge);
+  background: var(--field);
+  box-shadow: inset 0 1px 0 var(--hi);
+}
+.seg.ut button[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--hi);
 }
 @media (max-width: 440px) {
+  .seg.ut {
+    gap: 6px;
+  }
   .seg.ut button {
-    padding-left: 10px;
-    padding-right: 10px;
+    flex: 1 1 calc(50% - 3px);
+    padding: 8px 10px;
   }
 }
 .pn-net .card-h,
