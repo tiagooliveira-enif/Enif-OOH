@@ -6512,14 +6512,15 @@ function buildPdf(d, o) {
     doc.autoTable(Object.assign({startY:y, margin:{left:M, right:M, bottom:34}, head:head, body:body, styles:{font:MF(doc, 'Regular'), fontStyle:'normal', fontSize:9, cellPadding:5}, alternateRowStyles:{fillColor:[255, 251, 232]}, headStyles:{font:MF(doc, 'SemiBold'), fontStyle:'normal', fillColor:acc, textColor:ink}}, extra || {}));
     y = doc.lastAutoTable.finalY + 22;
   };
-  const shotCell = function(sh, x, y0, cw, draw) {
+  const shotBox = function(sh, cw) {return Math.min(150, cw * sh.h / sh.w);};
+  const shotCell = function(sh, x, y0, cw, draw, box) {
     const maxH = 150; let iw = cw, ih = iw * sh.h / sh.w;
     if (ih > maxH) {ih = maxH; iw = ih * sh.w / sh.h;}
     if (draw) {
       try {doc.addImage(sh.data, 'JPEG', x, y0, iw, ih);} catch (e) {/* sem ação */}
       doc.setDrawColor(210, 214, 221); doc.rect(x, y0, iw, ih, 'S');
     }
-    let ty = y0 + ih + 16;
+    let ty = y0 + (box || ih) + 16;
     montUse(doc, 'Bold'); doc.setFontSize(11); doc.setTextColor(ink[0], ink[1], ink[2]);
     doc.splitTextToSize(pdfTxt(sh.name), cw).forEach(function(ln) {if (draw)doc.text(ln, x, ty); ty += 14;});
     montUse(doc, 'Light'); doc.setFontSize(9); doc.setTextColor(mut[0], mut[1], mut[2]);
@@ -6534,9 +6535,9 @@ function buildPdf(d, o) {
   const drawShots = function(list) {                                            // duas imagens por linha, cada uma com o seu texto por baixo
     const gap = 20, cw = (PW - 2 * M - gap) / 2;
     for (let i = 0; i < list.length; i += 2) {
-      const pair = list.slice(i, i + 2), hh = Math.max.apply(null, pair.map(sh=>shotCell(sh, M, 0, cw, false)));
+      const pair = list.slice(i, i + 2), box = Math.max.apply(null, pair.map(sh=>shotBox(sh, cw))), hh = Math.max.apply(null, pair.map(sh=>shotCell(sh, M, 0, cw, false, box)));
       if (y + hh > PH - 50) {doc.addPage(); y = M;}
-      pair.forEach(function(sh, k) {shotCell(sh, M + k * (cw + gap), y, cw, true);});
+      pair.forEach(function(sh, k) {shotCell(sh, M + k * (cw + gap), y, cw, true, box);});
       y += hh + 14;
     }
   };
