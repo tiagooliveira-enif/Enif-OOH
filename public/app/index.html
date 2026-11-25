@@ -1567,11 +1567,16 @@ iframe.prev-media {
   white-space: nowrap;
 }
 @container (max-width: 340px) {
-  .tile-acts > .btn.sm[data-a="toggle-house"] {
-    margin-right: 100%;
-  }
   .tile-acts {
     flex-wrap: wrap;
+  }
+  .tile-acts .btn.sm {
+    flex: 1 1 0;
+    justify-content: center;
+    text-align: center;
+  }
+  .tile-acts > .btn.sm[data-a="toggle-house"] {
+    flex-basis: 100%;
   }
 }
 @container (max-width: 250px) {
