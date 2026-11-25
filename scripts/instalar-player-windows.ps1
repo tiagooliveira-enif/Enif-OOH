@@ -33,7 +33,7 @@ $dir = 'C:\EnifPlayer'
 New-Item -ItemType Directory -Force -Path $dir | Out-Null
 $url = "$Servidor/player/?code=$Codigo&key=$Chave"
 
-# script de arranque: volta a abrir o Edge se ele fechar ou falhar
+# script de arranque: espera pelo servidor e volta a abrir o Edge se ele fechar ou falhar
 $pos = ''
 $calc = ''
 if ($SegundoEcra) {
@@ -50,6 +50,14 @@ if ($s) { '{0},{1}' -f $s.Bounds.X, $s.Bounds.Y } else { '0,0' }
 $bat = @'
 @echo off
 :loop
+:espera
+rem espera que o servidor responda antes de abrir o Edge (rede ainda sem ligacao, ou servidor a reiniciar):
+rem sem isto, o Edge abria na pagina de erro e ficava la ate alguem carregar em Atualizar
+powershell -NoProfile -ExecutionPolicy Bypass -Command "try{if((Invoke-WebRequest -UseBasicParsing '__SERV__/health' -TimeoutSec 5).StatusCode -eq 200){exit 0}}catch{}; exit 1"
+if errorlevel 1 (
+  timeout /t 5 /nobreak >nul
+  goto espera
+)
 __CALC__
 "__EDGE__" __POS__--kiosk "__URL__" --edge-kiosk-type=fullscreen --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required --unsafely-treat-insecure-origin-as-secure="__SERV__" --user-data-dir="__DIR__\profile" --disable-pinch --overscroll-history-navigation=0
 timeout /t 5 /nobreak >nul
