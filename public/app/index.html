@@ -1493,6 +1493,30 @@ iframe.prev-media {
     padding-right: 10px;
   }
 }
+.pn-net .card-h,
+.pn-disk .card-h {
+  padding: 12px 16px 0;
+}
+.pn-net .card-h h2,
+.pn-disk .card-h h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.pn-net .card-b,
+.pn-disk .card-b {
+  padding: 4px 16px 12px;
+  font-size: 12.5px;
+}
+.pn-net .netbar,
+.pn-disk .netbar {
+  height: 6px;
+  margin: 6px 0 8px;
+}
+.pn-net .legend,
+.pn-disk .legend {
+  font-size: 12px;
+}
 .tile-acts {
   display: flex;
   flex-wrap: wrap;
@@ -4625,11 +4649,11 @@ function viewDash() {
   return kpis + '<div class="cols pn"><div class="stack">'
     + '<div class="card pn-att"><div class="card-h"><h2>Precisa de atenção</h2>' + (cSee ? '<button class="btn sm ghost" data-a="nav" data-v="ecras">Ver todos os ecrãs</button>' : '') + '</div><div class="card-b">' + al + '</div></div>'
     + '<div class="card pn-play"><div class="card-h"><h2>A reproduzir agora</h2>' + playTog + '</div><div class="card-b">' + playing + '</div></div>'
-    + '<div class="card pn-net"><div class="card-h"><h2>Estado da rede</h2></div><div class="card-b">' + net + '</div></div>'
-    + (can('conteudos.ver') ? '<div class="card pn-disk"><div class="card-h"><h2>Armazenamento</h2></div><div class="card-b">' + diskCard() + '</div></div>' : '')
     + '</div><div class="stack">'
     + '<div class="pn-cal">' + calCard() + '</div>'
     + '<div class="card pn-ai"><div class="card-h"><h2>' + ic('spark') + 'Sugestões da IA</h2></div><div class="card-b">' + ai + '</div></div>'
+    + '<div class="card pn-net"><div class="card-h"><h2>Estado da rede</h2></div><div class="card-b">' + net + '</div></div>'
+    + (can('conteudos.ver') ? '<div class="card pn-disk"><div class="card-h"><h2>Armazenamento</h2></div><div class="card-b">' + diskCard() + '</div></div>' : '')
     + '</div></div>';
 }
 /* ---------- ecrãs ---------- */
