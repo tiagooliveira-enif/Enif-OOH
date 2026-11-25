@@ -5403,7 +5403,7 @@ const MANUAL = {
  painel:{t:'Painel', intro:'O painel mostra, num relance, como está a rede de ecrãs e o que precisa da sua atenção.', blocks:[
   {h:'Ler o painel', steps:[
    ['Veja os números do topo', 'Ecrãs online, campanhas ativas, alertas abertos e visualizações estimadas de hoje. Se algum número estiver a vermelho, comece por aí.'],
-   ['Trate do que precisa de atenção', 'Em «Precisa de atenção» aparecem os alertas: ecrãs sem sinal, disco quase cheio, conflitos na playlist. Carregue em «Ver ecrã» para abrir o ecrã em causa.', 'ecras.ver'],
+   ['Trate do que precisa de atenção', 'Em «Precisa de atenção» aparecem os alertas: ecrãs sem sinal, disco quase cheio, conflitos na playlist. Carregue em «Ver ecrã» para abrir o ecrã em causa. No telemóvel mostra os 3 mais importantes; «Ver todos os ecrãs» abre os restantes.', 'ecras.ver'],
    ['Perceba o aviso «abaixo do contratado»', 'Quando uma campanha passa menos de 90 % das passagens previstas nas últimas 24 h, aparece um alerta com a causa principal (por exemplo, um ecrã sem sinal). Carregue em «Ver campanha» ou «Ver ecrã». Um ecrã sem internet não conta: continua a passar e guarda as passagens, e só depois de voltar e as enviar é que a plataforma faz a conta e, se ficou mesmo abaixo, avisa. Este aviso é só interno: não aparece nos relatórios.', 'campanhas.ver'],
    ['Receba os avisos importantes por e-mail', 'O administrador recebe um e-mail quando um ecrã fica sem ligação há 15 minutos ou mais, uma campanha fica quase sem passagens, o disco está quase cheio ou a cópia de segurança falha, e outro quando o problema se resolve. Às segundas-feiras às 8h recebe também um resumo da semana (ecrãs, alertas, campanhas, disco e cópias). Escolha em «Notificações > Preferências» (coluna E-mail).', 'admin'],
    ['Dê o alerta como resolvido', 'Depois de tratar do problema, carregue em «Marcar como resolvido» para o alerta sair da lista.', 'alertas.resolver'],
@@ -5443,7 +5443,7 @@ const MANUAL = {
    ['Atualizar agora', 'Faz o ecrã mostrar já a programação mais recente. Serve para quando está um cliente à frente do ecrã; no dia a dia o ecrã atualiza-se sozinho.'],
    ['Área do PC', 'Por defeito o player ocupa o ecrã inteiro do PC. Se o painel LED só mostra uma parte do ecrã do PC (por exemplo, o canto superior esquerdo), escolha em «Área do PC» o canto ou o centro: o player passa a desenhar só com o tamanho da resolução do ecrã e deixa o resto do PC a preto.'],
    ['Margem oculta', 'Se o painel esconde uma faixa do ecrã (por exemplo uma moldura ou uma montra à frente), em «Margem oculta» carregue em «Alterar» e indique quantos píxeis ficam tapados em cima, em baixo, à esquerda e à direita. O player deixa essa faixa a preto e a área visível passa a ser o resto. A compatibilidade dos conteúdos continua a usar a resolução do ecrã, sem contar com a margem.', 'ecras.gerir'],
-   ['Ajuste e alinhamento do vídeo', 'Em «Ajuste do vídeo» escolhe como o conteúdo enche o ecrã e, em «Alinhamento do vídeo», se fica ao centro ou encostado à esquerda/cima ou à direita/baixo.', 'ecras.gerir'],
+   ['Ajuste e alinhamento do vídeo', 'Em «Ajuste do vídeo» escolhe como o conteúdo enche o ecrã («Esticar» enche o ecrã todo, mesmo deformando a imagem, e aceita conteúdos de qualquer proporção) e, em «Alinhamento do vídeo», se fica ao centro ou encostado à esquerda/cima ou à direita/baixo.', 'ecras.gerir'],
    ['Reiniciar o player e Teste no ecrã', '«Reiniciar player» reinicia o programa do ecrã. «Teste no ecrã» mostra durante 30 segundos uma imagem de teste, para confirmar a posição e a resolução.'],
    ['Alterar dados', 'Ao lado da resolução, do horário e da localização há o botão «Alterar».'],
    ['Eliminar ecrã', 'Só quando o ecrã já não existir. Pede confirmação.']]}],
@@ -5479,14 +5479,16 @@ const MANUAL = {
   {h:'Carregar conteúdos', need:'conteudos.gerir', go:1, steps:[
    ['Carregue os ficheiros', 'Use «Carregar conteúdos» ou largue os ficheiros na zona tracejada.'],
    ['Espere pela leitura', 'A plataforma lê a resolução de cada ficheiro e abre a janela «Ecrãs de cada conteúdo».'],
-   ['Escolha os ecrãs de cada ficheiro', 'É obrigatório e nada vem marcado: escolha um a um os ecrãs onde o conteúdo pode passar. «Marcar os compatíveis» ajuda, e «Limpar» desfaz. Os ecrãs com proporção diferente (mais de 10 píxeis) ficam desativados.'],
+   ['Escolha os ecrãs de cada ficheiro', 'É obrigatório e nada vem marcado: escolha um a um os ecrãs onde o conteúdo pode passar. «Marcar os compatíveis» ajuda, e «Limpar» desfaz. Os ecrãs com proporção diferente (mais de 10 píxeis) ficam desativados, a não ser que o ecrã tenha o ajuste «Esticar», que aceita qualquer proporção (a imagem deforma para encher o ecrã).'],
    ['Confirme', 'O ficheiro entra na biblioteca. Se não servir a nenhum ecrã, não é carregado e a plataforma diz porquê.']]},
   {h:'Organizar', steps:[
    ['Veja um conteúdo', 'Carregue na imagem do cartão para abrir o vídeo (ou a imagem) numa janela e vê-lo como vai passar no ecrã. O cartão dos vídeos mostra a primeira imagem, para os reconhecer sem abrir.'],
    ['Mude a vista', 'Em «Cartões» vê cada conteúdo com a sua imagem; em «Lista» vê uma linha por conteúdo, com as campanhas, os ecrãs e a pasta. A escolha fica guardada na sua conta. Nas duas pode carregar na miniatura para ver o vídeo.'],
    ['Filtre e ordene', 'Use as pastas, os filtros Vídeos, Imagens e HTML5, e a ordenação por mais recentes ou maior tamanho.'],
    ['Use pastas', '«Nova pasta» cria uma pasta; em cada ficheiro escolha a pasta onde o quer.', 'conteudos.gerir'],
-   ['Mude os ecrãs permitidos', '«Ecrãs permitidos» muda os ecrãs onde o ficheiro pode passar. Tem de ficar pelo menos um.', 'conteudos.gerir'],
+   ['Mude os ecrãs permitidos', '«Alterar ecrãs», no cartão do ficheiro, muda os ecrãs onde ele pode passar. Tem de ficar pelo menos um.', 'conteudos.gerir'],
+   ['Use um conteúdo como spot da Enif', '«Spot da Enif», no cartão, faz o ficheiro passar uma vez em cada volta (ou «Deixar de ser spot» para o tirar). Só o administrador o vê.', 'admin'],
+   ['Elimine um conteúdo', 'O botão «Eliminar» (no telemóvel, só o ícone do caixote) pede confirmação e diz onde o ficheiro ainda é usado. Vai para a reciclagem, onde pode ser restaurado durante 30 dias.', 'conteudos.gerir'],
    ['Veja onde está a ser usado', 'As etiquetas por baixo do nome mostram as campanhas que usam o ficheiro. O «×» retira-o dessa campanha.']]},
   {h:'Limpeza automática', steps:[
    ['Quando um conteúdo é apagado', 'Um conteúdo que não está em nenhuma campanha ativa, agendada ou em pausa (nem é spot da Enif) vai para a reciclagem passado o prazo definido: por defeito 180 dias depois de a última campanha acabar, ou 60 dias depois de carregado se nunca foi usado. O administrador muda os dias nos dois campos, no fundo da página Conteúdos (no mínimo 7 dias). Na reciclagem fica 30 dias e ainda pode ser restaurado.'],
@@ -5514,13 +5516,13 @@ const MANUAL = {
  utilizadores:{t:'Utilizadores', intro:'Aqui, o administrador decide quem entra na plataforma e o que cada pessoa pode fazer.', blocks:[
   {h:'Criar e alterar contas', go:1, steps:[
    ['Carregue em «Novo utilizador»', 'No topo da página.'],
-   ['Preencha os dados', 'Nome, e-mail e palavra-passe. «Gerar» cria uma palavra-passe segura.'],
+   ['Preencha os dados', 'Nome, e-mail e palavra-passe. «Gerar» cria uma palavra-passe segura. «Exigir verificação em dois passos» obriga essa pessoa a usar um código ao entrar (precisa de o e-mail estar configurado); ela não consegue desligá-lo.'],
    ['Escolha o perfil', 'Administrador, Operador, Só consulta ou Personalizado. Em «O que pode fazer» marca ou desmarca cada permissão.'],
    ['Defina até quando (opcional)', 'Para quem só substitui nas férias, indique «Acesso válido até»: depois dessa data a conta deixa de entrar.'],
    ['Guarde', 'Carregue em «Criar utilizador». Para mudar alguém mais tarde, use «Editar»: pode definir uma nova palavra-passe sem saber a anterior ou desativar a conta.']]},
   {h:'A sua conta e a segurança', steps:[
-   ['Proteja a sua conta', 'No separador «Segurança» da página Utilizadores, em «A minha conta de administrador», pode mudar a palavra-passe, o e-mail de recuperação e ligar a verificação em dois passos.'],
-   ['Consulte as cópias de segurança e o registo', 'Veja as últimas cópias de segurança e o registo de auditoria (quem fez o quê e quando).']]}],
+   ['Proteja a sua conta', 'A página tem quatro separadores: Contas, Segurança, Cópias e Auditoria. Em «Segurança», na «A minha conta de administrador», pode mudar a palavra-passe, o e-mail de recuperação e ligar a verificação em dois passos. Ao entrar com código, «Confiar neste dispositivo» dispensa o código nesse navegador durante 30 dias; a lista de dispositivos de confiança, com «Remover», está na mesma secção.'],
+   ['Consulte as cópias de segurança e o registo', 'Em «Cópias» vê as últimas cópias de segurança e em «Auditoria» o registo de quem fez o quê e quando.']]}],
   tips:[['Só o administrador cria e altera contas. Cada pessoa só entra com os dados que lhe forem dados.'], ['Por segurança, a sessão termina sozinha se ninguém usar a página durante 15 minutos. Basta voltar a entrar.']]}
 };
 const kb = t=>String(t).replace(/«([^»]+)»/g, '<span class="kbtn">$1</span>');
