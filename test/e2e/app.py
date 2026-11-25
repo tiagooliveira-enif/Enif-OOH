@@ -81,7 +81,10 @@ try:
             pg.click(f'[data-a=nav][data-v={v_}]'); time.sleep(.8)
             ok('página '+v_+' abre', len(pg.inner_text('#view'))>40)
             ov=pg.evaluate('document.documentElement.scrollWidth-window.innerWidth'); ok('sem scroll horizontal em '+v_+' (1300)', ov<=0)
-        txt=pg.inner_text('#view')
+        txt=''
+        for t_ in ['seguranca','copias','auditoria']:   # a segurança está em separadores
+            pg.click(f'[data-a=utab][data-t={t_}]'); time.sleep(.3); txt+=pg.inner_text('#view')+'\n'
+        pg.click('[data-a=utab][data-t=contas]'); time.sleep(.2)
         ok('Utilizadores mostra Segurança, cópias e auditoria', 'Cópias de segurança' in txt and 'Registo de auditoria' in txt and 'dois passos' in txt)
         ok('auditoria já tem a entrada do administrador', 'Entrou' in txt)
         pg.click('[data-a=nav][data-v=ecras]'); time.sleep(.5)
@@ -114,13 +117,14 @@ try:
         time.sleep(1.5); rt=pg.inner_text('#view'); ok('relatórios falam de Visualizações', 'isualizações' in rt and 'mpressões' not in rt and 'Sem reproduções' not in rt)
         if 'isualizações' not in rt: print(rt[:600])
         # dois passos pela interface
-        pg.click('[data-a=nav][data-v=utilizadores]'); time.sleep(.5)
+        pg.click('[data-a=nav][data-v=utilizadores]'); time.sleep(.5); pg.click('[data-a=utab][data-t=seguranca]'); time.sleep(.4)   # a segurança está num separador
         ok('recuperação veio da configuração', 'rec@enif.pt' in pg.input_value('#sec-rec'))
         pg.click('[data-a=twofa-toggle]'); time.sleep(1); ok('dois passos ligados', 'ligada' in pg.inner_text('#view'))
         # mudar o e-mail de recuperação
         pg.fill('#sec-rec','novo@enif.pt'); pg.click('[data-a=rec-save]'); pg.wait_for_selector('#rc-code'); time.sleep(.3)
         pg.fill('#rc-code',code_for('novo@enif.pt')); pg.click('form[data-form=recconfirm] button[type=submit]'); time.sleep(1.2)
         ok('e-mail de recuperação confirmado por código', 'novo@enif.pt' in pg.input_value('#sec-rec'))
+        pg.click('[data-a=utab][data-t=copias]'); time.sleep(.4)
         pg.click('[data-a=backup-now]'); time.sleep(1.5); ok('cópia de segurança feita pela interface', 'manual' not in pg.inner_text('#view') and ('feita pelo administrador' in pg.inner_text('#view')))
         pg.evaluate("document.querySelector('[data-a=logout]')&&document.querySelector('[data-a=logout]').click()"); time.sleep(1)
         # login com código
@@ -128,7 +132,7 @@ try:
         pg.fill('#tf-code','000000' if code_for('novo@enif.pt')!='000000' else '111111'); pg.click('form[data-form=twofa] button[type=submit]'); time.sleep(.8)
         ok('código errado mostra erro', 'incorreto' in pg.inner_text('#form-err'))
         pg.fill('#tf-code',code_for('novo@enif.pt')); pg.click('form[data-form=twofa] button[type=submit]'); pg.wait_for_selector('[data-a=nav][data-v=ecras]'); ok('entrou com o código enviado ao e-mail de recuperação', True)
-        pg.click('[data-a=nav][data-v=utilizadores]'); time.sleep(.5); pg.click('[data-a=twofa-toggle]'); time.sleep(.8)
+        pg.click('[data-a=nav][data-v=utilizadores]'); time.sleep(.5); pg.click('[data-a=utab][data-t=seguranca]'); time.sleep(.4); pg.click('[data-a=twofa-toggle]'); time.sleep(.8)
         # recuperação
         pg.evaluate("document.querySelector('[data-a=logout]')&&document.querySelector('[data-a=logout]').click()"); time.sleep(1)
         pg.wait_for_selector('[data-a=forgot-open]'); pg.click('[data-a=forgot-open]'); pg.fill('#fg-email','t@enif.pt'); pg.click('form[data-form=forgot] button[type=submit]'); pg.wait_for_selector('#fc-code'); time.sleep(.3)

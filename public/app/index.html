@@ -1105,7 +1105,7 @@ button.t-row:hover {
 }
 .crow {
   display: grid;
-  grid-template-columns: 250px repeat(7, minmax(0, 1fr));
+  grid-template-columns: minmax(250px, 27%) repeat(7, minmax(0, 1fr));
   align-items: center;
   width: 100%;
   padding: 0;
@@ -1459,6 +1459,79 @@ iframe.prev-media {
 .tile-del:hover {
   border-color: var(--bad, #c0392b);
   color: var(--bad, #c0392b);
+}
+.tbl-log td:nth-child(1) {
+  white-space: nowrap;
+}
+.tbl-log td:nth-child(2),
+.tbl-log td:nth-child(3) {
+  white-space: nowrap;
+}
+.tbl-log td:nth-child(4) {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tbl-log td:nth-child(5) {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.seg.ut {
+  display: flex;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.seg.ut button {
+  flex: 1 0 auto;
+}
+@media (max-width: 440px) {
+  .seg.ut button {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
+.tile-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.tile-acts .btn.sm {
+  width: auto;
+  margin: 0;
+  padding: 5px 12px;
+  font-size: 12.5px;
+}
+.tile-acts .tile-del {
+  color: var(--bad, #c0392b);
+  border-color: color-mix(in srgb, var(--bad, #c0392b) 38%, transparent);
+  background: transparent;
+}
+.tile-acts .tile-del svg.i {
+  width: 14px;
+  height: 14px;
+  margin-right: 4px;
+}
+.tile-acts .tile-del:hover {
+  background: color-mix(in srgb, var(--bad, #c0392b) 10%, transparent);
+}
+@media (max-width: 700px) {
+  .tile-acts {
+    flex-wrap: nowrap;
+  }
+  .tile-acts .btn.sm {
+    padding: 5px 9px;
+    white-space: nowrap;
+  }
+  .tile-acts .tile-del .tx {
+    display: none;
+  }
+  .tile-acts .tile-del svg.i {
+    margin: 0;
+  }
 }
 
 /* reports */
@@ -2965,6 +3038,32 @@ button.avatar {
   .cols {
     grid-template-columns: minmax(0, 1fr);
   }
+  .cols.pn {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .cols.pn > .stack {
+    display: contents;
+  }
+  .pn-att {
+    order: 1;
+  }
+  .pn-play {
+    order: 2;
+  }
+  .pn-ai {
+    order: 3;
+  }
+  .pn-cal {
+    order: 4;
+  }
+  .pn-net {
+    order: 5;
+  }
+  .pn-disk {
+    order: 6;
+  }
 }
 @media (max-width: 900px) {
   .app {
@@ -3493,6 +3592,7 @@ const P = {
   search:'<circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/>',
   check:'<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   x:'<path d="M6 6l12 12M18 6 6 18"/>',
+  trash:'<path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"/>',
   shield:'<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
   help:'<circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>',
   bell:'<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
@@ -3623,7 +3723,7 @@ function devicesHtml() {
     + L.map(d=>'<div class="muted" style="margin-top:6px"><b>' + esc(d.label || 'Navegador') + '</b>' + (d.id === TID ? ' <span class="pill ok">este dispositivo</span>' : '') + ' · última entrada ' + esc(mailWhen(d.last)) + ' <button class="btn sm" data-a="dev-remove" data-id="' + esc(d.id) + '">Remover</button></div>').join('') + '</div>'
     + (L.length ? '<button class="btn sm" data-a="dev-clear">Remover todos</button>' : '') + '</div>';
 }
-function securityHtml() {
+function securityHtml(tab) {
   const me = state.user; if (!me || !me.admin) return '';
   const tfa = !!(me.twoFA || me.mfa);
   const chk =
@@ -3649,7 +3749,8 @@ function securityHtml() {
   const au = '<div class="card"><div class="card-h"><h2>' + ic('eye') + 'Registo de auditoria</h2><span class="hint">quem fez o quê · só o administrador vê</span><button class="btn sm" data-a="audit-csv">' + ic('download') + 'Descarregar</button></div><div class="scroll-x" style="margin-top:8px"><table class="tbl"><thead><tr><th>Data e hora</th><th>Quem</th><th>O quê</th></tr></thead><tbody>'
     + auditLog.slice(0, 30).map(a=>'<tr><td>' + esc(mailWhen(a.t)) + '</td><td>' + esc(a.who) + '</td><td>' + esc(a.what) + (a.detail ? ' <span class="muted">· ' + esc(a.detail) + '</span>' : '') + '</td></tr>').join('')
     + '</tbody></table></div><p class="hint" style="margin-top:8px">Mostra as últimas 30 ações. Ninguém, nem o administrador, pode editar ou apagar este registo.</p></div>';
-  return '<h2 class="sec-h" style="margin:22px 0 10px">Segurança</h2><div class="stack"><div class="card"><div class="card-h"><h2>' + ic('shield') + 'Estado da segurança</h2></div><div class="card-b">' + chk + '</div></div>' + acc + bk + au + '</div>';
+  const estado = '<div class="card"><div class="card-h"><h2>' + ic('shield') + 'Estado da segurança</h2></div><div class="card-b">' + chk + '</div></div>';
+  return {seguranca:'<div class="stack">' + estado + acc + '</div>', copias:'<div class="stack">' + bk + '</div>', auditoria:'<div class="stack">' + au + '</div>'};
 }
 function recModal(ch, email) {
   modal('<form data-form="recconfirm" data-ch="' + esc(ch) + '" novalidate><div class="modal-h"><h2>Confirmar o e-mail de recuperação</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
@@ -4438,8 +4539,11 @@ function viewUsers() {
     return '<div class="item u-item">' + avatarHtml(u) + '<div class="grow"><div class="title">' + esc(u.name) + (u === state.user ? ' <span class="muted" style="font-weight:500">(você)</span>' : '') + '</div><div class="muted mono">' + esc(u.email) + '</div><div class="muted" style="margin-top:4px">' + esc(areas) + '</div></div>'
       + '<div class="u-side" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="pill accent">' + roleName(u) + '</span><span class="pill ' + ai.c + '">' + ai.t + '</span>' + (u.mfa ? '<span class="pill ok">2 passos</span>' : '') + '<button class="btn sm" data-a="edit-user" data-id="' + u.id + '">Editar</button></div></div>';
   }).join('');
-  return '<div class="note">' + ic('alert') + '<p>Só o administrador cria e altera contas; mais ninguém tem esta secção. Cada pessoa só entra com os dados que o administrador lhe der.</p></div>'
-    + '<div class="card"><div class="card-b">' + rows + '</div></div>' + securityHtml();
+  const adm = !!(state.user && state.user.admin), tab = adm ? (state.utab || 'contas') : 'contas';
+  const tabs = adm ? '<div class="seg ut" role="group" aria-label="Secções" style="margin:0 0 14px">' + [['contas', 'Contas'], ['seguranca', 'Segurança'], ['copias', 'Cópias'], ['auditoria', 'Auditoria']].map(t=>'<button type="button" data-a="utab" data-t="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>' : '';
+  if (tab !== 'contas') {const sec = securityHtml(); return tabs + (sec && sec[tab] ? sec[tab] : '');}
+  return tabs + '<div class="note">' + ic('alert') + '<p>Só o administrador cria e altera contas; mais ninguém tem esta secção. Cada pessoa só entra com os dados que o administrador lhe der.</p></div>'
+    + '<div class="card"><div class="card-b">' + rows + '</div></div>';
 }
 function userModal(id) {
   if (!(state.user && state.user.admin)) return;
@@ -4514,18 +4618,18 @@ function viewDash() {
   const playTog = '<div class="seg" role="group" aria-label="Ver por"><button type="button" data-a="play-view" data-m="camp" aria-pressed="' + (!byScr) + '">Por campanha</button><button type="button" data-a="play-view" data-m="screen" aria-pressed="' + byScr + '">Por ecrã</button></div>';
   const sg = suggestions(), cRep = can('relatorios.ver');
   const fewCtl = can('ecras.gerir') ? '<div class="few-ctl"><label for="few-min">Avisar ecrãs com menos de</label><input id="few-min" type="number" min="0" max="99" step="1" value="' + state.fewMin + '" data-a-change="few-min"><span>campanhas ativas</span></div>' : '';
-  const ai = (sg.length ? sg.slice(0, 6).map(g=>sugHtml(g, cCamp, cSee, cRep)).join('') + (sg.length > 6 ? '<p class="hint">Mais ' + (sg.length - 6) + ' sugestões depois de resolver estas.</p>' : '') : '<div class="empty">Sem sugestões por agora.</div>') + fewCtl;
+  const ai = (sg.length ? sg.slice(0, 6).map(g=>sugHtml(g, cCamp, cSee, cRep)).join('') + (sg.length > 6 ? '<p class="hint">Mais ' + (sg.length - 6) + (sg.length - 6 === 1 ? ' sugestão' : ' sugestões') + ' depois de resolver estas.</p>' : '') : '<div class="empty">Sem sugestões por agora.</div>') + fewCtl;
   const pct = n=>total ? (n / total * 100).toFixed(2) : '0';
   const net = '<div class="netbar" role="img" aria-label="Estado da rede"><i style="width:' + pct(screens.filter(s=>s.status === 'online').length) + '%;background:var(--ok)"></i><i style="width:' + pct(att) + '%;background:var(--warn)"></i><i style="width:' + pct(off) + '%;background:var(--bad)"></i></div>'
     + '<div class="legend"><span style="--lc:var(--ok)">Online <b>' + screens.filter(s=>s.status === 'online').length + '</b></span><span style="--lc:var(--warn)">Atenção <b>' + att + '</b></span><span style="--lc:var(--bad)">Offline <b>' + off + '</b></span>' + (fora ? '<span style="--lc:var(--line-strong)" title="Fora do horário e sem sinal">Desligado · sem sinal <b>' + fora + '</b></span>' : '') + (fresh ? '<span style="--lc:var(--line-strong)">Por emparelhar <b>' + fresh + '</b></span>' : '') + '</div>';
-  return kpis + '<div class="cols"><div class="stack">'
-    + '<div class="card"><div class="card-h"><h2>Precisa de atenção</h2>' + (cSee ? '<button class="btn sm ghost" data-a="nav" data-v="ecras">Ver todos os ecrãs</button>' : '') + '</div><div class="card-b">' + al + '</div></div>'
-    + '<div class="card"><div class="card-h"><h2>A reproduzir agora</h2>' + playTog + '</div><div class="card-b">' + playing + '</div></div>'
+  return kpis + '<div class="cols pn"><div class="stack">'
+    + '<div class="card pn-att"><div class="card-h"><h2>Precisa de atenção</h2>' + (cSee ? '<button class="btn sm ghost" data-a="nav" data-v="ecras">Ver todos os ecrãs</button>' : '') + '</div><div class="card-b">' + al + '</div></div>'
+    + '<div class="card pn-play"><div class="card-h"><h2>A reproduzir agora</h2>' + playTog + '</div><div class="card-b">' + playing + '</div></div>'
+    + '<div class="card pn-net"><div class="card-h"><h2>Estado da rede</h2></div><div class="card-b">' + net + '</div></div>'
+    + (can('conteudos.ver') ? '<div class="card pn-disk"><div class="card-h"><h2>Armazenamento</h2></div><div class="card-b">' + diskCard() + '</div></div>' : '')
     + '</div><div class="stack">'
-    + calCard()
-    + '<div class="card"><div class="card-h"><h2>' + ic('spark') + 'Sugestões da IA</h2></div><div class="card-b">' + ai + '</div></div>'
-    + '<div class="card"><div class="card-h"><h2>Estado da rede</h2></div><div class="card-b">' + net + '</div></div>'
-    + (can('conteudos.ver') ? '<div class="card"><div class="card-h"><h2>Armazenamento</h2></div><div class="card-b">' + diskCard() + '</div></div>' : '')
+    + '<div class="pn-cal">' + calCard() + '</div>'
+    + '<div class="card pn-ai"><div class="card-h"><h2>' + ic('spark') + 'Sugestões da IA</h2></div><div class="card-b">' + ai + '</div></div>'
     + '</div></div>';
 }
 /* ---------- ecrãs ---------- */
@@ -5320,7 +5424,7 @@ const MANUAL = {
    ['Defina até quando (opcional)', 'Para quem só substitui nas férias, indique «Acesso válido até»: depois dessa data a conta deixa de entrar.'],
    ['Guarde', 'Carregue em «Criar utilizador». Para mudar alguém mais tarde, use «Editar»: pode definir uma nova palavra-passe sem saber a anterior ou desativar a conta.']]},
   {h:'A sua conta e a segurança', steps:[
-   ['Proteja a sua conta', 'Em «A minha conta de administrador» pode mudar a palavra-passe, o e-mail de recuperação e ligar a verificação em dois passos.'],
+   ['Proteja a sua conta', 'No separador «Segurança» da página Utilizadores, em «A minha conta de administrador», pode mudar a palavra-passe, o e-mail de recuperação e ligar a verificação em dois passos.'],
    ['Consulte as cópias de segurança e o registo', 'Veja as últimas cópias de segurança e o registo de auditoria (quem fez o quê e quando).']]}],
   tips:[['Só o administrador cria e altera contas. Cada pessoa só entra com os dados que lhe forem dados.'], ['Por segurança, a sessão termina sozinha se ninguém usar a página durante 15 minutos. Basta voltar a entrar.']]}
 };
@@ -5396,7 +5500,11 @@ function viewContentBase() {
     const cs = campsOfFile(x), c = cs[0];
     const icon = x.type === 'Vídeo' ? 'play' : (x.type === 'Imagem' ? 'image' : 'code');
     const ext = (x.name.split('.').pop() || '').toUpperCase();
-    const scrLine = x.ready ? '<span class="muted" style="font-size:13px">' + contScrTxt(x) + '</span>' + (cG && isAdm() ? '<button class="btn sm ghost" data-a="toggle-house" data-id="' + x.id + '">' + (x.house ? 'Deixar de ser spot da Enif' : 'Usar como spot da Enif') + '</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel" data-a="cont-screens" data-id="' + x.id + '">Ecrãs permitidos</button>' : '') + (cG && (!x.house || isAdm()) ? '<button type="button" class="tile-sel tile-del" data-a="del-content" data-id="' + x.id + '">Eliminar</button>' : '') : '';
+    const scrLine = x.ready ? '<span class="muted" style="font-size:13px">' + contScrTxt(x) + '</span>' + (cG ? '<div class="tile-acts">'
+      + (isAdm() ? '<button type="button" class="btn sm ghost" data-a="toggle-house" data-id="' + x.id + '" title="' + (x.house ? 'Deixar de ser spot da Enif' : 'Usar como spot da Enif') + '">' + (x.house ? 'Deixar de ser spot' : 'Spot da Enif') + '</button>' : '')
+      + (!x.house || isAdm() ? '<button type="button" class="btn sm" data-a="cont-screens" data-id="' + x.id + '" title="Ecrãs onde este conteúdo pode passar">Alterar ecrãs</button>' : '')
+      + (!x.house || isAdm() ? '<button type="button" class="btn sm tile-del" data-a="del-content" data-id="' + x.id + '" title="Eliminar este conteúdo" aria-label="Eliminar ' + esc(x.name) + '">' + ic('trash') + '<span class="tx">Eliminar</span></button>' : '')
+      + '</div>' : '') : '';
     const meta = !x.ready ? 'A preparar o conteúdo…' : (x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size);
     const pills = cs.map(k=>'<span class="pill">' + esc(k.name) + (cG ? '<button class="pill-x" data-a="unassoc" data-id="' + x.id + '" data-c="' + k.id + '" aria-label="Retirar da campanha ' + esc(k.name) + '">' + ic('x') + '</button>' : '') + '</span>').join('');
     const sel = '';
@@ -5545,7 +5653,7 @@ function areaTxt(s) {
   const a = s.area || 'inteiro', nm = (AREAS.find(f=>f[0] === a) || AREAS[0])[1].toLowerCase();
   return a === 'inteiro' ? 'O player ocupa o ecrã inteiro do PC.' : 'O player desenha só com o tamanho do ecrã (' + esc(s.res || '') + ') no ' + nm + '; o resto do PC fica a preto.';
 }
-const FITS = [['caber', 'Caber (barras pretas, nada cortado)'], ['preencher', 'Preencher (sem barras, corta as margens)'], ['esticar', 'Esticar (deforma a imagem)']];
+const FITS = [['caber', 'Caber (barras pretas)'], ['preencher', 'Preencher (corta margens)'], ['esticar', 'Esticar (deforma)']];
 function resField(cur) {
   const preset = RES_PRESETS.some(p=>p[0] === cur);
   const custom = !!cur && cur !== 'auto' && !preset;
@@ -5974,9 +6082,9 @@ function viewReports() {
   const log = airLog(recs), shown = log.slice(0, state.logLimit);
   const logRows = shown.map(function(r) {
     const saiu = r.live ? '<span class="pill ok dot">Em curso</span>' : (r.lost ? fmtHM(r.out) + ' <span class="pill bad">Sem sinal</span>' : fmtHM(r.out));
-    return '<tr><td>' + esc(dFull.format(r.d)) + '</td><td>' + esc(r.s.venue) + '<div class="muted">' + esc(r.s.city) + '</div></td><td>' + esc(r.s.spot) + '<div class="muted mono">' + r.s.id + '</div></td><td><b>' + esc(r.c.name) + '</b></td><td>' + (r.f ? esc(fname(r.f)) : '<span class="muted">—</span>') + '</td><td class="num">' + fmtHM(r.a) + '</td><td class="num">' + saiu + '</td><td class="num">' + fmt.format(r.plays) + '</td></tr>';
+    return '<tr><td>' + esc(dFull.format(r.d)) + '</td><td>' + esc(r.s.venue) + '<div class="muted">' + esc(r.s.city) + '</div></td><td>' + esc(r.s.spot) + '<div class="muted mono">' + r.s.id + '</div></td><td title="' + esc(r.c.name) + '"><b>' + esc(r.c.name) + '</b></td><td' + (r.f ? ' title="' + esc(fname(r.f)) + '"' : '') + '>' + (r.f ? esc(fname(r.f)) : '<span class="muted">—</span>') + '</td><td class="num">' + fmtHM(r.a) + '</td><td class="num">' + saiu + '</td><td class="num">' + fmt.format(r.plays) + '</td></tr>';
   }).join('');
-  const logCard = '<div class="card" data-nolim="1"><div class="card-h"><h2>Registo de emissão</h2><span class="hint">' + fmt.format(log.length) + ' registos · um por campanha, vídeo, ecrã e dia</span></div><div class="scroll-x" style="margin-top:8px"><table class="tbl" style="min-width:900px"><thead><tr><th>Data</th><th>Local</th><th>Ecrã</th><th>Campanha</th><th>Vídeo</th><th class="num">Entrou</th><th class="num">Saiu</th><th class="num">Passagens</th></tr></thead><tbody>' + logRows + '</tbody></table></div>'
+  const logCard = '<div class="card" data-nolim="1"><div class="card-h"><h2>Registo de emissão</h2><span class="hint">' + fmt.format(log.length) + ' registos · um por campanha, vídeo, ecrã e dia</span></div><div class="scroll-x" style="margin-top:8px"><table class="tbl tbl-log" style="min-width:900px"><thead><tr><th>Data</th><th>Local</th><th>Ecrã</th><th>Campanha</th><th>Vídeo</th><th class="num">Entrou</th><th class="num">Saiu</th><th class="num">Passagens</th></tr></thead><tbody>' + logRows + '</tbody></table></div>'
     + (log.length > shown.length ? '<div class="more"><button class="btn" data-a="log-more">Ver tudo</button></div>' : (log.length > 10 ? '<div class="more"><button class="btn" data-a="log-less">Mostrar só 10</button></div>' : '')) + '</div>';
   const mailCard = (state.user && state.user.admin) ? mailSection() : '';
   return tools + kpis + confLine + '<div class="stack">' + chart + '<div class="cols">' + table + rec + '</div>' + fileCard + logCard + mailCard + '</div>';
@@ -6330,7 +6438,7 @@ function modal(html) {
   root.innerHTML = '<div class="overlay" data-a="backdrop"><div class="modal" role="dialog" aria-modal="true">' + html + '</div></div>';
   const d = root.querySelector('.modal'), h = d && d.querySelector('h2');
   if (h) {h.id = 'dlg-title'; d.setAttribute('aria-labelledby', 'dlg-title');}
-  const f = d && (d.querySelector('input:not([type=hidden]):not([type=file]):not([disabled]):not([type=checkbox])') || d.querySelector('.modal-f .btn.primary') || d.querySelector('button'));
+  const f = d && (d.querySelector('input:not([type=hidden]):not([type=file]):not([disabled]):not([type=checkbox]):not([type=number])') || d.querySelector('.modal-f .btn.primary') || d.querySelector('button'));
   if (f) try {f.focus({preventScroll:true});} catch (e) {/* sem ação */}
 }
 function closeModal() {
@@ -6820,6 +6928,7 @@ const actions = {
   'cont-screens':function(t) {if (guard('conteudos.gerir'))contScreensModal(t.dataset.id);},
   cfilter:function(t) {state.cfilter = t.dataset.f; render();},
   ccal:function() {state.ccal = state.ccal === 'old' ? 'new' : 'old'; render();},
+  utab:function(t) {state.utab = ['contas', 'seguranca', 'copias', 'auditoria'].indexOf(t.dataset.t) > -1 ? t.dataset.t : 'contas'; render();},
   cmode:function(t) {state.cmode = t.dataset.m === 'list' ? 'list' : 'cards'; render();},
   cview:function(t) {state.cview = state.cview === t.dataset.v ? 'lib' : t.dataset.v; render();},
   'clean-see':function() {state.cview = 'exp'; state.view = 'conteudos'; render(); window.scrollTo(0, 0);},
@@ -7375,6 +7484,7 @@ document.addEventListener('submit', function(e) {
 
 /* ---------- listas compridas: 10 linhas e o botão «Ver tudo» ---------- */
 const LIM = 10, LIM_ROWS = ['item', 'crow', 'ni', 'log', 'pl-item', 'pl-warn', 'stile'], limOpen = new Set();
+const NARROW = window.matchMedia('(max-width: 700px)'), LIM_NARROW = 3;   /* no telemóvel, «Precisa de atenção» mostra só 3 alertas */
 function limitRows() {
   const groups = [];
   document.querySelectorAll('tbody').forEach(function(tb) {
@@ -7393,13 +7503,15 @@ function limitRows() {
   groups.forEach(function(g) {
     const rows = g.rows, n = rows.length; if (!n || !g.after) return;
     const nx = g.after.nextElementSibling, old = nx && nx.classList.contains('lim-more') ? nx : null;
-    if (n <= LIM) {rows.forEach(function(r) {r.classList.remove('lim-h');}); if (old)old.remove(); return;}
-    const card = g.box.closest('.card, .modal'), h = card && card.querySelector('h2, h3'), key = (h ? h.textContent.trim() : '') + '|' + (g.kind || 'tabela'), open = limOpen.has(key), mark = n + ':' + open;
+    const card = g.box.closest('.card, .modal'), h = card && card.querySelector('h2, h3'), title = h ? h.textContent.trim() : '';
+    const lim = (g.kind === 'item' && title === 'Precisa de atenção' && NARROW.matches) ? LIM_NARROW : LIM;
+    if (n <= lim) {rows.forEach(function(r) {r.classList.remove('lim-h');}); if (old)old.remove(); return;}
+    const key = title + '|' + (g.kind || 'tabela'), open = limOpen.has(key), mark = n + ':' + open + ':' + lim;
     if (rows[0].dataset.lim === mark && old) return;
     rows[0].dataset.lim = mark;
-    rows.forEach(function(r, i) {r.classList.toggle('lim-h', !open && i >= LIM);});
+    rows.forEach(function(r, i) {r.classList.toggle('lim-h', !open && i >= lim);});
     const box = old || document.createElement('div'), b = old ? old.firstChild : document.createElement('button');
-    box.className = 'lim-more'; b.className = 'btn'; b.dataset.a = 'lim-toggle'; b.dataset.k = key; b.textContent = open ? 'Mostrar só ' + LIM : 'Ver tudo';
+    box.className = 'lim-more'; b.className = 'btn'; b.dataset.a = 'lim-toggle'; b.dataset.k = key; b.textContent = open ? 'Mostrar só ' + lim : 'Ver tudo';
     if (!old) {box.appendChild(b); g.after.insertAdjacentElement('afterend', box);}
   });
 }
@@ -7409,6 +7521,7 @@ document.addEventListener('change', function(e) {
   c.textContent = k === a ? 'Todos (' + a + ')' : k + ' de ' + a;
 });
 let limTm = null;
+if (NARROW.addEventListener) NARROW.addEventListener('change', limitRows);
 new MutationObserver(function() {clearTimeout(limTm); limTm = setTimeout(limitRows, 60);}).observe(document.body, {childList:true, subtree:true});
 
 try {const sv = localStorage.getItem('enif-theme'); if (sv === 'light' || sv === 'dark')applyTheme(sv);} catch (e) {/* sem ação */}
