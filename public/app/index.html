@@ -1500,7 +1500,9 @@ iframe.prev-media {
 .seg.ut button[aria-pressed="true"] {
   border-color: var(--accent);
   background: var(--surface-strong);
-  box-shadow: var(--shadow-sm), inset 0 1px 0 var(--hi);
+  box-shadow:
+    var(--shadow-sm),
+    inset 0 1px 0 var(--hi);
 }
 @media (max-width: 440px) {
   .seg.ut {
@@ -3436,7 +3438,9 @@ button.avatar {
   #view > .tools:has(> .seg[aria-label="Vista dos conteúdos"]) > .hint {
     grid-column: 1/-1;
   }
-  #view > .tools:has(> .seg[aria-label="Vista dos conteúdos"]) > span:not(.hint) {
+  #view
+    > .tools:has(> .seg[aria-label="Vista dos conteúdos"])
+    > span:not(.hint) {
     display: none;
   }
   #view > .tools > .seg[aria-label="Vista dos conteúdos"] {
@@ -3446,7 +3450,10 @@ button.avatar {
     flex: 0 0 auto;
     padding-inline: 14px;
   }
-  #view > .tools:has(> .seg[aria-label="Vista dos conteúdos"]) .field-inline > .lab {
+  #view
+    > .tools:has(> .seg[aria-label="Vista dos conteúdos"])
+    .field-inline
+    > .lab {
     display: none;
   }
   #view > .tools > .seg button {
@@ -6809,7 +6816,7 @@ const actions = {
   'twofa-toggle':function() {
     const me = state.user, on = !me.twoFA;
     if (me.mfa) {toast('A verificação em dois passos é obrigatória para a sua conta.'); return;}
-    api('POST', '/api/me/twofa', {on:on}).then(function() {if (!on)setTrust(null);toast(on ? 'Verificação em dois passos ligada. Na próxima entrada pedimos um código.' : 'Verificação em dois passos desligada.'); return poll(true);}).catch(function(e) {toast(e.message);});
+    api('POST', '/api/me/twofa', {on:on}).then(function() {if (!on)setTrust(null); toast(on ? 'Verificação em dois passos ligada. Na próxima entrada pedimos um código.' : 'Verificação em dois passos desligada.'); return poll(true);}).catch(function(e) {toast(e.message);});
   },
   'backup-now':function() {
     toast('A fazer a cópia…');
