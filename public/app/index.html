@@ -4992,7 +4992,7 @@ function screenModal(id) {
   modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + (canG ? ' <button class="btn ghost sm name-edit" data-a="edit-name" data-id="' + s.id + '" aria-label="Alterar o nome do ecrã" title="Alterar o nome">' + ic('pencil') + '</button>' : '') + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
     + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? (s.disk.total - s.disk.free) + ' de ' + s.disk.total + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + s.disk.free + ' GB</span>') : '—') + '</dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
-    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + ajusteCell(s, canG) + areaCell(s, canG) + margemCell(s, canG) + '<div style="grid-column:1/-1"><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
+    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + ajusteCell(s, canG) + areaCell(s, canG) + margemCell(s, canG) + fichaCell(s) + '<div style="grid-column:1/-1"><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
     + '<h3 class="sec-t">Playlist</h3>' + (s.status === 'novo' ? '<p class="hint">Ecrã ainda sem ligação do player: a ordem abaixo é uma simulação do que vai passar quando ele ligar.</p>' : '') + playlistHtml(s) + (s.status === 'novo' ? '' : proofLogHtml(s))
     + '<h3 class="sec-t">Registo recente</h3>' + logsFor(s).map(l=>'<div class="log ' + l[2] + '"><time>' + l[0] + '</time><span>' + esc(l[1]) + '</span></div>').join('')
     + failsHtml(s)
@@ -6632,6 +6632,65 @@ async function doExport(o, sel, R) {
   } catch (e) {toast('Não foi possível guardar o PDF.');}
 }
 
+/* ---------- ficha técnica do ecrã: PDF carregado pelo administrador, descarregável por quem vê o ecrã ---------- */
+const FICHA_MAX = 10 * 1024 * 1024;
+const fichaSize = n=>n >= 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+function fichaCell(s) {
+  const f = (state.fichas || {})[s.id], adm = !!(state.user && state.user.admin);
+  if (!f && !adm) return '';
+  const lab = (t, ico)=>'<label class="btn sm" style="cursor:pointer">' + (ico ? ic(ico) : '') + t + '<input type="file" class="ficha-in" accept="application/pdf,.pdf" data-id="' + s.id + '" hidden></label>';
+  return '<div style="grid-column:1/-1"><dt>Ficha técnica</dt><dd style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
+    + (f ? '<button class="btn sm" data-a="ficha-dl" data-id="' + s.id + '" title="' + esc(f.name) + ' · ' + fichaSize(f.size) + '">' + ic('download') + 'Descarregar ficha técnica</button>'
+      + (adm ? lab('Substituir') + '<button class="btn sm" data-a="ficha-del" data-id="' + s.id + '" style="color:var(--bad)" title="Remover ficha técnica" aria-label="Remover ficha técnica">' + ic('trash') + '</button>' : '')
+      : '<span class="muted">Ainda não há ficha técnica.</span>' + lab('Adicionar PDF', 'upload'))
+    + '</dd></div>';
+}
+let fichaPend = null;                                                             // ficheiro escolhido, à espera de confirmação
+const fichaPdfOk = function(file) {
+  if (!file) return 'Escolha um ficheiro PDF.';
+  if (!/\.pdf$/i.test(file.name) || (file.type && file.type !== 'application/pdf')) return 'O ficheiro tem de ser um PDF.';
+  if (file.size > FICHA_MAX) return 'O PDF tem ' + fichaSize(file.size) + '. O máximo são 10 MB.';
+  return '';
+};
+function fichaAddModal(id) {
+  const s = screens.find(x=>x.id === id); if (!s || !fichaPend) return;
+  const same = screens.filter(x=>x.id !== id && s.city && x.city === s.city);
+  modal('<div class="modal-h"><div><h2>' + ((state.fichas || {})[id] ? 'Substituir' : 'Adicionar') + ' ficha técnica</h2><p class="muted">' + esc(s.venue) + ' · ' + esc(s.spot) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
+    + '<p><b>' + esc(fichaPend.name) + '</b> <span class="muted">· ' + fichaSize(fichaPend.size) + '</span></p>'
+    + (same.length ? '<label class="row-check" style="margin-top:12px"><input type="checkbox" id="ficha-all"> Usar também nos outros ecrãs de ' + esc(s.city) + ' (' + same.length + ')</label><p class="hint">Quem já tiver uma ficha própria é substituído.</p>' : '')
+    + '<p class="hint" style="margin-top:10px">Todos os utilizadores que vejam este ecrã poderão descarregar o PDF. Só os administradores o podem trocar ou remover.</p></div>'
+    + '<div class="modal-f"><button class="btn" data-a="close">Cancelar</button><button class="btn primary" data-a="ficha-save" data-id="' + id + '">Guardar</button></div>');
+}
+async function fichaSave(id) {
+  if (!state.user || !state.user.admin) {toast('Só um administrador pode alterar a ficha técnica.'); return;}
+  const s = screens.find(x=>x.id === id), file = fichaPend; if (!s || !file) return;
+  const all = !!($('#ficha-all') && $('#ficha-all').checked), also = all ? screens.filter(x=>x.id !== id && s.city && x.city === s.city).map(x=>x.id) : [];
+  try {
+    const r = await api('PUT', '/api/screens/' + encodeURIComponent(id) + '/ficha?name=' + encodeURIComponent(file.name) + (also.length ? '&also=' + also.map(encodeURIComponent).join(',') : ''), file, true);
+    state.fichas = r.fichas || {}; fichaPend = null;
+    toast(also.length ? 'Ficha técnica guardada em ' + (also.length + 1) + ' ecrãs.' : 'Ficha técnica guardada.'); screenModal(id);
+  } catch (e) {toast(e.message || 'Não foi possível guardar a ficha técnica.');}
+}
+async function fichaDl(id) {
+  const f = (state.fichas || {})[id]; if (!f) return;
+  try {
+    const r = await fetch('/api/screens/' + encodeURIComponent(id) + '/ficha', {headers:TOKEN ? {Authorization:'Bearer ' + TOKEN} : {}});
+    if (!r.ok) {let j = null; try {j = await r.json();} catch (e) {/* sem ação */} throw new Error((j && j.error) || 'Não foi possível descarregar a ficha técnica.');}
+    const a = document.createElement('a'); a.href = URL.createObjectURL(await r.blob()); a.download = f.name;
+    document.body.appendChild(a); a.click(); setTimeout(function() {URL.revokeObjectURL(a.href); a.remove();}, 2000);
+  } catch (e) {toast(e.message || 'Não foi possível descarregar a ficha técnica.');}
+}
+async function fichaDel(id) {
+  if (!state.user || !state.user.admin) {toast('Só um administrador pode alterar a ficha técnica.'); return;}
+  try {const r = await api('DELETE', '/api/screens/' + encodeURIComponent(id) + '/ficha'); state.fichas = r.fichas || {}; toast('Ficha técnica removida.'); screenModal(id);}
+  catch (e) {toast(e.message || 'Não foi possível remover a ficha técnica.');}
+}
+document.addEventListener('change', function(e) {
+  const t = e.target; if (!t || !t.classList || !t.classList.contains('ficha-in') || !t.files || !t.files[0]) return;
+  const err = fichaPdfOk(t.files[0]); if (err) {toast(err); t.value = ''; return;}
+  fichaPend = t.files[0]; fichaAddModal(t.dataset.id);
+});
+
 /* ---------- modal + toast ---------- */
 let modalOpener = null;
 function modal(html) {
@@ -6797,6 +6856,7 @@ function applyState(st) {
     return c;
   }));
   setArr(contents, st.contents.map(function(f) {if (f.type === 'Imagem')f.url = '/media/' + f.id + '?t=' + tk; else if (f.type === 'Vídeo' || f.type === 'HTML5')f.src = '/media/' + f.id + '?t=' + tk; return f;}));
+  state.fichas = st.fichas || {};
   state.devices = st.devices || []; state.smtpReady = !!st.smtpReady; state.serverDisk = st.serverDisk || null; state.backupDisk = st.backupDisk || null;
   setArr(auditLog, (st.auditLog || [])); setArr(backups, (st.backups || [])); setArr(emailLog, (st.emailLog || []));
   setArr(folders, st.folders);
@@ -7192,6 +7252,9 @@ const actions = {
     toast('«' + x.name + '» retirado de «' + c.name + '».'); render();
   },
   'edit-name':function(t) {if (guard('ecras.gerir'))nameModal(t.dataset.id);},
+  'ficha-dl':function(t) {fichaDl(t.dataset.id);},
+  'ficha-save':function(t) {fichaSave(t.dataset.id);},
+  'ficha-del':function(t) {fichaDel(t.dataset.id);},
   'edit-place':function(t) {if (guard('ecras.gerir'))placeModal(t.dataset.id);},
   period:function(t) {state.period = +t.dataset.n; state.custom = null; state.logLimit = 10; render();},
   'period-custom':function() {state.custom = {from:addDays(today, -13), to:today}; state.logLimit = 10; render();},

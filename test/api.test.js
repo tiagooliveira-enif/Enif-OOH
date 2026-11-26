@@ -430,6 +430,32 @@ async function main() {
     await alertMailTick(fake);
   }
 
+  // ---- ficha técnica do ecrã (PDF: só o administrador carrega e remove; quem vê os ecrãs descarrega)
+  {
+    const fvw = await tok('vw@x.pt'), fcn = await tok('cn@x.pt');
+    const pdf = n => { const b = new Uint8Array(n); b.set(Buffer.from('%PDF-1.4\n%teste\n')); return b; }, url = (id, q) => '/api/screens/' + id + '/ficha' + (q || '');
+    const ids = (await call('GET', '/api/state', undefined, adm)).j.screens.map(x => x.id), other = ids.find(x => x !== 'ECR-001');
+    ok('sem sessão não se carrega nem descarrega a ficha', (await call('PUT', url('ECR-001', '?name=a.pdf'), pdf(300))).s === 401 && (await call('GET', url('ECR-001'))).s === 401);
+    ok('quem não é administrador não carrega a ficha técnica', (await call('PUT', url('ECR-001', '?name=a.pdf'), pdf(300), top)).s === 403);
+    ok('ecrã inexistente: 404', (await call('PUT', url('ECR-XXX', '?name=a.pdf'), pdf(300), adm)).s === 404);
+    ok('ficheiro que não é PDF é recusado', (await call('PUT', url('ECR-001', '?name=a.pdf'), Buffer.from('isto não é um pdf'), adm)).s === 400 && (await call('PUT', url('ECR-001', '?name=a.txt'), pdf(300), adm)).s === 400);
+    ok('PDF com mais de 10 MB é recusado', [413, 0].includes((await call('PUT', url('ECR-001', '?name=a.pdf'), pdf(10 * 1048576 + 10), adm).catch(() => ({ s: 0 }))).s));
+    ok('o ecrã ainda não tem ficha: 404', (await call('GET', url('ECR-001'), undefined, fvw)).s === 404);
+    r = await call('PUT', url('ECR-001', '?name=' + encodeURIComponent('Braga Normas.pdf') + (other ? '&also=' + other : '')), pdf(2000), adm);
+    ok('o administrador carrega a ficha técnica', r.s === 200 && r.j.fichas['ECR-001'].name === 'Braga Normas.pdf' && r.j.fichas['ECR-001'].size === 2000 && (!other || r.j.fichas[other]));
+    const dl = await call('GET', url('ECR-001'), undefined, fvw), bytes = Buffer.from(await dl.r.arrayBuffer());
+    ok('quem vê os ecrãs descarrega o PDF igual ao carregado', dl.s === 200 && /application\/pdf/.test(dl.r.headers.get('content-type')) && /attachment/.test(dl.r.headers.get('content-disposition')) && bytes.length === 2000 && bytes.subarray(0, 5).toString() === '%PDF-');
+    ok('quem não vê os ecrãs não descarrega a ficha', (await call('GET', url('ECR-001'), undefined, fcn)).s === 403);
+    ok('o estado traz as fichas a quem vê os ecrãs e nada a quem não vê', (await call('GET', '/api/state', undefined, fvw)).j.fichas['ECR-001'].name === 'Braga Normas.pdf' && Object.keys((await call('GET', '/api/state', undefined, fcn)).j.fichas).length === 0);
+    r = await call('PUT', url('ECR-001', '?name=Nova.pdf'), pdf(500), adm);
+    ok('substituir a ficha troca o ficheiro', r.s === 200 && r.j.fichas['ECR-001'].name === 'Nova.pdf' && Buffer.from(await (await call('GET', url('ECR-001'), undefined, fvw)).r.arrayBuffer()).length === 500);
+    ok('quem não é administrador não remove a ficha', (await call('DELETE', url('ECR-001'), undefined, top)).s === 403 && (await call('DELETE', url('ECR-001'), undefined, fvw)).s === 403);
+    ok('o administrador remove a ficha e deixa de haver download', (await call('DELETE', url('ECR-001'), undefined, adm)).s === 200 && (await call('GET', url('ECR-001'), undefined, fvw)).s === 404);
+    ok('as fichas não se mexem pela sincronização genérica', (await sync(adm, [op('fichas', 'ECR-001', { id: 'ECR-001', file: 'x', name: 'x.pdf' })])).s === 400);
+    ok('carregar e remover ficam no registo de auditoria', db.prepare("SELECT COUNT(*) n FROM audit WHERE what LIKE '%ficha técnica%'").get().n >= 3);
+    if (other) await call('DELETE', url(other), undefined, adm);
+  }
+
   // ---- avisos push ao computador (chegam com a página fechada e sem sessão)
   {
     const crypto = require('node:crypto'), WP = require('../lib/webpush');

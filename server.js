@@ -338,6 +338,7 @@ function applyOp(user, op) {
     if (coll === 'screens') {
       need(user, 'ecras.gerir'); const sc = getDoc('screens', id);
       delDoc('screens', id); run('DELETE FROM secrets WHERE coll=? AND id=?', 'screens', id);
+      fichaDrop(id);
       docs('contents').forEach(f => { if (Array.isArray(f.screens) && f.screens.indexOf(id) > -1) putDoc('contents', f.id, Object.assign({}, f, { screens: f.screens.filter(x => x !== id) })); });
       if (sc) audit(user, 'Eliminou o ecrã', id + ' · ' + sc.venue);
       return;
@@ -763,7 +764,7 @@ function buildState(user) {
   const sv = screenViews(A.can(user, 'ecras.gerir'));
   const st = {
     idleMin: IDLE_MS / 60000, me: publicUser(user), now: S.lisbonNow(TZ), serverTime: Date.now(), tz: TZ,
-    screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: contentsView(), bin: docs('bin').filter(f => !f.gone), clean: cleanCfg(), folders: docs('folders'),
+    fichas: A.can(user, 'ecras.ver') ? fichasView() : {}, screens: sv.screens, alerts: sv.alerts, campaigns: docs('campaigns'), contents: contentsView(), bin: docs('bin').filter(f => !f.gone), clean: cleanCfg(), folders: docs('folders'),
     users: user.admin ? docs('users') : [], playerVersion: PLAYER_VERSION, smtpReady: smtpReady(), devices: (user.twoFA || user.mfa) ? trustList(user.id) : []
   };
   if (user.admin) {
@@ -911,6 +912,42 @@ async function upload(req, res, u) {
   try { run('INSERT INTO files(id,mime,size) VALUES(?,?,?)', id, mime, n); putDoc('contents', id, doc); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); drop(); throw e; }
   audit(user, 'Carregou conteúdos', name + (wantHouse ? ' (spot da Enif)' : ''));
   send(res, 200, doc);
+}
+
+/* ---------- ficha técnica do ecrã: PDF carregado por um administrador, descarregável por quem vê os ecrãs ---------- */
+const FICHA_MAX = 10 * 1048576;
+function fichaDrop(id) {
+  const f = getDoc('fichas', id); if (!f) return;
+  delDoc('fichas', id); try { fs.unlinkSync(path.join(MEDIA, path.basename(f.file))); } catch (e) { /* sem ação */ }
+}
+const fichasView = () => { const o = {}; docs('fichas').forEach(f => { o[f.id] = { name: f.name, size: f.size, up: f.up }; }); return o; };
+async function fichaPut(req, res, u, id) {
+  const user = needUser(req, u);
+  if (!user.admin) throw new HttpError(403, 'Só um administrador pode alterar a ficha técnica.');
+  if (!getDoc('screens', id)) throw new HttpError(404, 'Ecrã não existe');
+  const name = path.basename(String(u.searchParams.get('name') || 'ficha-tecnica.pdf')).replace(/[\u0000-\u001f"\\]/g, '').slice(0, 160) || 'ficha-tecnica.pdf';
+  if (!/\.pdf$/i.test(name)) throw bad('O ficheiro tem de ser um PDF.');
+  if ((+req.headers['content-length'] || 0) > FICHA_MAX) throw new HttpError(413, 'O PDF é demasiado grande (máximo 10 MB).');
+  const chunks = []; let n = 0;
+  await new Promise((ok, ko) => {
+    req.on('data', c => { n += c.length; if (n > FICHA_MAX) { ko(new HttpError(413, 'O PDF é demasiado grande (máximo 10 MB).')); req.destroy(); } else chunks.push(c); });
+    req.on('end', ok); req.on('error', ko); req.on('aborted', () => ko(bad('Envio interrompido.')));
+  });
+  const buf = Buffer.concat(chunks);
+  if (!buf.length) throw bad('Ficheiro vazio.');
+  if (buf.subarray(0, 5).toString('latin1') !== '%PDF-') throw bad('O ficheiro não é um PDF válido.');
+  const also = String(u.searchParams.get('also') || '').split(',').map(x => x.trim()).filter(x => x && x !== id && getDoc('screens', x)).slice(0, 200);
+  const ids = [id].concat(also), made = [], old = [];
+  try {
+    ids.forEach(k => {
+      const fid = 'D' + uid(6); fs.writeFileSync(path.join(MEDIA, fid), buf); made.push(fid);
+      const prev = getDoc('fichas', k); if (prev) old.push(prev.file);
+      putDoc('fichas', k, { id: k, file: fid, name, size: buf.length, up: Date.now(), by: user.name });
+    });
+  } catch (e) { made.forEach(f => { try { fs.unlinkSync(path.join(MEDIA, f)); } catch (x) { /* sem ação */ } }); throw e; }
+  old.forEach(f => { try { fs.unlinkSync(path.join(MEDIA, path.basename(f))); } catch (e) { /* sem ação */ } });
+  audit(user, ids.length > 1 ? 'Adicionou a ficha técnica a ' + ids.length + ' ecrãs' : 'Adicionou a ficha técnica', id + ' · ' + name);
+  send(res, 200, { fichas: fichasView() });
 }
 
 /* ---------- relatórios ---------- */
@@ -1322,6 +1359,23 @@ const router = async (req, res) => {
   }
   if (p === '/api/sync' && m === 'POST') { const user = needUser(req, u), b = await readJson(req); sync(user, b.ops); return send(res, 200, { ok: true }); }
   if (p === '/api/upload' && m === 'PUT') return upload(req, res, u);
+  if ((r = /^\/api\/screens\/([\w.-]+)\/ficha$/.exec(p))) {
+    if (m === 'PUT') return fichaPut(req, res, u, r[1]);
+    const user = needUser(req, u);
+    if (m === 'GET') {
+      need(user, 'ecras.ver');
+      const f = getDoc('fichas', r[1]), file = f && path.join(MEDIA, path.basename(f.file));
+      if (!f || !fs.existsSync(file)) throw new HttpError(404, 'Este ecrã não tem ficha técnica.');
+      const asc = f.name.replace(/[^\x20-\x7e]/g, '_').replace(/["\\]/g, '_');
+      return send(res, 200, fs.readFileSync(file), 'application/pdf', { 'Content-Disposition': 'attachment; filename="' + asc + '"; filename*=UTF-8\'\'' + encodeURIComponent(f.name), 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'private, no-store' });
+    }
+    if (m === 'DELETE') {
+      if (!user.admin) throw new HttpError(403, 'Só um administrador pode alterar a ficha técnica.');
+      const f = getDoc('fichas', r[1]); if (!f) throw new HttpError(404, 'Este ecrã não tem ficha técnica.');
+      fichaDrop(r[1]); audit(user, 'Removeu a ficha técnica', r[1] + ' · ' + f.name);
+      return send(res, 200, { fichas: fichasView() });
+    }
+  }
   if ((r = /^\/api\/screens\/([\w.-]+)\/falhas$/.exec(p)) && m === 'GET') {
     const user = needUser(req, u); need(user, 'ecras.ver');
     if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
