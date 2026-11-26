@@ -6063,9 +6063,9 @@ function setOpt(t) {
   else if (k === 'crop') {if (!hasCrop(s)) return; delete s.crop; audit('Margem oculta', s.id + ' · sem margem'); toast('Margem de ' + s.id + ' removida. O ecrã atualiza em instantes.');}
   reopenScreen(s.id);
 }
-let advOpen = false;
-function advCell(s, canG) {return '<div><dt>Imagem</dt><dd><button type="button" class="btn sm' + (advOpen ? ' primary' : '') + '" data-a="adv-toggle" data-id="' + s.id + '" aria-expanded="' + (advOpen ? 'true' : 'false') + '">' + ic('sliders') + 'Ajustar imagem</button></dd></div>';}
-function advPanel(s, canG) {return advOpen ? '<div class="adv-img" style="grid-column:1/-1"><div class="adv-body"><dl class="facts">' + ajusteCell(s, canG) + areaCell(s, canG) + margemCell(s, canG) + '</dl>' + previewSketch(s) + '</div></div>' : '';}
+let advOpen = null; /* id do ecrã com «Ajustar imagem» aberto */
+function advCell(s, canG) {return '<div><dt>Imagem</dt><dd><button type="button" class="btn sm' + (advOpen === s.id ? ' primary' : '') + '" data-a="adv-toggle" data-id="' + s.id + '" aria-expanded="' + (advOpen === s.id ? 'true' : 'false') + '">' + ic('sliders') + 'Ajustar imagem</button></dd></div>';}
+function advPanel(s, canG) {return advOpen === s.id ? '<div class="adv-img" style="grid-column:1/-1"><div class="adv-body"><dl class="facts">' + ajusteCell(s, canG) + areaCell(s, canG) + margemCell(s, canG) + '</dl>' + previewSketch(s) + '</div></div>' : '';}
 function cropParts(s) {
   const c = cropOf(s), p = [];
   if (c.t)p.push('cima ' + c.t + ' px'); if (c.b)p.push('baixo ' + c.b + ' px'); if (c.l)p.push('esquerda ' + c.l + ' px'); if (c.r)p.push('direita ' + c.r + ' px');
@@ -7406,7 +7406,7 @@ const actions = {
   'edit-bri':function(t) {if (guard('ecras.gerir'))briModal(t.dataset.id);},
   'edit-res':function(t) {if (guard('ecras.gerir'))resModal(t.dataset.id);},
   'set-opt':setOpt,
-  'adv-toggle':function(t) {advOpen = !advOpen; reopenScreen(t.dataset.id);},
+  'adv-toggle':function(t) {advOpen = advOpen === t.dataset.id ? null : t.dataset.id; reopenScreen(t.dataset.id);},
   'edit-crop':function(t) {if (guard('ecras.gerir'))cropModal(t.dataset.id);},
   'pick-screens':function() {screensModal();},
   'rs-all':function() {document.querySelectorAll('#modal-root input[type="checkbox"]').forEach(function(i) {i.checked = true;});},
