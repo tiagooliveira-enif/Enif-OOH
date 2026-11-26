@@ -524,7 +524,7 @@ function screenViews(withKeys) {
     o.lastSeen = lv.last_seen; o.ver = lv.ver; o.queue = lv.queue;
     if (lv.disk_total > 0) {
       o.disk = { free: lv.disk_free, total: lv.disk_total };
-      if (lv.disk_free / lv.disk_total < 0.1) { const dk = 'disk-' + s.id + '-' + ln.date; if (!resolved.has(dk)) alerts.push({ id: dk, sev: 'warn', screen: s.id, title: 'Disco quase cheio', detail: 'Só restam ' + lv.disk_free + ' GB livres no PC deste ecrã (de ' + lv.disk_total + ' GB). Liberte espaço ou use um disco maior.', time: fmtHM(now) }); }
+      if (lv.disk_free / lv.disk_total < 0.1) { const dk = 'disk-' + s.id + '-' + ln.date; if (!resolved.has(dk)) alerts.push({ id: dk, sev: 'warn', screen: s.id, title: 'Disco quase cheio', detail: 'Só restam ' + String(lv.disk_free).replace('.', ',') + ' GB livres no PC deste ecrã (de ' + String(lv.disk_total).replace('.', ',') + ' GB). Liberte espaço ou use um disco maior.', time: fmtHM(now) }); }
     }
     o.nowCamp = age < ONLINE_MS && lv.now_c !== '__proof' ? lv.now_c : null; o.nowFile = age < ONLINE_MS ? lv.now_f : null;
     o.ping = age < 90000 ? 'há ' + Math.max(1, Math.round(age / 1000)) + ' s' : 'há ' + durTxt(mins);
