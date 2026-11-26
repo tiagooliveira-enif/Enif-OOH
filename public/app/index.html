@@ -630,6 +630,26 @@ select.inline {
 .item .title {
   font-weight: 600;
 }
+.u-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+.u-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.u-sub {
+  margin-top: 3px;
+}
+.u-sub .mono {
+  font-size: 12px;
+}
+.u-side {
+  align-self: center;
+}
 .item .acts {
   display: flex;
   gap: 6px;
@@ -4704,8 +4724,8 @@ function viewUsers() {
   const rows = users.map(function(u) {
     const ai = accessInfo(u);
     const areas = u.admin ? 'Acesso total' : PERMS.filter(g=>g[1].some(p=>u.perms.indexOf(p[0]) > -1)).map(g=>g[0]).join(', ') || 'Só o painel';
-    return '<div class="item u-item">' + avatarHtml(u) + '<div class="grow"><div class="title">' + esc(u.name) + (u === state.user ? ' <span class="muted" style="font-weight:500">(você)</span>' : '') + '</div><div class="muted mono">' + esc(u.email) + '</div><div class="muted" style="margin-top:4px">' + esc(areas) + '</div></div>'
-      + '<div class="u-side" style="display:flex;flex-direction:column;align-items:flex-end;gap:6px"><span class="pill accent">' + roleName(u) + '</span><span class="pill ' + ai.c + '">' + ai.t + '</span>' + (u.mfa ? '<span class="pill ok">2 passos</span>' : '') + '<button class="btn sm" data-a="edit-user" data-id="' + u.id + '">Editar</button></div></div>';
+    return '<div class="item u-item">' + avatarHtml(u) + '<div class="grow"><div class="title u-name"><span>' + esc(u.name) + (u === state.user ? ' <span class="muted" style="font-weight:500">(você)</span>' : '') + '</span><span class="u-tags"><span class="pill accent">' + roleName(u) + '</span>' + (ai.c === 'ok' ? '' : '<span class="pill ' + ai.c + '">' + ai.t + '</span>') + (u.mfa ? '<span class="pill ok">2 passos</span>' : '') + '</span></div><div class="muted u-sub"><span class="mono">' + esc(u.email) + '</span> · ' + esc(areas) + '</div></div>'
+      + '<div class="u-side"><button class="btn sm" data-a="edit-user" data-id="' + u.id + '">Editar</button></div></div>';
   }).join('');
   const adm = !!(state.user && state.user.admin), tab = adm ? (state.utab || 'contas') : 'contas';
   const tabs = adm ? '<div class="seg ut" role="group" aria-label="Secções" style="margin:0 0 14px">' + [['contas', 'Contas'], ['seguranca', 'Segurança'], ['copias', 'Cópias'], ['auditoria', 'Auditoria']].map(t=>'<button type="button" data-a="utab" data-t="' + t[0] + '" aria-pressed="' + (tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>' : '';
