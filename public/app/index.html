@@ -4724,7 +4724,7 @@ function viewUsers() {
   const rows = users.map(function(u) {
     const ai = accessInfo(u);
     const areas = u.admin ? 'Acesso total' : PERMS.filter(g=>g[1].some(p=>u.perms.indexOf(p[0]) > -1)).map(g=>g[0]).join(', ') || 'Só o painel';
-    return '<div class="item u-item">' + avatarHtml(u) + '<div class="grow"><div class="title u-name"><span>' + esc(u.name) + (u === state.user ? ' <span class="muted" style="font-weight:500">(você)</span>' : '') + '</span><span class="u-tags"><span class="pill accent">' + roleName(u) + '</span>' + (ai.c === 'ok' ? '' : '<span class="pill ' + ai.c + '">' + ai.t + '</span>') + (u.mfa ? '<span class="pill ok">2 passos</span>' : '') + '</span></div><div class="muted u-sub"><span class="mono">' + esc(u.email) + '</span> · ' + esc(areas) + '</div></div>'
+    return '<div class="item u-item">' + avatarHtml(u) + '<div class="grow"><div class="title u-name"><span>' + esc(u.name) + (u === state.user ? ' <span class="muted" style="font-weight:500">(você)</span>' : '') + '</span><span class="u-tags"><span class="pill accent">' + roleName(u) + '</span>' + (ai.c === 'ok' ? '' : '<span class="pill ' + ai.c + '">' + ai.t + '</span>') + (u.mfa ? '<span class="pill ok">2 passos</span>' : '') + '</span></div><div class="muted u-sub">' + esc(areas) + '</div></div>'
       + '<div class="u-side"><button class="btn sm" data-a="edit-user" data-id="' + u.id + '">Editar</button></div></div>';
   }).join('');
   const adm = !!(state.user && state.user.admin), tab = adm ? (state.utab || 'contas') : 'contas';
