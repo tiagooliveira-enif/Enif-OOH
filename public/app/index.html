@@ -5957,7 +5957,7 @@ const briOf = s=>Object.assign({}, BRI_DEF, s.bri || {});
 function briTxt(s) {
   const b = briOf(s);
   if (b.mode === 'manual') return 'Manual · ' + b.manual + ' %';
-  return 'Automático · ' + b.day + ' % de dia, ' + b.night + ' % de noite';
+  return 'Automático';
 }
 const briPct = (sel)=>{let o = ''; for (let v = 10; v <= 100; v += 10)o += '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + ' %</option>'; return o;};
 function briModal(id) {
@@ -6149,7 +6149,7 @@ function locInfo(s) {
   else {const n = parseInt(s.id.slice(4), 10) || 1; f = (0.75 + ((n * 37) % 11) / 20) * cityF; conf = 'baixa';}
   return {f:f, conf:conf, why:why, hasC:hasC};
 }
-const locTxt = (s, extra)=>{const L = s.loc || {}, lk = !isNil(L.lat) ? '<a href="https://www.google.com/maps?q=' + L.lat + ',' + L.lng + '" target="_blank" rel="noopener">Abrir no mapa</a>' : ''; return (L.addr ? esc(L.addr) : '<span class="muted">Sem morada</span>') + (lk || extra ? '<span style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;margin-top:4px">' + lk + (extra || '') + '</span>' : '');};
+const locTxt = (s, extra)=>{const L = s.loc || {}, lk = !isNil(L.lat) ? '<a href="https://www.google.com/maps?q=' + L.lat + ',' + L.lng + '" target="_blank" rel="noopener">Abrir no mapa</a>' : ''; return (L.addr ? esc(L.addr) : '<span class="muted">Sem morada</span>') + (lk || extra ? '<span style="display:flex;flex-wrap:wrap;align-items:center;gap:0 12px;margin-top:0">' + lk + (extra || '') + '</span>' : '');};
 function confBox(s) {
   const i = locInfo(s);
   return '<span class="pill ' + (i.conf === 'alta' ? 'ok' : (i.conf === 'média' ? 'accent' : '')) + '">Confiança ' + i.conf + '</span> <span class="muted">' + (i.why.length ? esc(i.why.join(' · ')) : 'Sem tipo de local indicado') + '</span>' + (i.conf === 'alta' ? '' : '<div class="hint" style="margin-top:4px">Para melhorar: indique o tipo de local, as coordenadas e, se tiver, a contagem de pessoas.</div>');
