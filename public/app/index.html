@@ -6052,7 +6052,7 @@ function previewSketch(s) {
   return '<div class="pv-ex"><span class="sk" style="width:' + PW + 'px;height:' + PH + 'px" role="img" aria-label="Exemplo de como fica o ecrã com estes ajustes">'
     + '<span style="position:absolute;left:' + ax + 'px;top:' + ay + 'px;width:' + aw + 'px;height:' + ah + 'px;background:' + (hasCrop(s) ? hid : '#000') + ';outline:1px dashed #777">'
     + '<span style="position:absolute;left:' + ux + 'px;top:' + uy + 'px;width:' + uw + 'px;height:' + uh + 'px;overflow:hidden;background:#000">' + '<span class="sk-y" style="left:' + Math.round(vx) + 'px;top:' + Math.round(vy) + 'px;width:' + Math.round(vw) + 'px;height:' + Math.round(vh) + 'px"><span class="sk-t">Vídeo</span></span>' + '</span></span></span>'
-    + '<small class="muted">Exemplo do resultado.<br>Amarelo = vídeo · preto = barras ou resto do PC' + (hasCrop(s) ? ' · riscado = parte tapada' : '') + '</small></div>';
+    + '<small class="muted">Exemplo com um vídeo horizontal (16:9). Um vídeo com a proporção do ecrã enche-o todo.<br>Amarelo = vídeo · preto = barras ou resto do PC' + (hasCrop(s) ? ' · riscado = parte tapada' : '') + '</small></div>';
 }
 function setOpt(t) {
   if (!guard('ecras.gerir')) return;
