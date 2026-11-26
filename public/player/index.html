@@ -186,7 +186,7 @@ function flush() {
     queue = queue.filter(function(x) {return !ok[x.pid];}); saveQ(); stats.net = 'ok'; stats.sendErr = ''; stats.sentAt = Date.now();
   }).catch(function(e) {stats.net = 'sem ligação'; stats.sendErr = 'envio das passagens: ' + e.message;});
 }
-async function diskInfo() {try {if (navigator.storage && navigator.storage.estimate) {const e = await navigator.storage.estimate(); if (e.quota > 0) return {free:Math.max(0, e.quota - (e.usage || 0)), total:e.quota};}} catch (x) {/* sem ação */} return null;}
+async function diskInfo() {try {if (navigator.storage && navigator.storage.estimate) {const e = await navigator.storage.estimate(); if (e.quota > 0) {const G = 1073741824; return {free:Math.max(0, Math.round((e.quota - (e.usage || 0)) / G * 10) / 10), total:Math.round(e.quota / G * 10) / 10};}}} catch (x) {/* sem ação */} return null;}
 async function heartbeat() {
   const body = {c:cur.c, f:cur.f, queue:queue.length, ver:VERSION, w:Math.round(screen.width * (window.devicePixelRatio || 1)), h:Math.round(screen.height * (window.devicePixelRatio || 1)), ack:acks};
   const d = await diskInfo(); if (d)body.disk = d;

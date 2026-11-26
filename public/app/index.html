@@ -1872,6 +1872,89 @@ iframe.prev-media {
   gap: 14px 18px;
   margin: 0 0 18px;
 }
+.adv-img .facts {
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+}
+.adv-img .facts {
+  grid-template-columns: 1fr;
+}
+.adv-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  align-items: flex-start;
+}
+.adv-body .facts {
+  flex: 1 1 280px;
+  margin: 12px 0 0;
+}
+.pv-ex {
+  flex: none;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 200px;
+}
+.opts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+.opt-l {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  line-height: 1.25;
+}
+.opt-l small {
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+.opt .sk,
+.opt > span[role="img"],
+.opt > span[role="img"] + span {
+  margin-top: 0 !important;
+}
+.sk {
+  position: relative;
+  display: block;
+  background: #000;
+  border: 1px solid var(--line, #777);
+  border-radius: 4px;
+  box-sizing: content-box;
+  overflow: hidden;
+}
+.sk-y {
+  position: absolute;
+  background: #ffe651;
+}
+.sk-t {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #000;
+  font: 600 11px system-ui, sans-serif;
+}
+.sk-dot {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  border-radius: 50%;
+}
+.opt-t {
+  display: block;
+  margin: 10px 0 2px;
+}
 .facts dt {
   color: var(--muted);
   font-size: 12.5px;
@@ -3717,6 +3800,7 @@ const P = {
   alert:'<path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   off:'<path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7-7M5 13a9 9 0 0 1 4-3M2 9.5A14 14 0 0 1 8 6M12 20v.01"/>',
   upload:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+  sliders:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   left:'<path d="m15 5-7 7 7 7"/>',
   right:'<path d="m9 5 7 7-7 7"/>',
   image:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.6"/><path d="m21 16-5-5-8 9"/>',
@@ -4992,7 +5076,7 @@ function screenModal(id) {
   modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + (canG ? ' <button class="btn ghost sm name-edit" data-a="edit-name" data-id="' + s.id + '" aria-label="Alterar o nome do ecrã" title="Alterar o nome">' + ic('pencil') + '</button>' : '') + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
     + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? (s.disk.total - s.disk.free) + ' de ' + s.disk.total + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + s.disk.free + ' GB</span>') : '—') + '</dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
-    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + ajusteCell(s, canG) + areaCell(s, canG) + margemCell(s, canG) + fichaCell(s) + '<div style="grid-column:1/-1"><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
+    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + '<div><dt>Localização</dt><dd>' + locTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + advCell(s, canG) + fichaCell(s) + advPanel(s, canG) + '<div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
     + '<h3 class="sec-t">Playlist</h3>' + (s.status === 'novo' ? '<p class="hint">Ecrã ainda sem ligação do player: a ordem abaixo é uma simulação do que vai passar quando ele ligar.</p>' : '') + playlistHtml(s) + (s.status === 'novo' ? '' : proofLogHtml(s))
     + '<h3 class="sec-t">Registo recente</h3>' + logsFor(s).map(l=>'<div class="log ' + l[2] + '"><time>' + l[0] + '</time><span>' + esc(l[1]) + '</span></div>').join('')
     + failsHtml(s)
@@ -5869,15 +5953,10 @@ function readRes(fd) {
 /* ---------- brilho do ecrã (v62): automático por horário ou manual ---------- */
 const BRI_DEF = {mode:'auto', day:100, night:40, from:8, to:20, manual:80};
 const briOf = s=>Object.assign({}, BRI_DEF, s.bri || {});
-function briNow(s) {
-  const b = briOf(s); if (b.mode === 'manual') return b.manual;
-  const h = Math.floor(hourNow), day = b.from < b.to ? (h >= b.from && h < b.to) : (h >= b.from || h < b.to);
-  return day ? b.day : b.night;
-}
 function briTxt(s) {
   const b = briOf(s);
   if (b.mode === 'manual') return 'Manual · ' + b.manual + ' %';
-  return 'Automático · ' + b.day + ' % das ' + pad(b.from) + 'h às ' + pad(b.to) + 'h, ' + b.night + ' % de noite <span class="muted">(agora ' + briNow(s) + ' %)</span>';
+  return 'Automático · ' + b.day + ' % de dia, ' + b.night + ' % de noite';
 }
 const briPct = (sel)=>{let o = ''; for (let v = 10; v <= 100; v += 10)o += '<option value="' + v + '"' + (v === sel ? ' selected' : '') + '>' + v + ' %</option>'; return o;};
 function briModal(id) {
@@ -5918,9 +5997,75 @@ function cropSketch(s, c, W) {
     + (WW > 100 ? '<span class="muted" style="display:block;font-size:12px;margin-top:4px">Painel inteiro: ' + d.w + '×' + d.h + ' · zona escura = não se vê (fica a preto)</span>' : '');
 }
 const ALIGNS = [['centro', 'Ao centro'], ['inicio', 'Encostado à esquerda / cima'], ['fim', 'Encostado à direita / baixo']];
-function ajusteCell(s, canG) {return '<div><dt>Ajuste do vídeo</dt><dd>' + (canG ? '<select data-a-change="fit" data-id="' + s.id + '" aria-label="Ajuste do vídeo ao ecrã" style="width:auto">' + FITS.map(f=>'<option value="' + f[0] + '"' + ((s.fit || 'caber') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((FITS.find(f=>f[0] === (s.fit || 'caber')) || FITS[0])[1])) + ((s.fit || 'caber') === 'caber' ? '<span class="muted" style="display:block;margin:8px 0 4px;font-size:.85em">Se sobrarem barras, o vídeo fica:</span>' + (canG ? '<select data-a-change="align" data-id="' + s.id + '" aria-label="Alinhamento do vídeo" style="width:auto">' + ALIGNS.map(f=>'<option value="' + f[0] + '"' + ((s.align || 'centro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((ALIGNS.find(f=>f[0] === (s.align || 'centro')) || ALIGNS[0])[1])) : '') + '</dd></div>';}
-function areaCell(s, canG) {return '<div><dt>Área do PC</dt><dd>' + (canG ? '<select data-a-change="area" data-id="' + s.id + '" aria-label="Área do ecrã do PC onde o player desenha" style="width:auto">' + AREAS.map(f=>'<option value="' + f[0] + '"' + ((s.area || 'inteiro') === f[0] ? ' selected' : '') + '>' + f[1] + '</option>').join('') + '</select>' : esc((AREAS.find(f=>f[0] === (s.area || 'inteiro')) || AREAS[0])[1])) + '<small class="muted" style="display:block;margin-top:6px">' + areaTxt(s) + '</small>' + areaDiagram(s) + '</dd></div>';}
-function margemCell(s, canG) {return '<div><dt>Margem oculta</dt><dd>' + (hasCrop(s) ? esc(cropParts(s)) : 'Nenhuma') + (canG ? ' <button class="btn sm ghost" data-a="edit-crop" data-id="' + s.id + '">Alterar</button>' : '') + '<small class="muted" style="display:block;margin-top:6px">' + cropNote(s) + '</small>' + cropSketch(s, cropOf(s), 64) + '</dd></div>';}
+const FIT_SUB = {caber:'barras pretas', preencher:'corta margens', esticar:'deforma'};
+const ALIGN_LB = {centro:'Ao centro', inicio:'Esquerda / cima', fim:'Direita / baixo'};
+function boxDims(s, M) {const d = dimsOf(s.res) || {w:1920, h:1080}, k = M / Math.max(d.w, d.h); return {W:Math.max(14, Math.round(d.w * k)), H:Math.max(14, Math.round(d.h * k))};}
+const skBox = (b, inner)=>'<span class="sk" style="width:' + b.W + 'px;height:' + b.H + 'px">' + inner + '</span>';
+const skYel = (x, y, w, h, dot)=>'<span class="sk-y" style="left:' + Math.round(x) + 'px;top:' + Math.round(y) + 'px;width:' + Math.round(w) + 'px;height:' + Math.round(h) + 'px"><span class="sk-dot" style="' + dot + '"></span></span>';
+function fitSketch(s, v) {
+  const b = boxDims(s, 60), W = b.W, H = b.H, r = 16 / 9;
+  if (v === 'esticar') return skBox(b, skYel(0, 0, W, H, 'width:60%;height:60%'));
+  const sc = v === 'caber' ? Math.min(W / r, H) : Math.max(W / r, H), cw = sc * r, d = Math.round(sc * 0.6);
+  return skBox(b, skYel((W - cw) / 2, (H - sc) / 2, cw, sc, 'width:' + d + 'px;height:' + d + 'px'));
+}
+function alignSketch(s, v) {
+  const b = boxDims(s, 60), W = b.W, H = b.H, hor = W >= H, cw = hor ? W * 0.55 : W, ch = hor ? H : H * 0.55, L = hor ? W - cw : H - ch, o = v === 'centro' ? L / 2 : v === 'inicio' ? 0 : L, d = Math.round(Math.min(cw, ch) * 0.6);
+  return skBox(b, skYel(hor ? o : 0, hor ? 0 : o, cw, ch, 'width:' + d + 'px;height:' + d + 'px'));
+}
+function optBtn(k, id, v, label, sk, on, act) {return '<button type="button" class="btn sm' + (on ? ' primary' : '') + '" data-a="' + (act || 'set-opt') + '" data-k="' + k + '" data-v="' + v + '" data-id="' + id + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + sk + '<span class="opt-l">' + label + '</span></button>';}
+const AREA_LB = {inteiro:'Ecrã inteiro', tl:'Sup. esquerdo', tr:'Sup. direito', bl:'Inf. esquerdo', br:'Inf. direito', c:'Centro'};
+function ajusteCell(s, canG) {
+  const fit = s.fit || 'caber', al = s.align || 'centro', fl = (FITS.find(f=>f[0] === fit) || FITS[0])[1].split(' (')[0];
+  if (!canG) return '<div><dt>Ajuste do vídeo</dt><dd>' + esc(fl) + (fit === 'caber' ? '<small class="muted" style="display:block">Se sobrarem barras: ' + esc(ALIGN_LB[al].toLowerCase()) + '</small>' : '') + '</dd></div>';
+  return '<div><dt>Ajuste do vídeo</dt><dd><div class="opts">' + FITS.map(f=>optBtn('fit', s.id, f[0], f[1].split(' (')[0], '', fit === f[0])).join('') + '</div>'
+    + '<small class="muted opt-t">' + ({caber:'O vídeo cabe inteiro; podem sobrar barras pretas.', preencher:'O vídeo enche o ecrã; corta o que sobra.', esticar:'O vídeo enche o ecrã; a imagem fica deformada.'})[fit] + '</small>'
+    + (fit === 'caber' ? '<small class="muted opt-t">Se sobrarem barras, o vídeo fica:</small><div class="opts">' + ALIGNS.map(f=>optBtn('align', s.id, f[0], ALIGN_LB[f[0]], '', al === f[0])).join('') + '</div>' : '') + '</dd></div>';
+}
+function areaCell(s, canG) {
+  const a = s.area || 'inteiro';
+  if (!canG) return '<div><dt>Área do PC</dt><dd>' + esc(AREA_LB[a]) + '</dd></div>';
+  return '<div><dt>Área do PC</dt><dd><div class="opts">' + AREAS.map(f=>optBtn('area', s.id, f[0], AREA_LB[f[0]], '', a === f[0])).join('') + '</div>'
+    + '<small class="muted opt-t">' + (a === 'inteiro' ? 'O player ocupa o ecrã inteiro do PC.' : areaTxt(s)) + '</small></dd></div>';
+}
+function margemCell(s, canG) {
+  const has = hasCrop(s);
+  if (!canG) return '<div><dt>Margem oculta</dt><dd>' + (has ? esc(cropParts(s)) : 'Nenhuma') + '</dd></div>';
+  return '<div><dt>Margem oculta</dt><dd><div class="opts">' + optBtn('crop', s.id, 'none', 'Nenhuma', '', !has) + optBtn('crop', s.id, 'set', has ? 'Alterar margem' : 'Definir margem', '', has, 'edit-crop') + '</div>'
+    + '<small class="muted opt-t">' + (has ? '<b>' + esc(cropParts(s)) + '</b>. ' + cropNote(s) : 'Use se parte do painel estiver tapada (montra, moldura).') + '</small></dd></div>';
+}
+/* um só esquema com o resultado de tudo: PC (preto), área do painel, margem tapada (riscado) e vídeo (amarelo) */
+function previewSketch(s) {
+  const d = dimsOf(s.res) || {w:1920, h:1080}, vert = d.h > d.w, pc = vert ? [1080, 1920] : [1920, 1080], k = 170 / Math.max(pc[0], pc[1]);
+  const PW = Math.round(pc[0] * k), PH = Math.round(pc[1] * k), a = s.area || 'inteiro', big = d.w > pc[0] * 0.6 || d.h > pc[1] * 0.6;
+  let aw = PW, ah = PH, ax = 0, ay = 0;
+  if (a !== 'inteiro') {
+    aw = Math.round((big ? pc[0] / 2 : d.w) * k); ah = Math.round((big ? pc[1] / 2 : d.h) * k);
+    ax = a === 'tr' || a === 'br' ? PW - aw : a === 'c' ? Math.round((PW - aw) / 2) : 0; ay = a === 'bl' || a === 'br' ? PH - ah : a === 'c' ? Math.round((PH - ah) / 2) : 0;
+  }
+  const c = cropOf(s), kx = aw / d.w, ky = ah / d.h, ux = Math.round(c.l * kx), uy = Math.round(c.t * ky), uw = Math.max(8, aw - ux - Math.round(c.r * kx)), uh = Math.max(8, ah - uy - Math.round(c.b * ky));
+  const fit = s.fit || 'caber', al = s.align || 'centro', r = 16 / 9;
+  let vw = uw, vh = uh;
+  if (fit !== 'esticar') {const sc = fit === 'caber' ? Math.min(uw / r, uh) : Math.max(uw / r, uh); vh = sc; vw = sc * r;}
+  const fx = uw - vw, fy = uh - vh, vx = fit === 'caber' && Math.abs(fx) > 0.5 ? (al === 'centro' ? fx / 2 : al === 'inicio' ? 0 : fx) : fx / 2, vy = fit === 'caber' && Math.abs(fy) > 0.5 ? (al === 'centro' ? fy / 2 : al === 'inicio' ? 0 : fy) : fy / 2;
+  const hid = 'repeating-linear-gradient(45deg,#1a1a1a 0 3px,#3a3a3a 3px 6px)';
+  return '<div class="pv-ex"><span class="sk" style="width:' + PW + 'px;height:' + PH + 'px" role="img" aria-label="Exemplo de como fica o ecrã com estes ajustes">'
+    + '<span style="position:absolute;left:' + ax + 'px;top:' + ay + 'px;width:' + aw + 'px;height:' + ah + 'px;background:' + (hasCrop(s) ? hid : '#000') + ';outline:1px dashed #777">'
+    + '<span style="position:absolute;left:' + ux + 'px;top:' + uy + 'px;width:' + uw + 'px;height:' + uh + 'px;overflow:hidden;background:#000">' + '<span class="sk-y" style="left:' + Math.round(vx) + 'px;top:' + Math.round(vy) + 'px;width:' + Math.round(vw) + 'px;height:' + Math.round(vh) + 'px"><span class="sk-t">Vídeo</span></span>' + '</span></span></span>'
+    + '<small class="muted">Exemplo do resultado.<br>Amarelo = vídeo · preto = barras ou resto do PC' + (hasCrop(s) ? ' · riscado = parte tapada' : '') + '</small></div>';
+}
+function setOpt(t) {
+  if (!guard('ecras.gerir')) return;
+  const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
+  const k = t.dataset.k, v = t.dataset.v;
+  if (k === 'fit') {s.fit = v; toast('Ajuste de ' + s.id + ': ' + FITS.find(f=>f[0] === v)[1].split(' (')[0] + '. O ecrã atualiza em instantes.');}
+  else if (k === 'align') {s.align = v; toast('Alinhamento de ' + s.id + ': ' + ALIGN_LB[v] + '. O ecrã atualiza em instantes.');}
+  else if (k === 'area') {s.area = v; toast('Área de ' + s.id + ': ' + AREAS.find(f=>f[0] === v)[1].split(' (')[0] + '. O ecrã atualiza em instantes.');}
+  else if (k === 'crop') {if (!hasCrop(s)) return; delete s.crop; audit('Margem oculta', s.id + ' · sem margem'); toast('Margem de ' + s.id + ' removida. O ecrã atualiza em instantes.');}
+  reopenScreen(s.id);
+}
+let advOpen = false;
+function advCell(s, canG) {return '<div><dt>Imagem</dt><dd><button type="button" class="btn sm' + (advOpen ? ' primary' : '') + '" data-a="adv-toggle" data-id="' + s.id + '" aria-expanded="' + (advOpen ? 'true' : 'false') + '">' + ic('sliders') + 'Ajustar imagem</button></dd></div>';}
+function advPanel(s, canG) {return advOpen ? '<div class="adv-img" style="grid-column:1/-1"><div class="adv-body"><dl class="facts">' + ajusteCell(s, canG) + areaCell(s, canG) + margemCell(s, canG) + '</dl>' + previewSketch(s) + '</div></div>' : '';}
 function cropParts(s) {
   const c = cropOf(s), p = [];
   if (c.t)p.push('cima ' + c.t + ' px'); if (c.b)p.push('baixo ' + c.b + ' px'); if (c.l)p.push('esquerda ' + c.l + ' px'); if (c.r)p.push('direita ' + c.r + ' px');
@@ -6639,7 +6784,7 @@ function fichaCell(s) {
   const f = (state.fichas || {})[s.id], adm = !!(state.user && state.user.admin);
   if (!f && !adm) return '';
   const lab = (t, ico)=>'<label class="btn sm" style="cursor:pointer">' + (ico ? ic(ico) : '') + t + '<input type="file" class="ficha-in" accept="application/pdf,.pdf" data-id="' + s.id + '" hidden></label>';
-  return '<div style="grid-column:1/-1"><dt>Ficha técnica</dt><dd style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
+  return '<div><dt>Ficha técnica</dt><dd style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
     + (f ? '<button class="btn sm" data-a="ficha-dl" data-id="' + s.id + '" title="' + esc(f.name) + ' · ' + fichaSize(f.size) + '">' + ic('download') + 'Descarregar ficha técnica</button>'
       + (adm ? lab('Substituir') + '<button class="btn sm" data-a="ficha-del" data-id="' + s.id + '" style="color:var(--bad)" title="Remover ficha técnica" aria-label="Remover ficha técnica">' + ic('trash') + '</button>' : '')
       : '<span class="muted">Ainda não há ficha técnica.</span>' + lab('Adicionar PDF', 'upload'))
@@ -7260,6 +7405,8 @@ const actions = {
   'period-custom':function() {state.custom = {from:addDays(today, -13), to:today}; state.logLimit = 10; render();},
   'edit-bri':function(t) {if (guard('ecras.gerir'))briModal(t.dataset.id);},
   'edit-res':function(t) {if (guard('ecras.gerir'))resModal(t.dataset.id);},
+  'set-opt':setOpt,
+  'adv-toggle':function(t) {advOpen = !advOpen; reopenScreen(t.dataset.id);},
   'edit-crop':function(t) {if (guard('ecras.gerir'))cropModal(t.dataset.id);},
   'pick-screens':function() {screensModal();},
   'rs-all':function() {document.querySelectorAll('#modal-root input[type="checkbox"]').forEach(function(i) {i.checked = true;});},
@@ -7438,21 +7585,6 @@ document.addEventListener('change', function(e) {
   else if (ac === 'pv-hour') {if (pv) {pv.h = t.value === '' ? null : +t.value; pv.t = 0; pvDraw();}}
   else if (ac === 'csort') {state.csort = t.value; render();}
   else if (ac === 'folderSel') {state.folder = t.value; render();}
-  else if (ac === 'fit') {
-    if (!guard('ecras.gerir')) return;
-    const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
-    s.fit = t.value; toast('Ajuste de ' + s.id + ': ' + FITS.find(f=>f[0] === s.fit)[1].split(' (')[0] + '. O ecrã atualiza em instantes.'); reopenScreen(s.id);
-  }
-  else if (ac === 'align') {
-    if (!guard('ecras.gerir')) return;
-    const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
-    s.align = t.value; toast('Alinhamento de ' + s.id + ': ' + ALIGNS.find(f=>f[0] === s.align)[1] + '. O ecrã atualiza em instantes.');
-  }
-  else if (ac === 'area') {
-    if (!guard('ecras.gerir')) return;
-    const s = screens.find(x=>x.id === t.dataset.id); if (!s) return;
-    s.area = t.value; toast('Área de ' + s.id + ': ' + AREAS.find(f=>f[0] === s.area)[1].split(' (')[0] + '. O ecrã atualiza em instantes.'); reopenScreen(s.id);
-  }
   else if (ac === 'crop-prev') {const fm = t.closest('form'); if (fm)cropPrev(fm.dataset.id);}
   else if (ac === 'bri-mode') {const m = t.value === 'manual', a = $('#bri-auto'), b = $('#bri-man'); if (a)a.hidden = m; if (b)b.hidden = !m;}
   else if (ac === 'res') {const c = $('#res-custom'); if (c)c.hidden = t.value !== 'custom';}

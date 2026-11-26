@@ -91,7 +91,7 @@ try:
         ok('ecrãs reais listados', 'Fórum Braga' in pg.inner_text('#view') and 'Plaza Porto' in pg.inner_text('#view'))
         pg.click('[data-a=open-screen][data-id=ECR-001]'); time.sleep(.6)
         mt=pg.inner_text('.modal') if pg.query_selector('.modal') else ''
-        ok('ficha do ecrã mostra Brilho, Ajuste do vídeo e código do player', 'Brilho' in mt and 'Ajuste' in mt)
+        ok('ficha do ecrã mostra Brilho, Ajuste do vídeo e código do player', 'Brilho' in mt and 'Ajustar imagem' in mt)
         pg.keyboard.press('Escape'); pg.evaluate("document.querySelector('[data-a=close]')&&document.querySelector('[data-a=close]').click()")
         pg.click('[data-a=nav][data-v=campanhas]'); time.sleep(.6)
         ok('campanhas reais listadas', 'Verão no Fórum' in pg.inner_text('#view'))

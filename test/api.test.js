@@ -217,6 +217,10 @@ async function main() {
   ok('sinal de vida', (await hb()).s === 200);
   st = (await call('GET', '/api/state', undefined, top)).j;
   ok('ecrã online, resolução detetada', st.screens[0].status === 'online' && st.screens[0].res === '1080×1920' && st.screens[0].nowCamp === 'C1');
+  await hb({ disk: { free: 94 * 1073741824, total: 128 * 1073741824 } });
+  ok('o disco enviado em bytes (player antigo) aparece em GB', (d => d && d.total === 128 && d.free === 94)((await call('GET', '/api/state', undefined, top)).j.screens[0].disk));
+  await hb({ disk: { free: 94.5, total: 128 } });
+  ok('o disco enviado em GB fica em GB', (d => d && d.total === 128 && d.free === 94.5)((await call('GET', '/api/state', undefined, top)).j.screens[0].disk));
   const mk = (n, okv, hour) => Array.from({ length: n }, (_, i) => ({ pid: 'p' + Math.random().toString(36).slice(2) + i, c: 'C1', f: f1.j.id, ts: Date.now() - (hour ? 0 : 0), dur: 10, ok: okv ? 1 : 0 }));
   const batch = mk(12, true);
   r = await call('POST', '/api/player/plays', { code: 'ECR-001', key, plays: batch });

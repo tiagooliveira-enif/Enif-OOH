@@ -822,7 +822,7 @@ function playerApi(req, res, u, body) {
   if (req.method === 'POST' && p === '/api/player/heartbeat') {
     const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
     const now = Date.now(), w = Math.round(+body.w) || null, h = Math.round(+body.h) || null;
-    const dk = body.disk && +body.disk.total > 0 ? { f: Math.round(+body.disk.free) || 0, t: Math.round(+body.disk.total) } : null;
+    const gb = v => (+v > 1e6 ? +v / 1073741824 : +v), dk = body.disk && +body.disk.total > 0 ? { f: Math.round(gb(body.disk.free) * 10) / 10 || 0, t: Math.round(gb(body.disk.total) * 10) / 10 } : null; /* players antigos enviavam bytes */
     run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h,disk_free,disk_total) VALUES(?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(screen) DO UPDATE SET last_seen=excluded.last_seen, now_c=excluded.now_c, now_f=excluded.now_f, ver=excluded.ver, queue=excluded.queue, w=excluded.w, h=excluded.h,
          disk_free=COALESCE(excluded.disk_free,disk_free), disk_total=COALESCE(excluded.disk_total,disk_total)`,
