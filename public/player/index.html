@@ -142,7 +142,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '17';
+const VERSION = '18';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -327,7 +327,7 @@ async function playOne(c, id, secs) {
   const f = PL.files[id]; if (!f) {stats.err = 'ficheiro ' + id + ' não vem na lista'; return false;}
   let s = await srcFor(id, f);
   if (!s) {                                                              // ainda não está em cache: vai buscar à rede em vez de saltar em silêncio
-    if (stats.net === 'ok')s = {url:mediaUrl(id), revoke:false};
+    if (stats.net !== 'sem ligação')s = {url:mediaUrl(id), revoke:false};
     else {stats.err = 'sem cache nem rede: ' + (f.name || id); logPlay(c, id, 0, false, 'ficheiro não está no PC e sem internet'); return false;}
   }
   cur = {c:c, f:id}; const t0 = Date.now(), fm = fitMode(f); let ok = true, aborted = false, why = ''; lastFrameAt = Date.now();
