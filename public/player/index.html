@@ -142,7 +142,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '19';
+const VERSION = '20';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -191,7 +191,7 @@ const BOOT_AT = Date.now(), BOOT_WHY = (function() {try {const w = localStorage.
 function recarrega(w) {try {localStorage.setItem('enif.why', w);} catch (e) {/* sem ação */} location.reload();}
 async function heartbeat() {
   const body = {c:cur.c, f:cur.f, queue:queue.length, ver:VERSION, w:Math.round(screen.width * (window.devicePixelRatio || 1)), h:Math.round(screen.height * (window.devicePixelRatio || 1)), ack:acks};
-  body.boot = BOOT_AT; body.bootWhy = BOOT_WHY; const d = await diskInfo(); if (d)body.disk = d;
+  body.miss = PL && cache ? Object.keys(PL.files).filter(function(i) {return have[i] !== cacheKey(i, PL.files[i]);}).length : 0; body.boot = BOOT_AT; body.bootWhy = BOOT_WHY; const d = await diskInfo(); if (d)body.disk = d;
   return post('/api/player/heartbeat', body).then(function(r) {
     stats.net = 'ok'; stats.beatErr = ''; stats.beatAt = Date.now();
     const rl = ls('enif.reload');

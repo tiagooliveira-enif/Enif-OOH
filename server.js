@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '19';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '20';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -51,7 +51,7 @@ try { db.exec('ALTER TABLE boots ADD COLUMN why TEXT'); } catch (e) { /* já exi
 if (!db.prepare('SELECT 1 x FROM plays_agg LIMIT 1').get()) {                    // primeira vez: junta as passagens que já existem (uma só vez)
   db.exec("INSERT INTO plays_agg(screen,camp,file,day,hour,n,bad,sec) SELECT screen,camp,file,day,hour,SUM(ok),COUNT(*)-SUM(ok),SUM(CASE WHEN ok=1 THEN dur ELSE 0 END) FROM plays GROUP BY day,screen,camp,file,hour");
 }
-for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER', 'boot INTEGER', 'sys_ts INTEGER', 'sys_boot INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
+for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER', 'boot INTEGER', 'sys_ts INTEGER', 'sys_boot INTEGER', 'miss INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const q1 = (sql, ...a) => db.prepare(sql).get(...a);
 const run = (sql, ...a) => db.prepare(sql).run(...a);
@@ -456,6 +456,8 @@ function failingVideos(sid, since) {
     .map(r => ({ r, f: contentAny(r.file) })).filter(x => x.f && x.f.type === 'Vídeo')
     .map(x => { const w = q1('SELECT why, COUNT(*) c FROM plays WHERE screen=? AND file=? AND ok=0 AND ts>=? GROUP BY why ORDER BY c DESC LIMIT 1', sid, x.f.id, since); return { id: x.f.id, name: x.f.name, n: x.r.n, last: x.r.last, qIgn: !!x.f.qIgn, why: w && w.why ? w.why : '', times: q('SELECT ts, why FROM plays WHERE screen=? AND file=? AND ok=0 AND ts>=? ORDER BY ts DESC LIMIT 12', sid, x.f.id, since).map(t => ({ ts: t.ts, why: t.why || '' })) }; });
 }
+/* reinícios do player sem explicação (nem pedido, nem versão nova, nem as 3h): PC a reiniciar, falha de energia ou player preso */
+const unexplainedBoots = (sid, since) => q("SELECT ts FROM boots WHERE screen=? AND kind='player' AND ts>=? AND why IS NOT NULL AND why IN ('','preso')", sid, since).length;
 /* saúde do ecrã nas últimas 24 h: sinais perdidos (só dentro do horário), reinícios e vídeos a falhar */
 function healthOf(sc) {
   const now = Date.now(), lv = q1('SELECT first_seen FROM live WHERE screen=?', sc.id), from = Math.max(now - 864e5, lv && lv.first_seen ? lv.first_seen : now);
@@ -567,6 +569,8 @@ function screenViews(withKeys) {
       const key = 'fail-' + s.id + '-' + ln.date;
       if (!resolved.has(key)) alerts.push({ id: key, sev: 'warn', screen: s.id, title: 'Falhas de reprodução', detail: pct + ' % das reproduções de hoje falharam neste ecrã.', time: fmtHM(now) });
     } else o.status = 'online';
+    o.miss = age <= ONLINE_MS && lv.miss > 0 ? lv.miss : 0;
+    if (age <= ONLINE_MS) { const nb = unexplainedBoots(s.id, now - 864e5), kb = 'rb-' + s.id + '-' + ln.date; if (nb >= 3 && !resolved.has(kb)) alerts.push({ id: kb, sev: 'warn', screen: s.id, title: 'Reinícios a mais', detail: 'O player reiniciou ' + nb + ' vezes nas últimas 24 h sem ser por pedido, atualização ou reinício das 3h. Pode ser falha de energia, o PC a reiniciar ou o player a ficar preso.', time: fmtHM(now) }); }
     if (age <= ONLINE_MS) failingVideos(s.id, now - 864e5).forEach(v => {
       if (v.qIgn) return;
       const key = 'vf-' + s.id + '-' + v.id + '-' + ln.date;
@@ -687,6 +691,9 @@ function weeklyText() {
   L.push('Resumo da semana · ' + today, '');
   L.push('ECRÃS: ' + sv.screens.length + ' no total · ' + cnt('online') + ' online · ' + cnt('atencao') + ' com atenção · ' + cnt('offline') + ' offline · ' + cnt('fora') + ' desligados fora de horário · ' + cnt('novo') + ' ainda sem ligação');
   sv.screens.filter(x => x.status === 'offline' || x.status === 'atencao').slice(0, 10).forEach(x => L.push('  - ' + x.venue + ', ' + x.spot + ': ' + (x.status === 'offline' ? 'sem ligação' : 'com falhas')));
+  const wk = Date.now() - 7 * 864e5, prob = sv.screens.map(x => ({ x, b: unexplainedBoots(x.id, wk), v: failingVideos(x.id, wk).filter(f => !f.qIgn).length })).filter(r => r.b >= 2 || r.v > 0);
+  L.push('SAÚDE DOS ECRÃS (7 dias): ' + (prob.length ? prob.length + ' com sinais a ver' : 'sem problemas'));
+  prob.slice(0, 10).forEach(r => L.push('  - ' + r.x.venue + ', ' + r.x.spot + ': ' + (r.b ? r.b + ' reinício(s) sem motivo' : '') + (r.b && r.v ? ' · ' : '') + (r.v ? r.v + ' vídeo(s) a falhar' : '')));
   L.push('ALERTAS ABERTOS: ' + sv.alerts.length);
   sv.alerts.slice(0, 8).forEach(a => L.push('  - ' + a.title + (a.screen ? ' (' + a.screen + ')' : '')));
   const camps = docs('campaigns'), st = c => S.statusOf(c, today);
@@ -858,10 +865,10 @@ function playerApi(req, res, u, body) {
     if (dk && sysFresh) dk = null;
     const boot = +body.boot > 1e12 && +body.boot <= now + 60000 ? Math.round(+body.boot) : null;
     if (boot && (!prev || prev.boot !== boot)) run('INSERT OR IGNORE INTO boots(screen,ts,kind,why) VALUES(?,?,?,?)', s.id, boot, 'player', ['pedido', 'atualização', 'preso', '3h'].includes(body.bootWhy) ? body.bootWhy : '');
-    run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h,disk_free,disk_total,boot) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+    run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h,disk_free,disk_total,boot,miss) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(screen) DO UPDATE SET first_seen=COALESCE(first_seen,excluded.first_seen), last_seen=excluded.last_seen, now_c=excluded.now_c, now_f=excluded.now_f, ver=excluded.ver, queue=excluded.queue, w=excluded.w, h=excluded.h,
-         disk_free=COALESCE(excluded.disk_free,disk_free), disk_total=COALESCE(excluded.disk_total,disk_total), boot=COALESCE(excluded.boot,boot)`,
-      s.id, now, now, body.c || null, body.f || null, String(body.ver || ''), +body.queue || 0, w, h, dk ? dk.f : null, dk ? dk.t : null, boot);
+         disk_free=COALESCE(excluded.disk_free,disk_free), disk_total=COALESCE(excluded.disk_total,disk_total), boot=COALESCE(excluded.boot,boot), miss=excluded.miss`,
+      s.id, now, now, body.c || null, body.f || null, String(body.ver || ''), +body.queue || 0, w, h, dk ? dk.f : null, dk ? dk.t : null, boot, Math.max(0, Math.min(999, Math.round(+body.miss) || 0)));
     if (+body.ack > 0) run('DELETE FROM cmds WHERE screen=? AND id<=?', s.id, +body.ack);
     run('INSERT OR IGNORE INTO beats(screen,minute) VALUES(?,?)', s.id, Math.floor(now / 60000));
     if (s.res === 'auto' && w && h && w >= 64 && h >= 64) putDoc('screens', s.id, Object.assign({}, s, { res: w + '×' + h }));

@@ -5209,7 +5209,7 @@ function screenModal(id) {
   const canG = can('ecras.gerir'), canA = can('alertas.resolver');
   const ai = al.filter(a=>a.sev === 'ia').map(a=>'<div class="ai-box">' + ic('spark') + '<span class="hint">' + esc(a.detail) + '</span></div>').join('');
   modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + (canG ? ' <button class="btn ghost sm name-edit" data-a="edit-name" data-id="' + s.id + '" aria-label="Alterar o nome do ecrã" title="Alterar o nome">' + ic('pencil') + '</button>' : '') + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
-    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div>'
+    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + (s.miss > 0 ? ' <span class="pill warn" title="Ficheiros que ainda não chegaram ao PC deste ecrã">A descarregar ' + s.miss + (s.miss === 1 ? ' ficheiro' : ' ficheiros') + '</span>' : '') + '</dd></div>'
     + '<div><dt>Disco do PC</dt><dd>' + (s.disk ? gbTxt(s.disk.total - s.disk.free) + ' de ' + gbTxt(s.disk.total) + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + gbTxt(s.disk.free) + ' GB</span>') : '—') + '</dd></div>'
     + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div>'
     + '<div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div>'
@@ -5779,7 +5779,7 @@ const MANUAL = {
    ['Área do PC', 'Por defeito o player ocupa o ecrã inteiro do PC. Se o painel LED só mostra uma parte do ecrã do PC (por exemplo, o canto superior esquerdo), escolha em «Área do PC» o canto ou o centro: o player passa a desenhar só com o tamanho da resolução do ecrã e deixa o resto do PC a preto.', 'ecras.gerir'],
    ['Margem oculta', 'Se o painel esconde uma faixa do ecrã (por exemplo uma moldura ou uma montra à frente), em «Margem oculta» carregue em «Definir margem» (ou «Alterar margem») e indique quantos píxeis ficam tapados em cima, em baixo, à esquerda e à direita. O player deixa essa faixa a preto e a área visível passa a ser o resto. «Nenhuma» tira a margem. A compatibilidade dos conteúdos continua a usar a resolução do ecrã, sem contar com a margem.', 'ecras.gerir'],
    ['Reiniciar o player e Teste no ecrã', '«Reiniciar player» reinicia o programa do ecrã. «Teste no ecrã» mostra durante 30 segundos uma imagem de teste, para confirmar a posição e a resolução.'],
-   ['Saúde do ecrã (últimas 24 horas)', 'Na ficha do ecrã, o botão «Últimas 24 h» abre um resumo: reinícios do player ou do PC (com o motivo: pedido, versão nova, reinício das 3h, player parado ou PC ligado de novo), sinais perdidos (só conta quando o ecrã devia estar ligado) e vídeos que falharam. Se houver avisos, aparece um número ao lado do botão. Cada vídeo a falhar tem «Ver conteúdo», que mostra a qualidade do ficheiro. Quando um vídeo falha 3 ou mais vezes num dia, nasce o alerta «Vídeo a falhar».'],
+   ['Saúde do ecrã (últimas 24 horas)', 'Na ficha do ecrã, o botão «Últimas 24 h» abre um resumo: reinícios do player ou do PC (com o motivo: pedido, versão nova, reinício das 3h, player parado ou PC ligado de novo), sinais perdidos (só conta quando o ecrã devia estar ligado) e vídeos que falharam. Se houver avisos, aparece um número ao lado do botão. Cada vídeo a falhar tem «Ver conteúdo», que mostra a qualidade do ficheiro. Quando um vídeo falha 3 ou mais vezes num dia, nasce o alerta «Vídeo a falhar». Se o player reiniciar 3 ou mais vezes num dia sem ser por pedido, versão nova ou reinício das 3h, nasce o alerta «Reinícios a mais». Na ficha, «A descarregar N ficheiros» ao lado do estado mostra os vídeos que ainda não chegaram ao PC do ecrã.'],
    ['Disco do PC', 'Nos PCs com Windows o disco mostrado é o do disco C: (o instalador envia-o de 5 em 5 minutos). Nas caixas Android é um valor aproximado.'],
    ['Alterar dados', 'Ao lado da resolução, do horário, do brilho e da localização há o botão «Alterar». Em «Resolução» altera também o tipo do ecrã (totem vertical, painel horizontal, videowall ou outro).'],
    ['Eliminar ecrã', 'Só quando o ecrã já não existir. Pede confirmação.']]}],
@@ -5817,7 +5817,7 @@ const MANUAL = {
    ['Espere pela leitura', 'A plataforma lê a resolução de cada ficheiro e abre a janela «Ecrãs de cada conteúdo».'],
    ['Escolha os ecrãs de cada ficheiro', 'É obrigatório e nada vem marcado: escolha um a um os ecrãs onde o conteúdo pode passar. «Marcar os compatíveis» ajuda, e «Limpar» desfaz. Os ecrãs com proporção diferente (mais de 10 píxeis) ficam desativados, a não ser que o ecrã tenha o ajuste «Esticar», que aceita qualquer proporção (a imagem deforma para encher o ecrã).'],
    ['Confirme', 'O ficheiro entra na biblioteca. Se não servir a nenhum ecrã, não é carregado e a plataforma diz porquê.'],
-   ['Veja o aviso de qualidade dos vídeos', 'A plataforma lê o codec, os fps e o débito de cada vídeo. Se for pesado (por exemplo 60 fps, débito acima de 8 Mbps, mais de Full HD ou um codec que as caixas Android não aceitam bem), o cartão mostra «Atenção ao vídeo» e aparece uma faixa no topo com «Ver só esses». Abra o vídeo para ver o motivo. O ideal é H.264, 30 fps e até 8 Mbps.'],
+   ['Veja o aviso de qualidade dos vídeos', 'A plataforma lê o codec, os fps e o débito de cada vídeo. Se for pesado (por exemplo 60 fps, débito acima de 8 Mbps, mais de Full HD ou um codec que as caixas Android não aceitam bem), o cartão mostra «Atenção ao vídeo» e aparece uma faixa no topo com «Ver só esses». Abra o vídeo para ver o motivo. O ideal é H.264, 30 fps e até 8 Mbps. Logo depois de carregar, se algum vídeo tiver aviso, abre-se a janela «Atenção à qualidade» com o motivo e a opção de ignorar.'],
    ['Ignorar um aviso', 'Se sabe que o vídeo está bem, abra-o e carregue em «Ignorar aviso». O aviso deixa de aparecer em todo o lado (faixa, cartão e alertas) e só fica na janela do próprio vídeo, onde pode carregar em «Voltar a avisar».', 'conteudos.gerir']]},
   {h:'Organizar', steps:[
    ['Veja um conteúdo', 'Carregue na imagem do cartão para abrir o vídeo (ou a imagem) numa janela e vê-lo como vai passar no ecrã. O cartão dos vídeos mostra a primeira imagem, para os reconhecer sem abrir.'],
@@ -6075,7 +6075,7 @@ async function finishUpload(fd, err) {
   const folder = (state.folder !== 'all' && state.folder !== 'none') ? state.folder : null;
   pendUp = null; closeModal();
   state.cfilter = 'todos'; state.up = {done:0, total:L.length}; state.view = 'conteudos'; render();
-  let bad = 0; const enc = encodeURIComponent;
+  let bad = 0; const enc = encodeURIComponent, up0 = contents.map(function(x) {return x.id;});
   for (let k = 0; k < L.length; k++) {
     const u = L[k];
     try {
@@ -6088,8 +6088,18 @@ async function finishUpload(fd, err) {
   }
   state.up = null;
   const okn = L.length - bad;
+  const warned = contents.filter(function(x) {return up0.indexOf(x.id) < 0 && qAct(x);});
   if (okn)toast(okn + (okn === 1 ? ' ficheiro carregado.' : ' ficheiros carregados.') + (skip.length ? ' Não carregado: ' + skip.join(', ') + '.' : ''));
   if (state.view === 'conteudos')render();
+  if (warned.length)qualityModal(warned);
+}
+let qList = [];
+function qualityModal(list) {
+  qList = list.map(function(x) {return x.id;});
+  modal('<div class="modal-h"><div><h2>Atenção à qualidade</h2><p class="muted">' + list.length + (list.length === 1 ? ' vídeo carregado pode' : ' vídeos carregados podem') + ' engasgar nos ecrãs</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
+    + '<p class="hint" style="margin:0 0 12px">Já estão na biblioteca. Pode deixá-los, trocá-los por uma versão mais leve ou ignorar o aviso de cada um.</p>'
+    + list.map(function(x) {return '<b class="ell" style="display:block;margin:0 0 6px">' + esc(x.name) + '</b>' + qBox(x, 'card');}).join('')
+    + '</div><div class="modal-f"><button class="btn primary" data-a="close">Percebi</button></div>');
 }
 function contScreensModal(id) {
   const x = fileById(id); if (!x) return;
@@ -7291,7 +7301,9 @@ const actions = {
     x.qIgn = !x.qIgn;
     audit(x.qIgn ? 'Ignorou o aviso de qualidade do vídeo' : 'Voltou a mostrar o aviso de qualidade do vídeo', x.name);
     toast(x.qIgn ? 'Aviso ignorado. Só aparece aqui, no cartão do vídeo.' : 'O aviso voltou a aparecer.');
-    render(); actions['content-view'](t);
+    render();
+    const h2 = document.querySelector('#modal-root h2');
+    if (h2 && h2.textContent === 'Atenção à qualidade')qualityModal(qList.map(fileById).filter(Boolean)); else actions['content-view'](t);
   },
   cwarn:function() {state.cwarn = !state.cwarn; render();},
   backdrop:function(t, e) {if (e.target === t)closeModal();},

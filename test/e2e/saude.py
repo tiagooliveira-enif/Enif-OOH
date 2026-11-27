@@ -23,7 +23,7 @@ try:
     d = json.loads(urllib.request.urlopen(urllib.request.Request(B + '/api/upload?name=pesado.mp4&mime=video/mp4&screens=ECR-001', data=open(vid, 'rb').read(), headers={'Authorization': 'Bearer ' + tok}, method='PUT')).read())
     state = json.loads(urllib.request.urlopen(urllib.request.Request(B + '/api/state', headers=h)).read())
     key = state['screens'][0]['playerKey']
-    post('/api/player/heartbeat', {'code': 'ECR-001', 'key': key, 'ver': '17', 'w': 1080, 'h': 1920, 'boot': int(time.time() * 1000) - 600000})
+    post('/api/player/heartbeat', {'code': 'ECR-001', 'key': key, 'ver': '17', 'w': 1080, 'h': 1920, 'boot': int(time.time() * 1000) - 600000, 'miss': 2})
     post('/api/player/plays', {'code': 'ECR-001', 'key': key, 'plays': [{'pid': 'f%d' % i, 'c': 'X', 'f': d['id'], 'ts': int(time.time() * 1000), 'dur': 0, 'ok': 0, 'why': 'erro'} for i in range(4)]})
     with sync_playwright() as p:
         br = p.chromium.launch(); errs = []
@@ -34,6 +34,7 @@ try:
         labs = pg.eval_on_selector_all('#modal-root dl.facts > div > dt', 'e=>e.map(x=>x.textContent)')
         ok('ordem da ficha do ecrã', labs[:12] == ['Estado', 'Disco do PC', 'Última ligação', 'Disponibilidade (7 dias)', 'Brilho', 'Horário', 'A reproduzir', 'Resolução', 'Saúde do ecrã', 'Localização', 'Imagem', 'Ficha técnica'] or labs[:11] == ['Estado', 'Disco do PC', 'Última ligação', 'Disponibilidade (7 dias)', 'Brilho', 'Horário', 'A reproduzir', 'Resolução', 'Saúde do ecrã', 'Localização', 'Imagem'])
         ok('«Tipo» já não é um campo à parte', 'Tipo' not in labs)
+        ok('a ficha diz que faltam 2 ficheiros a descarregar', 'A descarregar 2 ficheiros' in pg.inner_text('#modal-root'))
         ok('o botão da saúde mostra o aviso do vídeo a falhar', '1 aviso' in pg.inner_text('[data-a=health]'))
         pg.click('[data-a=health]'); time.sleep(.8)
         m = pg.inner_text('#modal-root')
@@ -50,6 +51,16 @@ try:
         time.sleep(1.5)
         r = json.loads(urllib.request.urlopen(urllib.request.Request(B + '/api/state', headers=h)).read())
         ok('o «ignorar» ficou guardado no servidor e o alerta desapareceu', [c for c in r['contents'] if c['id'] == d['id']][0].get('qIgn') is True and not any(a['title'] == 'Vídeo a falhar' for a in r['alerts']))
+        # aviso logo depois de carregar um vídeo pesado
+        pg.keyboard.press('Escape'); pg.click('[data-a=nav][data-v=conteudos]'); time.sleep(.6)
+        pg.set_input_files('#file-input', vid); time.sleep(1.5)
+        pg.check('#modal-root input[name=us0]') if pg.locator('#modal-root input[name=us0]').count() else None
+        pg.locator('#modal-root input[type=checkbox]').first.check(); pg.click('form[data-form=upload] button[type=submit]'); time.sleep(3)
+        m = pg.inner_text('#modal-root')
+        ok('depois de carregar um vídeo pesado aparece «Atenção à qualidade»', 'Atenção à qualidade' in m and 'pesado.mp4' in m and '60 fps' in m)
+        pg.click('#modal-root [data-a=q-ign]'); time.sleep(.6)
+        ok('ignorar na própria janela mantém-na aberta e marca o aviso', 'Atenção à qualidade' in pg.inner_text('#modal-root') and 'Voltar a avisar' in pg.inner_text('#modal-root'))
+        pg.click('#modal-root .modal-f [data-a=close]'); time.sleep(.3)
         pg.reload(); pg.wait_for_selector('[data-a=nav][data-v=ecras]'); time.sleep(1); pg.click('[data-a=nav][data-v=ecras]'); time.sleep(.5); pg.click('[data-a=open-screen][data-id=ECR-001]'); time.sleep(1.5)
         ok('com o aviso ignorado, a saúde deixa de contar o vídeo', 'aviso' not in pg.inner_text('[data-a=health]'))
         pg.click('[data-a=edit-res]'); time.sleep(.5)

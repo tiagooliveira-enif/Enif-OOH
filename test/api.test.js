@@ -230,6 +230,7 @@ async function main() {
     ok('a saúde do ecrã exige sessão', (await call('GET', '/api/screens/ECR-001/saude')).s === 401);
     await hb({ boot: T0 + 900000, bootWhy: '3h' }); await hb({ boot: T0 + 1200000, bootWhy: 'invento' });
     ok('o motivo do reinício fica guardado (só os conhecidos)', (r2 => r2.j.boots.find(b => b.ts === T0 + 900000).why === '3h' && r2.j.boots.find(b => b.ts === T0 + 1200000).why === '')(await call('GET', '/api/screens/ECR-001/saude', undefined, top)));
+    h = await call('GET', '/api/screens/ECR-001/saude', undefined, top);
     ok('cada arranque do player conta uma vez só', h.s === 200 && h.j.boots.filter(b => b.kind === 'player').length === 4 && h.j.boots[0].ts === T0 + 1200000);
     ok('a saúde traz sinais perdidos e vídeos a falhar (listas)', Array.isArray(h.j.gaps) && Array.isArray(h.j.fails));
     ok('ecrã que não existe: 404', (await call('GET', '/api/screens/ECR-999/saude', undefined, top)).s === 404);
@@ -267,6 +268,19 @@ async function main() {
     ok('vídeo com aviso ignorado deixa de dar alerta', !(await call('GET', '/api/state', undefined, top)).j.alerts.some(a => a.title === 'Vídeo a falhar'));
     ok('ignorar fica no registo de auditoria', db.prepare("SELECT COUNT(*) n FROM audit WHERE what LIKE '%aviso de qualidade%'").get().n >= 1);
     ok('voltar a avisar', (await sync(top, [op('contents', vq.j.id, { qIgn: false }, ['qIgn'])])).s === 200 && !(await call('GET', '/api/state', undefined, top)).j.contents.find(c => c.id === vq.j.id).qIgn);
+    // reinícios a mais, descarregamento pendente e resumo semanal
+    db.prepare("DELETE FROM boots WHERE screen='ECR-001'").run();
+    await hb({ miss: 2 });
+    ok('o ecrã diz quantos ficheiros ainda faltam descarregar', (await call('GET', '/api/state', undefined, top)).j.screens[0].miss === 2);
+    await hb({ miss: 0 });
+    ok('sem ficheiros em falta, o aviso desaparece', !(await call('GET', '/api/state', undefined, top)).j.screens[0].miss);
+    ok('2 reinícios sem motivo não fazem alerta', !(await call('GET', '/api/state', undefined, top)).j.alerts.some(a => a.title === 'Reinícios a mais'));
+    await hb({ boot: Date.now() - 5000, bootWhy: '' }); await hb({ boot: Date.now() - 4000, bootWhy: 'preso' }); await hb({ boot: Date.now() - 3000, bootWhy: '3h' }); await hb({ boot: Date.now() - 2000, bootWhy: 'pedido' });
+    const nb0 = (await call('GET', '/api/state', undefined, top)).j.alerts.filter(a => a.title === 'Reinícios a mais').length;
+    await hb({ boot: Date.now() - 1000, bootWhy: '' });
+    ok('3 reinícios sem motivo fazem o alerta «Reinícios a mais» (pedidos e das 3h não contam)', nb0 === 0 && (await call('GET', '/api/state', undefined, top)).j.alerts.some(a => a.title === 'Reinícios a mais' && /3 vezes/.test(a.detail)));
+    ok('o resumo semanal traz a saúde dos ecrãs', /SAÚDE DOS ECRÃS \(7 dias\): 1 com sinais/.test(weeklyText()) && /reinício\(s\) sem motivo/.test(weeklyText()));
+    db.prepare("DELETE FROM boots WHERE screen='ECR-001' AND why IS NOT NULL AND why IN ('','preso')").run();
     db.prepare("DELETE FROM plays WHERE pid LIKE 'vf%'").run(); db.prepare('DELETE FROM plays_agg WHERE file=?').run(vq.j.id);   // as falhas de teste não contam para o resto
   }
   const mk = (n, okv, hour) => Array.from({ length: n }, (_, i) => ({ pid: 'p' + Math.random().toString(36).slice(2) + i, c: 'C1', f: f1.j.id, ts: Date.now() - (hour ? 0 : 0), dur: 10, ok: okv ? 1 : 0 }));
