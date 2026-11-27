@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '20';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '21';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -275,7 +275,13 @@ function cleanCampaign(o, id, old) {
       if (v.length > 1) it.ivs = v;
     }
     if ((it.d0 && !isDate(it.d0)) || (it.d1 && !isDate(it.d1))) throw bad('Dias do vídeo inválidos.');
-    if (!getDoc('contents', it.f)) throw bad('Conteúdo inexistente.');
+    const fc = getDoc('contents', it.f);
+    if (!fc) throw bad('Conteúdo inexistente.');
+    if (!isNil(i.dur) && i.dur !== '') {                                  // duração própria do conteúdo: só pode ter menos segundos do que a campanha
+      const sn = Math.round(num(i.dur, 3, 60, 'Duração do conteúdo'));
+      if (sn > out.dur) throw bad('Conflito: «' + fc.name + '» tem ' + sn + ' s, mais do que a campanha (' + out.dur + ' s). Um conteúdo só pode ter menos segundos do que a campanha.');
+      if (sn < out.dur) it.dur = sn;
+    }
     return it;
   });
   // campos que só o servidor escreve (avisos e relatório final já enviados ao comercial)

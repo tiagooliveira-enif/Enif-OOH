@@ -211,6 +211,22 @@ async function main() {
   r = await call('GET', '/api/player/playlist?code=ECR-001&key=' + key);
   const hNow = S.lisbonNow('Europe/Lisbon').h, loop = r.j.days[today][hNow];
   ok('playlist tem o loop desta hora com duração e ficheiros', r.s === 200 && loop.seq.length === 1 && loop.seq[0].dur === 10 && loop.seq[0].items.length === 2 && Object.keys(r.j.files).length === 2 && r.j.screen.fit === 'caber');
+  // duração própria de um conteúdo (só pode ter menos segundos do que a campanha)
+  {
+    const it = (d) => [{ f: f1.j.id, h0: null, h1: null, d0: null, d1: null, ppm: 1, dur: d }, { f: f2.j.id, h0: null, h1: null, d0: null, d1: null, ppm: 1 }];
+    const rj = await sync(top, [camp('C1', { items: it(11) })]);
+    ok('conteúdo com mais segundos do que a campanha: conflito', rj.s === 400 && /Conflito/.test(JSON.stringify(rj.j)) && /mais do que a campanha \(10 s\)/.test(JSON.stringify(rj.j)));
+    ok('conteúdo com menos de 3 segundos recusado', (await sync(top, [camp('C1', { items: it(2) })])).s === 400);
+    ok('conteúdo com 5 s numa campanha de 10 s aceite', (await sync(top, [camp('C1', { items: it(5) })])).s === 200);
+    ok('a duração do conteúdo fica guardada', (await call('GET', '/api/state', undefined, top)).j.campaigns.find(c => c.id === 'C1').items[0].dur === 5);
+    r = await call('GET', '/api/player/playlist?code=ECR-001&key=' + key);
+    const en = r.j.days[today][hNow].seq[0];
+    ok('a playlist leva a duração própria só do conteúdo mais curto', en.dur === 10 && en.ds && en.ds[f1.j.id] === 5 && !en.ds[f2.j.id]);
+    ok('baixar a duração da campanha abaixo da do conteúdo: conflito', (await sync(top, [camp('C1', { dur: 4, items: it(5) })])).s === 400);
+    ok('igual à da campanha não guarda nada (é o mesmo que vazio)', (await sync(top, [camp('C1', { items: it(10) })])).s === 200 && (await call('GET', '/api/state', undefined, top)).j.campaigns.find(c => c.id === 'C1').items[0].dur === undefined);
+    r = await call('GET', '/api/player/playlist?code=ECR-001&key=' + key);
+    ok('sem duração própria a playlist não leva «ds»', !r.j.days[today][hNow].seq[0].ds);
+  }
   ok('playlist tem hoje e amanhã', Object.keys(r.j.days).length === 2);
   ok('ficheiro do player acessível com a chave do ecrã', (await fetch(base + `/media/${f1.j.id}?code=ECR-001&key=${key}`)).status === 200);
   const hb = (o) => call('POST', '/api/player/heartbeat', Object.assign({ code: 'ECR-001', key, c: 'C1', f: f1.j.id, queue: 0, ver: '2', w: 1080, h: 1920 }, o || {}));

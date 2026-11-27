@@ -3161,6 +3161,18 @@ button.avatar {
 .ci-order {
   margin: 4px 0 8px;
 }
+.ci-gap {
+  margin-left: 14px;
+}
+@media (max-width: 380px) {
+  .ci-line input[type="number"] {
+    width: 44px;
+    padding: 6px;
+  }
+  .ci-line small {
+    font-size: 11px;
+  }
+}
 .ci-line input[type="number"] {
   width: 72px;
   padding: 6px 10px;
@@ -3173,6 +3185,13 @@ button.avatar {
   }
   .ci-line {
     flex-wrap: wrap;
+  }
+  .ci-line input[type="number"] {
+    width: 54px;
+    padding: 6px 8px;
+  }
+  .ci-gap {
+    margin-left: 4px;
   }
   .ci-line input[type="date"] {
     flex: 1 1 120px;
@@ -5564,24 +5583,30 @@ function itemsField(c) {
     return '<div class="ci-row"><label class="ci-main"><input type="checkbox" name="ci" value="' + f.id + '" data-a-change="ci-toggle"' + (it ? ' checked' : '') + '><span class="ell">' + esc(f.name) + '</span>' + (fo ? '<small class="muted">' + esc(fo.name) + '</small>' : '') + (gone ? '<small class="muted">saiu a ' + iso(it0.d1).split('-').reverse().join('/') + '</small>' : '') + '</label>'
       + '<div class="ci-win"' + (it ? '' : ' hidden') + '>'
       + '<span class="ci-line"><small>Dias</small><input type="date" name="cid0_' + f.id + '" value="' + (it && it.d0 ? iso(it.d0) : '') + '" aria-label="Dia de entrada de ' + esc(f.name) + '"><span>–</span><input type="date" name="cid1_' + f.id + '" value="' + (it && it.d1 ? iso(it.d1) : '') + '" aria-label="Dia de saída de ' + esc(f.name) + '"></span>'
-      + '<span class="ci-line"><small title="Quantas vezes por minuto este vídeo passa. Com mais de 1, o vídeo repete-se na ronda com as passagens espaçadas por igual (por exemplo A, B, C, A, D, E, F) e a campanha entra mais vezes por volta. Deixe 1 se não precisar de um ritmo próprio.">Vezes/min</small><input type="number" name="cip_' + f.id + '" min="1" max="12" step="1" value="' + ((it && it.ppm) || 1) + '" aria-label="Passagens por minuto de ' + esc(f.name) + '"></span>'
+      + '<span class="ci-line"><small title="Quantos segundos este conteúdo passa. Deixe vazio para usar a duração da campanha. Só pode ter menos segundos do que a campanha.">Duração (s)</small><input type="number" name="cis_' + f.id + '" min="3" max="' + c.dur + '" step="1" value="' + ((it && it.dur) || '') + '" placeholder="' + c.dur + '" aria-label="Duração em segundos de ' + esc(f.name) + '"><small class="ci-gap" title="Quantas vezes por minuto este vídeo passa. Com mais de 1, o vídeo repete-se na ronda com as passagens espaçadas por igual (por exemplo A, B, C, A, D, E, F) e a campanha entra mais vezes por volta. Deixe 1 se não precisar de um ritmo próprio.">Vezes/min</small><input type="number" name="cip_' + f.id + '" min="1" max="12" step="1" value="' + ((it && it.ppm) || 1) + '" aria-label="Passagens por minuto de ' + esc(f.name) + '"></span>'
       + '<span class="ci-line ci-pos"><small>Posição</small><input type="number" name="cio_' + f.id + '" min="1" max="99" step="1" value="' + (rank[f.id] || '') + '" aria-label="Posição de ' + esc(f.name) + ' na ordem"></span>'
       + '<span class="ci-line ci-hours"><small>Horas</small>' + ivBox('ci0_' + f.id, 'ci1_' + f.id, (it && it.ivs && it.ivs.length) ? it.ivs : [[it ? it.h0 : null, it ? it.h1 : null]], 'Início da campanha', 'Fim da campanha', ' do vídeo ' + esc(f.name)) + '</span></div></div>';
   }).join('');
   return '<div class="field"><span class="lab">Conteúdos desta campanha</span><div class="field-inline ci-order"><label for="c-order">Ordem em que alternam</label><select id="c-order" name="order" data-a-change="ci-order"><option value="auto"' + (c.manual ? '' : ' selected') + '>Automática (dia e hora de entrada)</option><option value="manual"' + (c.manual ? ' selected' : '') + '>Manual (defino eu)</option></select><input type="checkbox" id="ci-only" class="ci-only-cb" hidden><label for="ci-only" class="ci-onlybtn" role="button" title="Mostra só os conteúdos escolhidos nesta campanha, sem ter de percorrer a lista toda">Só os escolhidos</label></div><div class="checks ci-list"' + (c.manual ? ' data-manual="1"' : '') + '>' + rows + '</div><span class="hint">Escolha os conteúdos e, para cada um, os dias e as horas em que entra e sai. Se deixar em branco, acompanha a campanha. Os vídeos ativos passam alternados, um em cada passagem da campanha.<details class="more-hint"><summary>Ver exemplo e outras regras</summary>Com 5 vídeos e 2 passagens por minuto, o 1.º minuto leva A e B, o 2.º leva C e D, o 3.º leva E e A, e assim por diante. Na ordem automática, entra primeiro quem tem o dia e a hora de entrada mais cedo; na manual, a ordem é a das posições que definir. Quando um sai, os outros continuam. «Vezes/min» é opcional: serve para um vídeo exclusivo ter um ritmo próprio, e esse vídeo não pode partilhar dias e horas com outros.</details></span></div>';
 }
-function readItems(fd, ch0, ch1, cs, ce, cv) {
+function readItems(fd, ch0, ch1, cs, ce, cv, cdur) {
   const items = [], warns = [];
   fd.getAll('ci').forEach(function(id) {
     const as = fd.getAll('ci0_' + id), bs = fd.getAll('ci1_' + id), x = String(fd.get('cid0_' + id) || ''), y = String(fd.get('cid1_' + id) || '');
     const pr = String(isNil(fd.get('cip_' + id)) ? '1' : fd.get('cip_' + id)).trim(), pn = Math.round(+pr);
-    const it = {f:id, ppm:pn, h0:null, h1:null, d0:x ? parseISO(x) : null, d1:y ? parseISO(y) : null, _pr:pr, _a:as, _b:bs};
+    const it = {f:id, ppm:pn, h0:null, h1:null, d0:x ? parseISO(x) : null, d1:y ? parseISO(y) : null, _pr:pr, _a:as, _b:bs, _s:String(fd.get('cis_' + id) || '').trim()};
     items.push(it);
   });
   for (let k = 0; k < items.length; k++) {
     const it = items[k];
     if (!it._pr || !(it.ppm >= 1 && it.ppm <= 12)) return {err:'Passagens por minuto de «' + fileById(it.f).name + '»: indique um número inteiro entre 1 e 12.'};
     const nm = fileById(it.f).name, n = it._a.length;
+    if (it._s) {
+      const sn = Math.round(+it._s.replace(',', '.'));
+      if (!(sn >= 3)) return {err:'Duração de «' + nm + '»: indique pelo menos 3 segundos ou deixe vazio para usar a da campanha.'};
+      if (sn > cdur) return {err:'Conflito: «' + nm + '» tem ' + sn + ' s, mais do que a campanha (' + cdur + ' s). Um conteúdo só pode ter menos segundos do que a campanha. Baixe os segundos do conteúdo ou aumente a duração da campanha.'};
+      if (sn < cdur)it.dur = sn;
+    }
     if (n === 1) {
       it.h0 = (it._a[0] === '' || isNil(it._a[0])) ? null : +it._a[0]; it.h1 = (it._b[0] === '' || isNil(it._b[0])) ? null : +it._b[0];
     } else {
@@ -5596,7 +5621,7 @@ function readItems(fd, ch0, ch1, cs, ce, cv) {
       it.h0 = m.list[0][0]; it.h1 = m.list[m.list.length - 1][1];
       if (m.list.length > 1)it.ivs = m.list;
     }
-    delete it._pr; delete it._a; delete it._b;
+    delete it._pr; delete it._a; delete it._b; delete it._s;
   }
   const manual = fd.get('order') === 'manual';
   if (manual && items.length > 1) {
@@ -5794,7 +5819,7 @@ const MANUAL = {
    ['Defina as datas e as horas', 'Início e Fim, e a janela «Das» e «Até às». Se quiser ajuda, «Sugerir horário com IA» propõe a janela com mais passagem de pessoas.'],
    ['Escolha a duração e a modalidade', 'Duração do vídeo em segundos e modalidade de passagem: 2× por minuto, 1× por minuto ou 1× a cada 5 minutos (ou «Outra…»). Escolha também a prioridade: Alta garante as passagens por minuto, Normal passa uma vez por volta. Numa campanha de prioridade Alta com poucas passagens (por exemplo 1× a cada 5 minutos), a ronda do ecrã pode ficar mais longa para cumprir o pedido; a playlist mostra então «N passagens por volta».'],
    ['Partilhe a posição (opcional)', 'Em «Partilhar a posição no loop» escolha outra campanha para passarem à vez, uma por volta, ocupando só uma posição na playlist.'],
-   ['Escolha os conteúdos', 'Marque os conteúdos da campanha. Para cada um pode definir os dias, as horas e a posição. Se deixar em branco, acompanha a campanha. Fique atento aos avisos amarelos: dizem em que ecrãs o conteúdo não passa ou é ajustado. Com muitos ficheiros, «Só os escolhidos» mostra apenas os marcados. Quando a data de saída de um conteúdo passa, ele deixa de contar e aparece desmarcado («saiu a…»); ao guardar a campanha, sai de vez da lista.'],
+   ['Escolha os conteúdos', 'Marque os conteúdos da campanha. Para cada um pode definir os dias, as horas e a posição. Se deixar em branco, acompanha a campanha. Em «Duração (s)» pode dar a um conteúdo menos segundos do que a campanha (por exemplo 5 s numa campanha de 10 s); vazio usa a da campanha, e mais segundos do que a campanha dá erro de conflito. Fique atento aos avisos amarelos: dizem em que ecrãs o conteúdo não passa ou é ajustado. Com muitos ficheiros, «Só os escolhidos» mostra apenas os marcados. Quando a data de saída de um conteúdo passa, ele deixa de contar e aparece desmarcado («saiu a…»); ao guardar a campanha, sai de vez da lista.'],
    ['Carregue em «Criar campanha»', 'Confirme no calendário que ela aparece nos dias certos.']]},
   {h:'Acompanhar e alterar', steps:[
    ['Veja o calendário', 'Mostra a semana, com todas as campanhas. Use as setas para mudar de semana e «Hoje» para voltar.'],
@@ -7112,7 +7137,7 @@ function serDoc(coll, o) {
     CMP_KEYS.forEach(function(k) {d[k] = o[k] === undefined ? null : o[k];});
     d.start = iso(o.start); d.end = iso(o.end); d.manual = !!o.manual; d.sector = o.sector || ''; d.sales = o.sales || '';
     d.pauses = (o.pauses || []).map(function(p) {return {from:iso(p.from), to:p.to ? iso(p.to) : null};});
-    d.items = o.items.map(function(i) {return {f:i.f, h0:isNil(i.h0) ? null : i.h0, h1:isNil(i.h1) ? null : i.h1, d0:i.d0 ? iso(i.d0) : null, d1:i.d1 ? iso(i.d1) : null, ppm:i.ppm || 1};});
+    d.items = o.items.map(function(i) {return {f:i.f, h0:isNil(i.h0) ? null : i.h0, h1:isNil(i.h1) ? null : i.h1, d0:i.d0 ? iso(i.d0) : null, d1:i.d1 ? iso(i.d1) : null, ppm:i.ppm || 1, dur:i.dur || null};});
   } else if (coll === 'folders') {d.name = o.name;}
   else if (coll === 'contents') {d.folder = o.folder || null; d.screens = Array.isArray(o.screens) ? o.screens.slice() : null; d.house = !!o.house; d.qIgn = !!o.qIgn;}
   else if (coll === 'users') {
@@ -7196,7 +7221,7 @@ function applyState(st) {
   setArr(campaigns, st.campaigns.map(function(c) {
     c.start = parseISO(c.start); c.end = parseISO(c.end); c.sector = c.sector || ''; c.sales = c.sales || '';
     c.pauses = (c.pauses || []).map(function(p) {return {from:parseISO(p.from), to:p.to ? parseISO(p.to) : null};});
-    c.items = (c.items || []).map(function(i) {return {f:i.f, h0:isNil(i.h0) ? null : i.h0, h1:isNil(i.h1) ? null : i.h1, d0:i.d0 ? parseISO(i.d0) : null, d1:i.d1 ? parseISO(i.d1) : null, ppm:i.ppm || 1};});
+    c.items = (c.items || []).map(function(i) {return {f:i.f, h0:isNil(i.h0) ? null : i.h0, h1:isNil(i.h1) ? null : i.h1, d0:i.d0 ? parseISO(i.d0) : null, d1:i.d1 ? parseISO(i.d1) : null, ppm:i.ppm || 1, dur:i.dur || null};});
     return c;
   }));
   setArr(contents, st.contents.map(function(f) {if (f.type === 'Imagem')f.url = '/media/' + f.id + '?t=' + tk; else if (f.type === 'Vídeo' || f.type === 'HTML5')f.src = '/media/' + f.id + '?t=' + tk; return f;}));
@@ -7710,9 +7735,10 @@ document.addEventListener('click', function(e) {
 });
 document.addEventListener('input', function(e) {
   const id = e.target.id;
+  if (e.target.name && e.target.name.indexOf('cis_') === 0) {const mx = +e.target.max; if (mx && +e.target.value > mx) {e.target.value = mx; toast('O máximo é ' + mx + ' s, a duração da campanha.');} return;}
   if (id === 'q') {state.q = e.target.value; state.limit = 10; drawScreenList();}
   else if (id === 'cq') {state.cq = e.target.value; const r = $('#camp-rows'), n = $('#cq-n'); if (r)r.innerHTML = campRows(); if (n)n.textContent = campHint();}
-  else if (id === 'c-ppm' || id === 'c-dur') {const h = $('#ppm-hint'), p = $('#c-ppm'), d = $('#c-dur'); if (h && p && d)h.textContent = ppmHint(parseFloat(p.value), parseFloat(d.value));}
+  else if (id === 'c-ppm' || id === 'c-dur') {const h = $('#ppm-hint'), p = $('#c-ppm'), d = $('#c-dur'); if (h && p && d)h.textContent = ppmHint(parseFloat(p.value), parseFloat(d.value)); if (id === 'c-dur') {const dv = parseInt(d.value, 10); document.querySelectorAll('input[name^="cis_"]').forEach(function(x) {if (dv > 0) {x.max = dv; x.placeholder = dv;}});}}
   else if (id === 'rs-q') {
     const q = e.target.value.trim().toLowerCase();
     document.querySelectorAll('#modal-root .vgroup').forEach(function(g) {
@@ -8077,7 +8103,7 @@ document.addEventListener('submit', function(e) {
   const mg = mergeIvs(rawIv), h0 = mg.list[0][0], h1 = mg.list[mg.list.length - 1][1], cvl = mg.list;
   if (!(dur >= 3 && dur <= 60)) {err.textContent = 'Duração do vídeo: indique entre 3 e 60 segundos.'; return;}
   if (!(ppm >= 0.2 && ppm <= 12)) {err.textContent = 'Passagens por minuto: indique um valor entre 0,2 (1 a cada 5 minutos) e 12.'; return;}
-  const ri = readItems(fd, h0, h1, parseISO(sv), parseISO(ev), cvl);
+  const ri = readItems(fd, h0, h1, parseISO(sv), parseISO(ev), cvl, dur);
   if (ri.err) {err.textContent = ri.err; return;}
   const data = {name:name, client:client || 'Sem cliente', venues:vs, start:parseISO(sv), end:parseISO(ev), noEnd:noEnd, h0:h0, h1:h1, ivs:cvl.length > 1 ? cvl : null, ppm:ppm, dur:dur, priority:fd.get('priority'), items:ri.items, manual:ri.manual, sales:sales, sector:sector};
   let c;

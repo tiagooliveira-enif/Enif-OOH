@@ -142,7 +142,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '20';
+const VERSION = '21';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -419,7 +419,7 @@ async function loop() {
         if (en.spot)lastSpotAt = Date.now();
         tried++;
         const id = pick(en); if (!id) continue;
-        played = await playOne(en.spot ? '__spot' : en.c, id, en.dur);
+        played = await playOne(en.spot ? '__spot' : en.c, id, !en.spot && en.ds && en.ds[id] > 0 ? Math.min(en.dur, en.ds[id]) : en.dur);   // conteúdo com duração própria passa só esse tempo (nunca mais do que a campanha)
         if (!played && en.spot && l.spot5 === en)lastSpotAt = 0;
       }
       if (!played) {showBrand(PL.screen.venue); await sleep(1500);}             // nada tocou: mantém o último quadro
