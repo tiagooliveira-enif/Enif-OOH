@@ -228,7 +228,9 @@ async function main() {
     await hb({ boot: T0 + 600000 });
     let h = (await call('GET', '/api/screens/ECR-001/saude', undefined, top));
     ok('a saúde do ecrã exige sessão', (await call('GET', '/api/screens/ECR-001/saude')).s === 401);
-    ok('cada arranque do player conta uma vez só', h.s === 200 && h.j.boots.filter(b => b.kind === 'player').length === 2 && h.j.boots[0].ts === T0 + 600000);
+    await hb({ boot: T0 + 900000, bootWhy: '3h' }); await hb({ boot: T0 + 1200000, bootWhy: 'invento' });
+    ok('o motivo do reinício fica guardado (só os conhecidos)', (r2 => r2.j.boots.find(b => b.ts === T0 + 900000).why === '3h' && r2.j.boots.find(b => b.ts === T0 + 1200000).why === '')(await call('GET', '/api/screens/ECR-001/saude', undefined, top)));
+    ok('cada arranque do player conta uma vez só', h.s === 200 && h.j.boots.filter(b => b.kind === 'player').length === 4 && h.j.boots[0].ts === T0 + 1200000);
     ok('a saúde traz sinais perdidos e vídeos a falhar (listas)', Array.isArray(h.j.gaps) && Array.isArray(h.j.fails));
     ok('ecrã que não existe: 404', (await call('GET', '/api/screens/ECR-999/saude', undefined, top)).s === 404);
     ok('o sysinfo recusa chave errada', (await call('POST', '/api/player/sysinfo', { code: 'ECR-001', key: 'x', diskFreeGB: 10, diskTotalGB: 100 })).s === 401);

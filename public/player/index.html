@@ -142,7 +142,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '18';
+const VERSION = '19';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -187,14 +187,15 @@ function flush() {
   }).catch(function(e) {stats.net = 'sem ligação'; stats.sendErr = 'envio das passagens: ' + e.message;});
 }
 async function diskInfo() {try {if (navigator.storage && navigator.storage.estimate) {const e = await navigator.storage.estimate(); if (e.quota > 0) {const G = 1073741824; return {free:Math.max(0, Math.round((e.quota - (e.usage || 0)) / G * 10) / 10), total:Math.round(e.quota / G * 10) / 10};}}} catch (x) {/* sem ação */} return null;}
-const BOOT_AT = Date.now();
+const BOOT_AT = Date.now(), BOOT_WHY = (function() {try {const w = localStorage.getItem('enif.why') || ''; localStorage.removeItem('enif.why'); return w;} catch (e) {return '';}})();
+function recarrega(w) {try {localStorage.setItem('enif.why', w);} catch (e) {/* sem ação */} location.reload();}
 async function heartbeat() {
   const body = {c:cur.c, f:cur.f, queue:queue.length, ver:VERSION, w:Math.round(screen.width * (window.devicePixelRatio || 1)), h:Math.round(screen.height * (window.devicePixelRatio || 1)), ack:acks};
-  body.boot = BOOT_AT; const d = await diskInfo(); if (d)body.disk = d;
+  body.boot = BOOT_AT; body.bootWhy = BOOT_WHY; const d = await diskInfo(); if (d)body.disk = d;
   return post('/api/player/heartbeat', body).then(function(r) {
     stats.net = 'ok'; stats.beatErr = ''; stats.beatAt = Date.now();
     const rl = ls('enif.reload');
-    if (r.reload !== null && r.reload !== undefined && rl !== null && +rl !== r.reload) {ls('enif.reload', String(r.reload)); location.reload(); return;}
+    if (r.reload !== null && r.reload !== undefined && rl !== null && +rl !== r.reload) {ls('enif.reload', String(r.reload)); recarrega('pedido'); return;}
     const pr = r.proof || null;
     if ((pr ? pr.id : null) !== (PROOF ? PROOF.id : null)) {
       if (pr)refresh().then(function() {setProof(pr);}); else setProof(null);
@@ -288,8 +289,8 @@ async function refresh() {
     if (r.status === 401) {stats.err = 'código/chave inválidos'; return;}
     if (!r.ok) throw new Error('HTTP ' + r.status);
     const j = await r.json(); stats.net = 'ok'; stats.err = '';
-    if (j.playerVersion !== VERSION) {location.reload(); return;}
-    const rl = ls('enif.reload'); if (rl !== null && +rl !== j.reload) {ls('enif.reload', String(j.reload)); location.reload(); return;}
+    if (j.playerVersion !== VERSION) {recarrega('atualização'); return;}
+    const rl = ls('enif.reload'); if (rl !== null && +rl !== j.reload) {ls('enif.reload', String(j.reload)); recarrega('pedido'); return;}
     ls('enif.reload', String(j.reload));
     if (typeof j.generated === 'number')skew = j.generated - Date.now();
     PL = j; ls('enif.playlist', JSON.stringify(j)); applyArea();
@@ -450,9 +451,9 @@ setInterval(drawDbg, 1000);
   heartbeat();
   await refresh();
   // vigilante: se nada mudar durante 10 minutos, recarrega a página (sem nunca ficar preto: arranca da lista guardada)
-  setInterval(function() {if (PL && Date.now() - lastFrameAt > 600e3)location.reload();}, 60000);
+  setInterval(function() {if (PL && Date.now() - lastFrameAt > 600e3)recarrega('preso');}, 60000);
   // recarrega uma vez por dia (3h da manhã) para evitar fugas de memória
-  setInterval(function() {const n = new Date(); if (n.getHours() === 3 && n.getMinutes() === 0 && performance.now() > 3600e3)location.reload();}, 60000);
+  setInterval(function() {const n = new Date(); if (n.getHours() === 3 && n.getMinutes() === 0 && performance.now() > 3600e3)recarrega('3h');}, 60000);
 })();
 })();
 </script>

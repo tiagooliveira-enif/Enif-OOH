@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '18';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '19';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS alert_push(id TEXT PRIMARY KEY, ts INTEGER NOT NULL, 
 CREATE TABLE IF NOT EXISTS proof_log(id INTEGER PRIMARY KEY AUTOINCREMENT, screen TEXT NOT NULL, t0 INTEGER NOT NULL, files TEXT NOT NULL, secs INTEGER NOT NULL, who TEXT);
 `);
 try { db.exec('ALTER TABLE plays ADD COLUMN why TEXT'); } catch (e) { /* já existe */ }
+try { db.exec('ALTER TABLE boots ADD COLUMN why TEXT'); } catch (e) { /* já existe */ }
 if (!db.prepare('SELECT 1 x FROM plays_agg LIMIT 1').get()) {                    // primeira vez: junta as passagens que já existem (uma só vez)
   db.exec("INSERT INTO plays_agg(screen,camp,file,day,hour,n,bad,sec) SELECT screen,camp,file,day,hour,SUM(ok),COUNT(*)-SUM(ok),SUM(CASE WHEN ok=1 THEN dur ELSE 0 END) FROM plays GROUP BY day,screen,camp,file,hour");
 }
@@ -466,7 +467,7 @@ function healthOf(sc) {
     if (miss && run0 === null) run0 = m;
     if (!miss && run0 !== null) { if (m - run0 >= 3) gaps.push({ ts: run0 * 60000, min: m - run0 }); run0 = null; }
   }
-  const boots = q('SELECT ts,kind FROM boots WHERE screen=? AND ts>=? ORDER BY ts DESC LIMIT 30', sc.id, now - 864e5).map(r => ({ ts: r.ts, kind: r.kind }));
+  const boots = q('SELECT ts,kind,why FROM boots WHERE screen=? AND ts>=? ORDER BY ts DESC LIMIT 30', sc.id, now - 864e5).map(r => ({ ts: r.ts, kind: r.kind, why: r.why || '' }));
   return { since: from, gaps: gaps.reverse(), boots, fails: failingVideos(sc.id, now - 864e5) };
 }
 /* comprovativo: o ecrã repõe só 1 ou 2 conteúdos (que servem ao ecrã), no máximo 2 minutos, para filmar o vídeo de prova.
@@ -856,7 +857,7 @@ function playerApi(req, res, u, body) {
     const prev = q1('SELECT boot,sys_ts FROM live WHERE screen=?', s.id), sysFresh = prev && prev.sys_ts && now - prev.sys_ts < 20 * 60000;   // com o disco real do Windows, o do browser fica de parte
     if (dk && sysFresh) dk = null;
     const boot = +body.boot > 1e12 && +body.boot <= now + 60000 ? Math.round(+body.boot) : null;
-    if (boot && (!prev || prev.boot !== boot)) run('INSERT OR IGNORE INTO boots(screen,ts,kind) VALUES(?,?,?)', s.id, boot, 'player');
+    if (boot && (!prev || prev.boot !== boot)) run('INSERT OR IGNORE INTO boots(screen,ts,kind,why) VALUES(?,?,?,?)', s.id, boot, 'player', ['pedido', 'atualização', 'preso', '3h'].includes(body.bootWhy) ? body.bootWhy : '');
     run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h,disk_free,disk_total,boot) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
          ON CONFLICT(screen) DO UPDATE SET first_seen=COALESCE(first_seen,excluded.first_seen), last_seen=excluded.last_seen, now_c=excluded.now_c, now_f=excluded.now_f, ver=excluded.ver, queue=excluded.queue, w=excluded.w, h=excluded.h,
          disk_free=COALESCE(excluded.disk_free,disk_free), disk_total=COALESCE(excluded.disk_total,disk_total), boot=COALESCE(excluded.boot,boot)`,
