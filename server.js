@@ -453,7 +453,7 @@ function expectedMinutes(scr, from, to) {
 function failingVideos(sid, since) {
   return q('SELECT file, COUNT(*) n, MAX(ts) last FROM plays WHERE screen=? AND ok=0 AND ts>=? GROUP BY file HAVING n>=3 ORDER BY n DESC LIMIT 20', sid, since)
     .map(r => ({ r, f: contentAny(r.file) })).filter(x => x.f && x.f.type === 'Vídeo')
-    .map(x => ({ id: x.f.id, name: x.f.name, n: x.r.n, last: x.r.last, qIgn: !!x.f.qIgn }));
+    .map(x => { const w = q1('SELECT why, COUNT(*) c FROM plays WHERE screen=? AND file=? AND ok=0 AND ts>=? GROUP BY why ORDER BY c DESC LIMIT 1', sid, x.f.id, since); return { id: x.f.id, name: x.f.name, n: x.r.n, last: x.r.last, qIgn: !!x.f.qIgn, why: w && w.why ? w.why : '' }; });
 }
 /* saúde do ecrã nas últimas 24 h: sinais perdidos (só dentro do horário), reinícios e vídeos a falhar */
 function healthOf(sc) {

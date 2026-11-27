@@ -38,7 +38,7 @@ try:
         pg.click('[data-a=health]'); time.sleep(.8)
         m = pg.inner_text('#modal-root')
         ok('a saúde mostra reinícios, sinais e o vídeo a falhar', 'Reinícios' in m and 'Sinais perdidos' in m and 'pesado.mp4' in m and 'falhou 4 vezes' in m and 'O player reiniciou' in m)
-        ok('o vídeo a falhar traz o motivo da qualidade (60 fps)', '60 fps' in m)
+        ok('o vídeo a falhar traz o motivo da qualidade (60 fps) e o motivo da falha', '60 fps' in m and 'Motivo: erro' in m)
         pg.click('#modal-root [data-a=content-view]'); time.sleep(.8)
         m = pg.inner_text('#modal-root')
         ok('o cartão do vídeo mostra codec, fps e o aviso', 'H264' in m and '60 fps' in m and 'Qualidade do vídeo: atenção' in m)
