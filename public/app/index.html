@@ -1078,6 +1078,28 @@ button.t-row:hover {
   font-size: 12px;
   color: var(--muted);
 }
+@media (max-width: 560px) {
+  dl.facts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-flow: dense;
+    gap: 12px 14px;
+  }
+  dl.facts > .fw {
+    grid-column: 1 / -1;
+  }
+  dl.facts dd .btn.ghost {
+    padding-left: 0;
+    padding-right: 0;
+    margin-right: 10px;
+  }
+  dl.facts [data-a="adv-toggle"] {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+  dl.facts [data-a="adv-toggle"] svg {
+    display: none;
+  }
+}
 @media (max-width: 460px) {
   .stiles {
     gap: 8px;
@@ -5074,7 +5096,7 @@ function screenModal(id) {
   const canG = can('ecras.gerir'), canA = can('alertas.resolver');
   const ai = al.filter(a=>a.sev === 'ia').map(a=>'<div class="ai-box">' + ic('spark') + '<span class="hint">' + esc(a.detail) + '</span></div>').join('');
   modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + (canG ? ' <button class="btn ghost sm name-edit" data-a="edit-name" data-id="' + s.id + '" aria-label="Alterar o nome do ecrã" title="Alterar o nome">' + ic('pencil') + '</button>' : '') + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
-    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div><dt>Disco do PC</dt><dd>' + (s.disk ? gbTxt(s.disk.total - s.disk.free) + ' de ' + gbTxt(s.disk.total) + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + gbTxt(s.disk.free) + ' GB</span>') : '—') + '</dd></div>'
+    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div class="fw"><dt>Disco do PC</dt><dd>' + (s.disk ? gbTxt(s.disk.total - s.disk.free) + ' de ' + gbTxt(s.disk.total) + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + gbTxt(s.disk.free) + ' GB</span>') : '—') + '</dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
     + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + '<div><dt>Localização</dt><dd>' + locTxt(s, canG ? '<button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + advCell(s, canG) + fichaCell(s) + advPanel(s, canG) + '<div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
     + '<h3 class="sec-t">Playlist</h3>' + (s.status === 'novo' ? '<p class="hint">Ecrã ainda sem ligação do player: a ordem abaixo é uma simulação do que vai passar quando ele ligar.</p>' : '') + playlistHtml(s) + (s.status === 'novo' ? '' : proofLogHtml(s))
@@ -6790,7 +6812,7 @@ function fichaCell(s) {
   const f = (state.fichas || {})[s.id], adm = !!(state.user && state.user.admin);
   if (!f && !adm) return '';
   const lab = (t, ico)=>'<label class="btn sm" style="cursor:pointer">' + (ico ? ic(ico) : '') + t + '<input type="file" class="ficha-in" accept="application/pdf,.pdf" data-id="' + s.id + '" hidden></label>';
-  return '<div><dt>Ficha técnica</dt><dd style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
+  return '<div class="fw"><dt>Ficha técnica</dt><dd style="display:flex;flex-wrap:wrap;align-items:center;gap:8px">'
     + (f ? '<button class="btn sm" data-a="ficha-dl" data-id="' + s.id + '" title="' + esc(f.name) + ' · ' + fichaSize(f.size) + '">' + ic('download') + 'Descarregar ficha técnica</button>'
       + (adm ? lab('Substituir') + '<button class="btn sm" data-a="ficha-del" data-id="' + s.id + '" style="color:var(--bad)" title="Remover ficha técnica" aria-label="Remover ficha técnica">' + ic('trash') + '</button>' : '')
       : '<span class="muted">Ainda não há ficha técnica.</span>' + lab('Adicionar PDF', 'upload'))
