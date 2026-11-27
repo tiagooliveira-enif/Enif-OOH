@@ -221,6 +221,52 @@ async function main() {
   ok('o disco enviado em bytes (player antigo) aparece em GB', (d => d && d.total === 128 && d.free === 94)((await call('GET', '/api/state', undefined, top)).j.screens[0].disk));
   await hb({ disk: { free: 94.5, total: 128 } });
   ok('o disco enviado em GB fica em GB', (d => d && d.total === 128 && d.free === 94.5)((await call('GET', '/api/state', undefined, top)).j.screens[0].disk));
+  // ---- saúde do ecrã, disco real do Windows e reinícios
+  {
+    const T0 = Date.now() - 3600000;
+    await hb({ boot: T0 }); await hb({ boot: T0 });
+    await hb({ boot: T0 + 600000 });
+    let h = (await call('GET', '/api/screens/ECR-001/saude', undefined, top));
+    ok('a saúde do ecrã exige sessão', (await call('GET', '/api/screens/ECR-001/saude')).s === 401);
+    ok('cada arranque do player conta uma vez só', h.s === 200 && h.j.boots.filter(b => b.kind === 'player').length === 2 && h.j.boots[0].ts === T0 + 600000);
+    ok('a saúde traz sinais perdidos e vídeos a falhar (listas)', Array.isArray(h.j.gaps) && Array.isArray(h.j.fails));
+    ok('ecrã que não existe: 404', (await call('GET', '/api/screens/ECR-999/saude', undefined, top)).s === 404);
+    ok('o sysinfo recusa chave errada', (await call('POST', '/api/player/sysinfo', { code: 'ECR-001', key: 'x', diskFreeGB: 10, diskTotalGB: 100 })).s === 401);
+    ok('o sysinfo recusa disco impossível', (await call('POST', '/api/player/sysinfo', { code: 'ECR-001', key, diskFreeGB: 500, diskTotalGB: 100 })).s === 400);
+    ok('o sysinfo guarda o disco real e o arranque do PC', (await call('POST', '/api/player/sysinfo', { code: 'ECR-001', key, diskFreeGB: 51.234, diskTotalGB: 237.9, boot: T0 - 86400000 })).s === 200);
+    const d1 = (await call('GET', '/api/state', undefined, top)).j.screens[0].disk;
+    ok('o disco real aparece em GB com 1 decimal', d1.free === 51.2 && d1.total === 237.9);
+    await hb({ disk: { free: 1, total: 2 } });
+    ok('com o disco do Windows ativo, o disco aproximado do browser não o substitui', (d => d.free === 51.2 && d.total === 237.9)((await call('GET', '/api/state', undefined, top)).j.screens[0].disk));
+    h = await call('GET', '/api/screens/ECR-001/saude', undefined, top);
+    ok('o arranque do PC (há mais de 24 h) fica de fora; os do player ficam', !h.j.boots.some(b => b.kind === 'pc'));
+    await call('POST', '/api/player/sysinfo', { code: 'ECR-001', key, diskFreeGB: 51.2, diskTotalGB: 237.9, boot: Date.now() - 7200000 });
+    h = await call('GET', '/api/screens/ECR-001/saude', undefined, top);
+    ok('o arranque recente do PC aparece na saúde', h.j.boots.some(b => b.kind === 'pc'));
+    db.prepare('UPDATE live SET sys_ts=NULL WHERE screen=?').run('ECR-001');
+    await hb({ disk: { free: 94.5, total: 128 } });
+
+    // qualidade do vídeo lida no servidor + ignorar o aviso + alerta «Vídeo a falhar»
+    const vf = path.join(tmp, 'q60.mp4');
+    require('node:child_process').execFileSync('ffmpeg', ['-y', '-v', 'error', '-f', 'lavfi', '-i', 'testsrc=size=1080x1920:rate=60', '-t', '2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', vf]);
+    const vq = await up(top, 'q60.mp4', 'video/mp4', fs.readFileSync(vf));
+    ok('o servidor lê o codec, os fps e o débito do vídeo', vq.s === 200 && vq.j.q && vq.j.q.codec === 'h264' && vq.j.q.fps === 60 && vq.j.q.mbps >= 0 && vq.j.q.w === 1080 && !vq.j.qIgn);
+    const vq2 = await up(top, 'q60b.mp4', 'video/mp4', fs.readFileSync(vf), '&qign=1');
+    ok('o aviso pode ser ignorado logo ao carregar', vq2.s === 200 && vq2.j.qIgn === true);
+    const failN = n => call('POST', '/api/player/plays', { code: 'ECR-001', key, plays: Array.from({ length: n }, (_, i) => ({ pid: 'vf' + Math.random().toString(36).slice(2) + i, c: 'C1', f: vq.j.id, ts: Date.now(), dur: 0, ok: 0, why: 'erro' })) });
+    await failN(2);
+    ok('2 falhas não fazem alerta', !(await call('GET', '/api/state', undefined, top)).j.alerts.some(a => a.title === 'Vídeo a falhar'));
+    await failN(2);
+    h = await call('GET', '/api/screens/ECR-001/saude', undefined, top);
+    ok('4 falhas: o vídeo aparece na saúde do ecrã', h.j.fails.length === 1 && h.j.fails[0].n === 4 && h.j.fails[0].name === 'q60.mp4' && h.j.fails[0].qIgn === false);
+    ok('4 falhas: aparece o alerta «Vídeo a falhar»', (await call('GET', '/api/state', undefined, top)).j.alerts.some(a => a.title === 'Vídeo a falhar' && /q60\.mp4/.test(a.detail)));
+    ok('quem não gere conteúdos não ignora o aviso', (await sync(tpl2, [op('contents', vq.j.id, { qIgn: true }, ['qIgn'])])).s === 403);
+    ok('ignorar o aviso do vídeo', (await sync(top, [op('contents', vq.j.id, { qIgn: true }, ['qIgn'])])).s === 200 && (await call('GET', '/api/state', undefined, top)).j.contents.find(c => c.id === vq.j.id).qIgn === true);
+    ok('vídeo com aviso ignorado deixa de dar alerta', !(await call('GET', '/api/state', undefined, top)).j.alerts.some(a => a.title === 'Vídeo a falhar'));
+    ok('ignorar fica no registo de auditoria', db.prepare("SELECT COUNT(*) n FROM audit WHERE what LIKE '%aviso de qualidade%'").get().n >= 1);
+    ok('voltar a avisar', (await sync(top, [op('contents', vq.j.id, { qIgn: false }, ['qIgn'])])).s === 200 && !(await call('GET', '/api/state', undefined, top)).j.contents.find(c => c.id === vq.j.id).qIgn);
+    db.prepare("DELETE FROM plays WHERE pid LIKE 'vf%'").run(); db.prepare('DELETE FROM plays_agg WHERE file=?').run(vq.j.id);   // as falhas de teste não contam para o resto
+  }
   const mk = (n, okv, hour) => Array.from({ length: n }, (_, i) => ({ pid: 'p' + Math.random().toString(36).slice(2) + i, c: 'C1', f: f1.j.id, ts: Date.now() - (hour ? 0 : 0), dur: 10, ok: okv ? 1 : 0 }));
   const batch = mk(12, true);
   r = await call('POST', '/api/player/plays', { code: 'ECR-001', key, plays: batch });

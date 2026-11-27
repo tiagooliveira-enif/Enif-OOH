@@ -114,6 +114,23 @@ $lnk2.Arguments = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File 
 $lnk2.IconLocation = "$edge,0"
 $lnk2.Save()
 
+# envia ao servidor o espaço livre do disco C: e a hora de arranque do PC (de 5 em 5 minutos), para a "Saúde do ecrã"
+$sysPs1 = @'
+try {
+  $d = Get-PSDrive -Name C
+  $boot = [DateTimeOffset]::new((Get-CimInstance Win32_OperatingSystem).LastBootUpTime).ToUnixTimeMilliseconds()
+  $corpo = @{ code = '__COD__'; key = '__CHV__'; diskFreeGB = [math]::Round($d.Free / 1GB, 1); diskTotalGB = [math]::Round(($d.Free + $d.Used) / 1GB, 1); boot = $boot } | ConvertTo-Json
+  Invoke-RestMethod -Uri '__SERV__/api/player/sysinfo' -Method Post -ContentType 'application/json' -Body $corpo -TimeoutSec 15 | Out-Null
+} catch { }
+'@
+$sysPs1 = $sysPs1.Replace('__SERV__', $Servidor).Replace('__COD__', $Codigo).Replace('__CHV__', $Chave)
+Set-Content -Path "$dir\sysinfo.ps1" -Value $sysPs1 -Encoding UTF8
+try {
+  $acao = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$dir\sysinfo.ps1`""
+  $gat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
+  Register-ScheduledTask -TaskName 'Enif sysinfo' -Action $acao -Trigger $gat -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
+} catch { Write-Host 'Aviso: não foi possível criar a tarefa do disco (o disco mostrado será aproximado).' -ForegroundColor Yellow }
+
 # nunca suspender nem desligar o ecrã
 powercfg /change standby-timeout-ac 0
 powercfg /change monitor-timeout-ac 0

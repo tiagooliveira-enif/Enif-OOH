@@ -1993,6 +1993,92 @@ iframe.prev-media {
   letter-spacing: 0.04em;
   margin: 18px 0 6px;
 }
+.sec-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+}
+.sec-row .sec-t {
+  margin: 0;
+}
+.qbox {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ok);
+  border-radius: 8px;
+  font-size: 13px;
+}
+.qbox.q-ign {
+  border-left-color: var(--muted);
+}
+.qbox.q-warn {
+  border-left-color: #e0b341;
+}
+.qbox.q-bad {
+  border-left-color: #e5645a;
+}
+.qbox > b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.qbox svg.i {
+  width: 16px;
+  height: 16px;
+}
+.qgrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+.qbox ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+.health {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.hl {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.hl b {
+  font-size: 20px;
+}
+.hl.warn {
+  border-color: #e0b341;
+}
+.hfs {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+.hf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.hf > div {
+  flex: 1 1 240px;
+}
+.hf small {
+  flex: 1 1 100%;
+}
 .log {
   display: flex;
   gap: 12px;
@@ -3822,6 +3908,7 @@ const P = {
   alert:'<path d="M12 4 2.5 20h19z"/><path d="M12 10v4.5M12 17.5v.01"/>',
   off:'<path d="M3 3l18 18"/><path d="M8.5 16.5a5 5 0 0 1 7-7M5 13a9 9 0 0 1 4-3M2 9.5A14 14 0 0 1 8 6M12 20v.01"/>',
   upload:'<path d="M12 16V4M7 9l5-5 5 5M4 20h16"/>',
+  heart:'<path d="M20.8 5.6a5 5 0 0 0-7.1 0L12 7.3l-1.7-1.7a5 5 0 0 0-7.1 7.1l1.7 1.7L12 21l7.1-6.6 1.7-1.7a5 5 0 0 0 0-7.1z"/>',
   sliders:'<path d="M4 7h10M18 7h2M4 17h2M10 17h10"/><circle cx="16" cy="7" r="2"/><circle cx="8" cy="17" r="2"/>',
   left:'<path d="m15 5-7 7 7 7"/>',
   right:'<path d="m9 5 7 7-7 7"/>',
@@ -5089,6 +5176,30 @@ function playerBox(s) {
 function pairModal(s) {
   modal('<div class="modal-h"><h2>Ecrã registado</h2><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b"><p><b>' + esc(s.venue) + ' · ' + esc(s.spot) + '</b> (' + esc(s.id) + ') já está na lista.</p><p class="muted" style="margin-top:6px">Quando o player se ligar, o estado passa a Online.</p>' + playerBox(s) + '</div><div class="modal-f"><button class="btn primary" data-a="close">Concluir</button></div>');
 }
+/* ---------- saúde do ecrã (últimas 24 h): reinícios, sinais perdidos e vídeos a falhar ---------- */
+const healthCache = {};
+function healthNum(h) {return h ? h.fails.filter(f=>{const x = fileById(f.id); return !(x && x.qIgn);}).length + (h.gaps.length > 2 ? 1 : 0) : 0;}
+function healthCell(s) {
+  if (s.status === 'novo') return '';
+  const h = healthCache[s.id], n = healthNum(h);
+  return '<div class="fw"><dt>Saúde do ecrã</dt><dd><button type="button" class="btn sm" data-a="health" data-id="' + s.id + '">' + ic('heart') + 'Últimas 24 h' + (n ? ' <span class="pill warn" style="margin-left:6px">' + n + (n === 1 ? ' aviso' : ' avisos') + '</span>' : '') + '</button></dd></div>';
+}
+function healthModal(id, h) {
+  const s = screens.find(x=>x.id === id); if (!s) return;
+  const hm = ts=>{const d = new Date(ts); return pad(d.getHours()) + ':' + pad(d.getMinutes());}, dm = ts=>{const d = new Date(ts); return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + hm(ts);};
+  const gapMin = h.gaps.reduce((a, g)=>a + g.min, 0), nF = h.fails.length;
+  const tile = (l, v, sub, cls)=>'<div class="hl ' + (cls || '') + '"><span class="muted">' + l + '</span><b>' + v + '</b><small class="muted">' + sub + '</small></div>';
+  const rows = h.fails.map(function(f) {
+    const x = fileById(f.id), c = x ? qCheck(x) : null;
+    return '<div class="hf"><div><b>' + esc(f.name) + '</b><span class="muted"> · falhou ' + f.n + ' vezes · última às ' + hm(f.last) + '</span></div>' + (c && c.lvl !== 'ok' && !x.qIgn ? '<small class="muted">' + esc(c.msgs[0]) + '</small>' : '') + (x ? '<button class="btn sm ghost" data-a="content-view" data-id="' + x.id + '">Ver conteúdo</button>' : '') + '</div>';
+  }).join('');
+  modal('<div class="modal-h"><div><h2>Saúde do ecrã</h2><p class="muted">' + esc(s.venue) + ' · ' + esc(s.spot) + ' · ' + s.id + ' · últimas 24 horas</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">'
+    + '<div class="health">' + tile('Reinícios', h.boots.length, h.boots.length ? 'última às ' + hm(h.boots[0].ts) : 'nenhum', '') + tile('Sinais perdidos', h.gaps.length, h.gaps.length ? gapMin + ' min no total' : 'nenhum', h.gaps.length > 2 ? 'warn' : '') + tile('Vídeos com falhas', nF, nF ? 'ver abaixo' : 'nenhum', nF ? 'warn' : '') + '</div>'
+    + (h.gaps.length ? '<h3 class="sec-t">Sinais perdidos</h3>' + h.gaps.map(g=>'<div class="log warn"><time style="width:auto;white-space:nowrap">' + dm(g.ts) + '</time><span>Sem sinal durante ' + g.min + ' min</span></div>').join('') : '')
+    + (h.boots.length ? '<h3 class="sec-t">Reinícios</h3>' + h.boots.map(b=>'<div class="log"><time style="width:auto;white-space:nowrap">' + dm(b.ts) + '</time><span>' + (b.kind === 'pc' ? 'O PC arrancou' : 'O player reiniciou (pedido, atualização ou PC ligado)') + '</span></div>').join('') : '')
+    + (nF ? '<h3 class="sec-t">Vídeos a falhar</h3><div class="hfs">' + rows + '</div>' : '<p class="hint" style="margin:12px 0 0">Sem vídeos a falhar nas últimas 24 horas.</p>')
+    + '</div><div class="modal-f"><button class="btn" data-a="open-screen" data-id="' + id + '">Voltar ao ecrã</button></div>');
+}
 function screenModal(id) {
   const s = screens.find(x=>x.id === id); if (!s) return;
   const pl = playingOn(s);
@@ -5096,14 +5207,29 @@ function screenModal(id) {
   const canG = can('ecras.gerir'), canA = can('alertas.resolver');
   const ai = al.filter(a=>a.sev === 'ia').map(a=>'<div class="ai-box">' + ic('spark') + '<span class="hint">' + esc(a.detail) + '</span></div>').join('');
   modal('<div class="modal-h"><div><h2>' + esc(s.venue) + ' · ' + esc(s.spot) + (canG ? ' <button class="btn ghost sm name-edit" data-a="edit-name" data-id="' + s.id + '" aria-label="Alterar o nome do ecrã" title="Alterar o nome">' + ic('pencil') + '</button>' : '') + '</h2><p class="muted mono">' + s.id + ' · ' + esc(s.city) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div>'
-    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div><div><dt>Tipo</dt><dd>' + esc(s.type) + '</dd></div><div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div><div class="fw"><dt>Disco do PC</dt><dd>' + (s.disk ? gbTxt(s.disk.total - s.disk.free) + ' de ' + gbTxt(s.disk.total) + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + gbTxt(s.disk.free) + ' GB</span>') : '—') + '</dd></div>'
+    + '<div class="modal-b">' + ai + '<dl class="facts"><div><dt>Estado</dt><dd>' + statusPill(s.status) + '</dd></div>'
+    + '<div><dt>Disco do PC</dt><dd>' + (s.disk ? gbTxt(s.disk.total - s.disk.free) + ' de ' + gbTxt(s.disk.total) + ' GB usados ' + (diskLow(s) ? '<span class="pill bad">Quase cheio</span>' : '<span class="pill ok">Livre ' + gbTxt(s.disk.free) + ' GB</span>') : '—') + '</dd></div>'
+    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div>'
+    + '<div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div>'
     + '<div><dt>Brilho</dt><dd>' + briTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-bri" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
-    + '<div><dt>Última ligação</dt><dd>' + (s.ping || '—') + '</dd></div><div><dt>Disponibilidade (7 dias)</dt><dd>' + (s.uptime || '—') + '</dd></div><div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div><div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + '<div><dt>Localização</dt><dd>' + locTxt(s, canG ? '<button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + advCell(s, canG) + fichaCell(s) + advPanel(s, canG) + '<div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
+    + '<div><dt>Horário</dt><dd>' + esc(schedTxt(s)) + (canG ? ' <button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
+    + '<div><dt>A reproduzir</dt><dd>' + (pl.length ? esc(pl[0].name) + (pl.length > 1 ? ' <span class="muted">+' + (pl.length - 1) + '</span>' : '') : (s.status !== 'novo' && !isOnNow(s) ? 'Desligado' : '—')) + '</dd></div>'
+    + '<div><dt>Resolução</dt><dd>' + resTxt(s) + (canG ? ' <button class="btn sm ghost" data-a="edit-res" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>'
+    + healthCell(s)
+    + '<div><dt>Localização</dt><dd>' + locTxt(s, canG ? '<button class="btn sm ghost" data-a="edit-place" data-id="' + s.id + '">Alterar</button>' : '') + '</dd></div>' + advCell(s, canG) + fichaCell(s) + advPanel(s, canG) + '<div style="grid-column:1/-1"><dt>Estimativa de audiência</dt><dd style="font-weight:500">' + confBox(s) + '</dd></div></dl>'
     + '<h3 class="sec-t">Playlist</h3>' + (s.status === 'novo' ? '<p class="hint">Ecrã ainda sem ligação do player: a ordem abaixo é uma simulação do que vai passar quando ele ligar.</p>' : '') + playlistHtml(s) + (s.status === 'novo' ? '' : proofLogHtml(s))
     + '<h3 class="sec-t">Registo recente</h3>' + logsFor(s).map(l=>'<div class="log ' + l[2] + '"><time>' + l[0] + '</time><span>' + esc(l[1]) + '</span></div>').join('')
     + failsHtml(s)
     + (canG ? playerBox(s) : '') + '</div>'
     + '<div class="modal-f scr-f"><div class="scr-acts">' + (al.length && canA ? '<button class="btn" data-a="resolve-screen" data-id="' + s.id + '">Resolver alertas</button>' : '') + ((canG || can('playlist.gerir')) && s.status !== 'novo' && s.status !== 'offline' ? '<button class="btn" data-a="sync-now" data-id="' + s.id + '">Atualizar agora</button>' : '') + (canG && s.status !== 'novo' ? '<button class="btn" data-a="restart" data-id="' + s.id + '">Reiniciar player</button>' : '') + (canG && s.status !== 'novo' && s.status !== 'offline' ? '<button class="btn" data-a="screen-test" data-id="' + s.id + '">Teste no ecrã</button>' : '') + (canG ? '<button class="btn" data-a="del-screen" data-id="' + s.id + '" style="color:var(--bad)">Eliminar ecrã</button>' : '') + '</div><button class="btn primary" data-a="close">Fechar</button></div>');
+  if (s.status !== 'novo' && !healthCache[id])loadHealth(id);
+}
+function loadHealth(id) {
+  api('GET', '/api/screens/' + encodeURIComponent(id) + '/saude').then(function(h) {
+    healthCache[id] = h;
+    const b = document.querySelector('#modal-root [data-a="health"][data-id="' + id + '"]'), c = b ? b.closest('dd') : null;
+    if (c) c.innerHTML = healthCell(screens.find(x=>x.id === id)).replace(/^<div[^>]*><dt>[^<]*<\/dt><dd>/, '').replace(/<\/dd><\/div>$/, '');
+  }).catch(function() {/* sem ação: o botão continua a funcionar */});
 }
 const failsState = {};
 function failsHtml(s) {
@@ -5651,7 +5777,9 @@ const MANUAL = {
    ['Área do PC', 'Por defeito o player ocupa o ecrã inteiro do PC. Se o painel LED só mostra uma parte do ecrã do PC (por exemplo, o canto superior esquerdo), escolha em «Área do PC» o canto ou o centro: o player passa a desenhar só com o tamanho da resolução do ecrã e deixa o resto do PC a preto.', 'ecras.gerir'],
    ['Margem oculta', 'Se o painel esconde uma faixa do ecrã (por exemplo uma moldura ou uma montra à frente), em «Margem oculta» carregue em «Definir margem» (ou «Alterar margem») e indique quantos píxeis ficam tapados em cima, em baixo, à esquerda e à direita. O player deixa essa faixa a preto e a área visível passa a ser o resto. «Nenhuma» tira a margem. A compatibilidade dos conteúdos continua a usar a resolução do ecrã, sem contar com a margem.', 'ecras.gerir'],
    ['Reiniciar o player e Teste no ecrã', '«Reiniciar player» reinicia o programa do ecrã. «Teste no ecrã» mostra durante 30 segundos uma imagem de teste, para confirmar a posição e a resolução.'],
-   ['Alterar dados', 'Ao lado da resolução, do horário e da localização há o botão «Alterar».'],
+   ['Saúde do ecrã (últimas 24 horas)', 'Na ficha do ecrã, o botão «Últimas 24 h» abre um resumo: reinícios do player ou do PC, sinais perdidos (só conta quando o ecrã devia estar ligado) e vídeos que falharam. Se houver avisos, aparece um número ao lado do botão. Cada vídeo a falhar tem «Ver conteúdo», que mostra a qualidade do ficheiro. Quando um vídeo falha 3 ou mais vezes num dia, nasce o alerta «Vídeo a falhar».'],
+   ['Disco do PC', 'Nos PCs com Windows o disco mostrado é o do disco C: (o instalador envia-o de 5 em 5 minutos). Nas caixas Android é um valor aproximado.'],
+   ['Alterar dados', 'Ao lado da resolução, do horário, do brilho e da localização há o botão «Alterar». Em «Resolução» altera também o tipo do ecrã (totem vertical, painel horizontal, videowall ou outro).'],
    ['Eliminar ecrã', 'Só quando o ecrã já não existir. Pede confirmação.']]}],
   tips:[['O estado «Por emparelhar» significa que o código ainda não foi introduzido no player.'], ['Fora do horário de funcionamento (ligar e desligar), a imagem do ecrã fica totalmente preta, mesmo que o painel continue ligado.'], ['O brilho de cada ecrã fica guardado na ficha, em «Brilho» e «Alterar» (Automático por horário ou Manual). Por agora a plataforma ainda não o aplica ao painel: ajuste-o na NovaLCT.', 'ecras.gerir']]},
  campanhas:{t:'Campanhas', intro:'Uma campanha diz o que passa, onde, quando e com que frequência.', blocks:[
@@ -5686,7 +5814,9 @@ const MANUAL = {
    ['Carregue os ficheiros', 'Use «Carregar conteúdos» ou largue os ficheiros na zona tracejada.'],
    ['Espere pela leitura', 'A plataforma lê a resolução de cada ficheiro e abre a janela «Ecrãs de cada conteúdo».'],
    ['Escolha os ecrãs de cada ficheiro', 'É obrigatório e nada vem marcado: escolha um a um os ecrãs onde o conteúdo pode passar. «Marcar os compatíveis» ajuda, e «Limpar» desfaz. Os ecrãs com proporção diferente (mais de 10 píxeis) ficam desativados, a não ser que o ecrã tenha o ajuste «Esticar», que aceita qualquer proporção (a imagem deforma para encher o ecrã).'],
-   ['Confirme', 'O ficheiro entra na biblioteca. Se não servir a nenhum ecrã, não é carregado e a plataforma diz porquê.']]},
+   ['Confirme', 'O ficheiro entra na biblioteca. Se não servir a nenhum ecrã, não é carregado e a plataforma diz porquê.'],
+   ['Veja o aviso de qualidade dos vídeos', 'A plataforma lê o codec, os fps e o débito de cada vídeo. Se for pesado (por exemplo 60 fps, débito acima de 8 Mbps, mais de Full HD ou um codec que as caixas Android não aceitam bem), o cartão mostra «Atenção ao vídeo» e aparece uma faixa no topo com «Ver só esses». Abra o vídeo para ver o motivo. O ideal é H.264, 30 fps e até 8 Mbps.'],
+   ['Ignorar um aviso', 'Se sabe que o vídeo está bem, abra-o e carregue em «Ignorar aviso». O aviso deixa de aparecer em todo o lado (faixa, cartão e alertas) e só fica na janela do próprio vídeo, onde pode carregar em «Voltar a avisar».', 'conteudos.gerir']]},
   {h:'Organizar', steps:[
    ['Veja um conteúdo', 'Carregue na imagem do cartão para abrir o vídeo (ou a imagem) numa janela e vê-lo como vai passar no ecrã. O cartão dos vídeos mostra a primeira imagem, para os reconhecer sem abrir.'],
    ['Mude a vista', 'Em «Cartões» vê cada conteúdo com a sua imagem; em «Lista» vê uma linha por conteúdo, com as campanhas, os ecrãs e a pasta. A escolha fica guardada na sua conta. Nas duas pode carregar na miniatura para ver o vídeo.'],
@@ -5796,7 +5926,7 @@ function viewContentBase() {
   const cur = folderById(fo);
   const newBtn = cG ? '<button class="btn sm" data-a="new-folder">' + ic('plus') + 'Nova pasta</button>' : '';
   const folderBtns = cG && cur ? '<span class="c-fa"><button class="btn sm" data-a="rename-folder" data-id="' + cur.id + '">Renomear</button><button class="btn sm ghost" data-a="del-folder" data-id="' + cur.id + '">Eliminar pasta</button></span>' : '';
-  const shownC = contents.filter(x=>inF(x, fo) && (f === 'todos' || x.type === f) && (state.cview !== 'exp' || (leftDays(x) !== null && leftDays(x) <= CLEAN_WARN)));
+  const shownC = contents.filter(x=>inF(x, fo) && (f === 'todos' || x.type === f) && (!state.cwarn || qAct(x)) && (state.cview !== 'exp' || (leftDays(x) !== null && leftDays(x) <= CLEAN_WARN)));
   if (state.csort === 'size')shownC.sort((a, b)=>sizeBytes(b.size) - sizeBytes(a.size));
   const rowsL = [];
   const tiles = shownC.map(function(x) {
@@ -5808,7 +5938,7 @@ function viewContentBase() {
       + (!x.house || isAdm() ? '<button type="button" class="btn sm" data-a="cont-screens" data-id="' + x.id + '" title="Ecrãs onde este conteúdo pode passar">Alterar ecrãs</button>' : '')
       + (!x.house || isAdm() ? '<button type="button" class="btn sm tile-del" data-a="del-content" data-id="' + x.id + '" title="Eliminar este conteúdo" aria-label="Eliminar ' + esc(x.name) + '">' + ic('trash') + '<span class="tx">Eliminar</span></button>' : '')
       + '</div>' : '') : '';
-    const meta = !x.ready ? 'A preparar o conteúdo…' : (x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size);
+    const meta = !x.ready ? 'A preparar o conteúdo…' : (x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size) + qChip(x);
     const pills = cs.map(k=>'<span class="pill">' + esc(k.name) + (cG ? '<button class="pill-x" data-a="unassoc" data-id="' + x.id + '" data-c="' + k.id + '" aria-label="Retirar da campanha ' + esc(k.name) + '">' + ic('x') + '</button>' : '') + '</span>').join('');
     const sel = '';
     const fol = x.folder ? folderById(x.folder) : null;
@@ -5818,7 +5948,7 @@ function viewContentBase() {
     rowsL.push('<tr><td><div class="cl-main">' + thumbH(' cl-th') + '<div class="cl-n"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted">' + meta + '</span></div></div></td><td>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted">Sem campanha</span>') + '</td><td class="cl-hide">' + (x.ready ? '<span class="muted">' + contScrTxt(x) + '</span>' : '') + '<div class="cl-a">' + acts + '</div></td><td class="cl-hide">' + fsel + '</td><td class="cl-hide">' + expLine(x, cG) + '</td></tr>');
     return '<article class="card tile">' + thumbH('') + '<div class="tile-b"><strong class="ell" title="' + esc(x.name) + '">' + esc(x.name) + '</strong><span class="muted" style="font-size:13px">' + meta + '</span>' + ((pills || x.house) ? '<div class="pills">' + (x.house ? '<span class="pill accent">Spot da Enif</span>' : '') + pills + '</div>' : '<span class="muted" style="font-size:13px">Sem campanha</span>') + expLine(x, cG) + scrLine + sel + fsel + '</div></article>';
   }).join('');
-  return upBanner() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
+  return upBanner() + warnBanner() + (cG ? '<div class="drop" id="drop">' + ic('upload') + '<b>Largue aqui os ficheiros</b><span class="muted">Imagens, vídeos e HTML5. Ao carregar, escolhe os ecrãs onde cada conteúdo pode passar.' + (cur ? ' Entram na pasta «' + esc(cur.name) + '».' : '') + '</span><button class="btn sm" data-a="pick-files">Escolher ficheiros</button></div>' : '')
     + '<div class="tools" style="margin-bottom:10px"><div class="seg sm" role="group" aria-label="Tipo de conteúdo">' + chips + '</div><div class="tools c-tools-r">' + newBtn + '<label class="field-inline" for="c-folder"><select id="c-folder" data-a-change="folderSel" aria-label="Pasta" style="width:auto">' + fopts + '</select></label>' + folderBtns + '</div></div>'
     + '<div class="tools" style="margin-top:0"><span class="hint" style="margin:0">' + shownC.length + (shownC.length === 1 ? ' ficheiro' : ' ficheiros') + ' · ' + fmtBytes(shownC.reduce((a, x)=>a + sizeBytes(x.size), 0)) + ' · armazenamento do servidor: ' + diskInfo().pct.toFixed(0) + ' % usado (' + fmtBytes(diskInfo().free) + ' livres)</span><span style="flex:1"></span><div class="seg sm" role="group" aria-label="Vista dos conteúdos"><button class="seg-b" data-a="cmode" data-m="cards" aria-pressed="' + (state.cmode !== 'list') + '">Cartões</button><button class="seg-b" data-a="cmode" data-m="list" aria-pressed="' + (state.cmode === 'list') + '">Lista</button></div><label class="field-inline" for="c-sort"><span class="lab">Ordenar</span><select id="c-sort" aria-label="Ordenar" data-a-change="csort" style="width:auto"><option value="recent"' + (state.csort === 'recent' ? ' selected' : '') + '>Mais recentes</option><option value="size"' + (state.csort === 'size' ? ' selected' : '') + '>Maior tamanho</option></select></label></div>'
     + (diskInfo().pct >= 80 ? '<div class="banner">' + ic('alert') + '<p><b>Armazenamento quase cheio:</b> ' + diskInfo().pct.toFixed(0) + ' % usado. Apague conteúdos que já não usa ou aumente o espaço do servidor.</p></div>' : '')
@@ -5871,6 +6001,35 @@ function screenPick(name, f, chosen) {
 }
 const resShown = f=>f.res && f.res !== 'Responsivo' ? esc(f.res) : (f.res === 'Responsivo' ? 'responsivo' : 'não detetada');
 let pendUp = null;
+/* ---------- qualidade do vídeo (lida no servidor com o ffprobe, ao carregar) ---------- */
+const Q_MAX_MBPS = 8, Q_BAD_MBPS = 15;
+function qCheck(x) {
+  if (!x || x.type !== 'Vídeo' || !x.q || x.q.none || !x.q.codec) return null;
+  const q = Object.assign({res:x.res, dur:x.dur}, x.q), m = [], d = dimsOf(q.res); let lvl = 'ok';
+  const fm = n=>String(n).replace('.', ',');
+  if (!/264/.test(q.codec)) {m.push('Codec ' + q.codec.toUpperCase() + ': pode não reproduzir em todos os ecrãs (caixas Android). Recomendado H.264.'); lvl = 'warn';}
+  if (q.fps > 30.5) {m.push(fm(Math.round(q.fps)) + ' fps pesam mais e não se notam num ecrã de rua. 30 fps chega.'); lvl = 'warn';}
+  if (q.mbps > Q_BAD_MBPS) {m.push('Débito muito alto (' + fm(q.mbps) + ' Mbps). Pode engasgar; recomendado até ' + Q_MAX_MBPS + ' Mbps.'); lvl = 'bad';}
+  else if (q.mbps > Q_MAX_MBPS) {m.push('Débito alto (' + fm(q.mbps) + ' Mbps). Recomendado até ' + Q_MAX_MBPS + ' Mbps.'); if (lvl === 'ok')lvl = 'warn';}
+  if (d && Math.max(d.w, d.h) > 1920) {m.push('Resolução acima de Full HD: os ecrãs raramente precisam e o ficheiro pesa mais.'); if (lvl === 'ok')lvl = 'warn';}
+  if (q.bit10) {m.push('Vídeo de 10 bits: muitas caixas Android não o reproduzem bem. Recomendado 8 bits.'); if (lvl === 'ok')lvl = 'warn';}
+  return {q:q, lvl:lvl, msgs:m};
+}
+const qAct = x=>{const c = qCheck(x); return c && c.lvl !== 'ok' && !x.qIgn ? c : null;};
+const qChip = x=>{const c = qAct(x); return c ? ' <span class="pill ' + c.lvl + '" title="' + esc(c.msgs.join(' ')) + '">' + (c.lvl === 'bad' ? 'Vídeo pesado' : 'Atenção ao vídeo') + '</span>' : '';};
+function qBox(x, mode) {
+  const c = qCheck(x); if (!c) return '';
+  const q = c.q, fmt = n=>String(n).replace('.', ',');
+  return '<div class="qbox q-' + (x.qIgn ? 'ign' : c.lvl) + '"><b>' + ic(c.lvl === 'ok' ? 'check' : 'alert') + (c.lvl === 'ok' ? 'Qualidade do vídeo: boa' : (x.qIgn ? 'Aviso de qualidade ignorado' : (c.lvl === 'bad' ? 'Qualidade do vídeo: pode engasgar' : 'Qualidade do vídeo: atenção'))) + '</b>'
+    + '<div class="qgrid"><span>' + esc(q.codec.toUpperCase()) + '</span><span>' + fmt(q.fps) + ' fps</span><span>' + fmt(q.mbps) + ' Mbps</span><span>' + esc(q.res || '') + '</span>' + (q.dur ? '<span>' + esc(q.dur) + '</span>' : '') + '</div>'
+    + (c.msgs.length ? '<ul>' + c.msgs.map(t=>'<li>' + esc(t) + '</li>').join('') + '</ul><p class="hint" style="margin:6px 0 0">Para resolver, converta o vídeo para H.264, 30 fps e até ' + Q_MAX_MBPS + ' Mbps antes de o carregar.</p>' : '')
+    + (c.lvl === 'ok' || !can('conteudos.gerir') ? '' : (mode === 'card' && x.id ? '<button class="btn sm' + (x.qIgn ? '' : ' primary') + '" style="margin-top:8px" data-a="q-ign" data-id="' + x.id + '">' + (x.qIgn ? 'Voltar a avisar' : 'Ignorar aviso') + '</button>' : '')) + '</div>';
+}
+function warnBanner() {
+  const n = contents.filter(x=>qAct(x)).length;
+  if (!n && !state.cwarn) return '';
+  return '<div class="banner">' + ic('alert') + '<p><b>' + n + (n === 1 ? ' vídeo pode' : ' vídeos podem') + ' engasgar nos ecrãs</b> (codec, fps ou débito acima do recomendado). ' + (state.cwarn ? 'A mostrar só esses.' : 'Abra o vídeo para ver o motivo.') + '</p><button class="btn sm" data-a="cwarn">' + (state.cwarn ? 'Ver todos' : 'Ver só esses') + '</button></div>';
+}
 function uploadModal() {
   const L = pendUp; if (!L || !L.length) return;
   const blocks = L.map(function(u, i) {
@@ -6128,7 +6287,7 @@ function cropPrev(id) {
 }
 function resModal(id) {
   const s = screens.find(x=>x.id === id); if (!s) return;
-  modal('<form data-form="res" data-id="' + id + '" novalidate><div class="modal-h"><h2>Resolução do ecrã</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b"><p class="muted" style="margin-bottom:14px">' + esc(s.venue) + ' · ' + esc(s.spot) + '</p>' + resField(s.res) + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Guardar</button></div></form>');
+  modal('<form data-form="res" data-id="' + id + '" novalidate><div class="modal-h"><h2>Resolução e tipo do ecrã</h2><button type="button" class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b"><p class="muted" style="margin-bottom:14px">' + esc(s.venue) + ' · ' + esc(s.spot) + '</p><div class="field"><label for="rs-type">Tipo de ecrã</label><select id="rs-type" name="type">' + typeNames.map((t, i)=>'<option value="' + i + '"' + (t === s.type ? ' selected' : '') + '>' + t + '</option>').join('') + '</select></div>' + resField(s.res) + '<p class="err" id="form-err" role="alert"></p></div><div class="modal-f"><button type="button" class="btn" data-a="close">Cancelar</button><button class="btn primary" type="submit">Guardar</button></div></form>');
 }
 
 /* ---------- relatórios ---------- */
@@ -6943,7 +7102,7 @@ function serDoc(coll, o) {
     d.pauses = (o.pauses || []).map(function(p) {return {from:iso(p.from), to:p.to ? iso(p.to) : null};});
     d.items = o.items.map(function(i) {return {f:i.f, h0:isNil(i.h0) ? null : i.h0, h1:isNil(i.h1) ? null : i.h1, d0:i.d0 ? iso(i.d0) : null, d1:i.d1 ? iso(i.d1) : null, ppm:i.ppm || 1};});
   } else if (coll === 'folders') {d.name = o.name;}
-  else if (coll === 'contents') {d.folder = o.folder || null; d.screens = Array.isArray(o.screens) ? o.screens.slice() : null; d.house = !!o.house;}
+  else if (coll === 'contents') {d.folder = o.folder || null; d.screens = Array.isArray(o.screens) ? o.screens.slice() : null; d.house = !!o.house; d.qIgn = !!o.qIgn;}
   else if (coll === 'users') {
     USR_KEYS.forEach(function(k) {d[k] = o[k] === undefined ? null : o[k];});
     d.until = o.until ? iso(o.until) : null; d.photo = o.photo || null;
@@ -7122,12 +7281,22 @@ const actions = {
     const media = x.type === 'Vídeo' && x.src ? '<video class="prev-media" src="' + x.src + '" controls autoplay playsinline></video>'
       : (x.type === 'Imagem' && x.url ? '<img class="prev-media" src="' + x.url + '" alt="' + esc(x.name) + '">'
         : (x.type === 'HTML5' && x.src ? '<iframe class="prev-media" src="' + x.src + '" sandbox="allow-scripts" title="' + esc(x.name) + '"></iframe>' : '<p class="muted">Não há pré-visualização para este conteúdo na demonstração.</p>'));
-    modal('<div class="modal-h"><div><h2>' + esc(x.name) + '</h2><p class="muted">' + esc(x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">' + media + '</div>');
+    modal('<div class="modal-h"><div><h2>' + esc(x.name) + '</h2><p class="muted">' + esc(x.type + ' · ' + x.res + (x.dur ? ' · ' + x.dur : '') + ' · ' + x.size) + '</p></div><button class="btn ghost sm" data-a="close" aria-label="Fechar">' + ic('x') + '</button></div><div class="modal-b">' + qBox(x, 'card') + media + '</div>');
   },
+  'q-ign':function(t) {
+    if (!guard('conteudos.gerir')) return;
+    const x = fileById(t.dataset.id); if (!x) return;
+    x.qIgn = !x.qIgn;
+    audit(x.qIgn ? 'Ignorou o aviso de qualidade do vídeo' : 'Voltou a mostrar o aviso de qualidade do vídeo', x.name);
+    toast(x.qIgn ? 'Aviso ignorado. Só aparece aqui, no cartão do vídeo.' : 'O aviso voltou a aparecer.');
+    render(); actions['content-view'](t);
+  },
+  cwarn:function() {state.cwarn = !state.cwarn; render();},
   backdrop:function(t, e) {if (e.target === t)closeModal();},
   'open-screen':function(t) {if (guard('ecras.ver'))screenModal(t.dataset.id);},
   'resolve-alert':function(t) {if (!guard('alertas.resolver')) return; extraOps.push({op:'del', coll:'alerts', id:t.dataset.id}); alerts = alerts.filter(a=>a.id !== t.dataset.id); toast('Alerta marcado como resolvido.'); render();},
   'resolve-screen':function(t) {if (!guard('alertas.resolver')) return; alerts.filter(a=>a.screen === t.dataset.id).forEach(a=>extraOps.push({op:'del', coll:'alerts', id:a.id})); alerts = alerts.filter(a=>a.screen !== t.dataset.id); closeModal(); toast('Alertas do ecrã resolvidos.'); render();},
+  health:function(t) {api('GET', '/api/screens/' + encodeURIComponent(t.dataset.id) + '/saude').then(function(h) {healthCache[t.dataset.id] = h; healthModal(t.dataset.id, h);}).catch(function(e) {toast('Não foi possível carregar a saúde do ecrã: ' + e.message);});},
   fails:function(t) {api('GET', '/api/screens/' + encodeURIComponent(t.dataset.id) + '/falhas').then(function(j) {failsState[t.dataset.id] = j; reopenScreen(t.dataset.id);}).catch(function(e) {toast('Não foi possível carregar as falhas: ' + e.message);});},
   'fails-hide':function(t) {delete failsState[t.dataset.id]; reopenScreen(t.dataset.id);},
   restart:function(t) {if (!guard('ecras.gerir')) return; closeModal(); api('POST', '/api/screens/' + encodeURIComponent(t.dataset.id) + '/restart', {}).then(function() {toast('Pedido de reinício enviado a ' + t.dataset.id + '. O player reinicia em instantes.');}).catch(function(e) {toast(e.message);});},
@@ -7838,7 +8007,7 @@ document.addEventListener('submit', function(e) {
     const s = screens.find(x=>x.id === f.dataset.id), rr = readRes(fd);
     if (!s) return;
     if (rr.err) {err.textContent = rr.err; return;}
-    s.res = rr.v; toast('Resolução de ' + s.id + ' atualizada.'); render(); screenModal(s.id); return;
+    s.res = rr.v; if (typeNames[+fd.get('type')])s.type = typeNames[+fd.get('type')]; toast('Resolução e tipo de ' + s.id + ' atualizados.'); render(); screenModal(s.id); return;
   }
   if (kind === 'repscreens') {
     const sel = fd.getAll('scr'), scope = repScope();

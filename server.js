@@ -14,7 +14,7 @@ const TZ = process.env.TZ_NAME || 'Europe/Lisbon';
 const MAX_UPLOAD = (+process.env.MAX_UPLOAD_MB || 6144) * 1048576;
 const ONLINE_MS = 150 * 1000;            // sem sinal de vida há mais de 2,5 min = offline
 const IDLE_MS = Math.round((+process.env.IDLE_MIN || 15) * 60000);   // a sessão termina se ninguém usar a página durante este tempo
-const PLAYER_VERSION = '16';              // mudar para obrigar os players a recarregar
+const PLAYER_VERSION = '17';              // mudar para obrigar os players a recarregar
 const MEDIA = path.join(DATA, 'media');
 fs.mkdirSync(MEDIA, { recursive: true });
 
@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS trusted(id TEXT PRIMARY KEY, user TEXT NOT NULL, hash
 CREATE INDEX IF NOT EXISTS trusted_hash ON trusted(hash);
 CREATE TABLE IF NOT EXISTS files(id TEXT PRIMARY KEY, mime TEXT, size INTEGER);
 CREATE TABLE IF NOT EXISTS live(screen TEXT PRIMARY KEY, first_seen INTEGER, last_seen INTEGER, now_c TEXT, now_f TEXT, ver TEXT, queue INTEGER DEFAULT 0, w INTEGER, h INTEGER, reload INTEGER DEFAULT 0);
+CREATE TABLE IF NOT EXISTS boots(screen TEXT NOT NULL, ts INTEGER NOT NULL, kind TEXT NOT NULL, PRIMARY KEY(screen,ts));
 CREATE TABLE IF NOT EXISTS beats(screen TEXT NOT NULL, minute INTEGER NOT NULL, PRIMARY KEY(screen,minute));
 CREATE TABLE IF NOT EXISTS plays(pid TEXT PRIMARY KEY, screen TEXT, camp TEXT, file TEXT, ts INTEGER, day TEXT, hour INTEGER, dur REAL, ok INTEGER);
 CREATE INDEX IF NOT EXISTS plays_rep ON plays(day,screen,camp,file,hour,ok,dur);   -- cobre a soma dos Relatórios (sem ir à tabela) e as consultas por dia
@@ -49,7 +50,7 @@ try { db.exec('ALTER TABLE plays ADD COLUMN why TEXT'); } catch (e) { /* já exi
 if (!db.prepare('SELECT 1 x FROM plays_agg LIMIT 1').get()) {                    // primeira vez: junta as passagens que já existem (uma só vez)
   db.exec("INSERT INTO plays_agg(screen,camp,file,day,hour,n,bad,sec) SELECT screen,camp,file,day,hour,SUM(ok),COUNT(*)-SUM(ok),SUM(CASE WHEN ok=1 THEN dur ELSE 0 END) FROM plays GROUP BY day,screen,camp,file,hour");
 }
-for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
+for (const col of ['disk_free INTEGER', 'disk_total INTEGER', 'bri INTEGER', 'boot INTEGER', 'sys_ts INTEGER', 'sys_boot INTEGER']) { try { db.exec('ALTER TABLE live ADD COLUMN ' + col); } catch (e) { /* já existe */ } }
 const q = (sql, ...a) => db.prepare(sql).all(...a);
 const q1 = (sql, ...a) => db.prepare(sql).get(...a);
 const run = (sql, ...a) => db.prepare(sql).run(...a);
@@ -387,6 +388,10 @@ function applyOp(user, op) {
       if (!user.admin) throw new HttpError(403, 'Só o administrador pode fazer isto.');
       n.house = wantHouse;
     }
+    if (d.qIgn !== undefined && !!d.qIgn !== !!old.qIgn) {
+      n.qIgn = !!d.qIgn; if (!n.qIgn) delete n.qIgn;
+      audit(user, n.qIgn ? 'Ignorou o aviso de qualidade do vídeo' : 'Voltou a mostrar o aviso de qualidade do vídeo', old.name);
+    }
     const scr = d.screens === undefined ? null : d.screens;
     const changedScreens = scr !== null && !same(scr, old.screens || null);
     if (changedScreens && (old.house || n.house) && !user.admin) throw new HttpError(403, 'Só o administrador pode alterar este conteúdo.');
@@ -443,6 +448,26 @@ function expectedMinutes(scr, from, to) {
     t = next;
   }
   return total;
+}
+/* vídeos que falharam nas últimas 24 h num ecrã (3 ou mais vezes) */
+function failingVideos(sid, since) {
+  return q('SELECT file, COUNT(*) n, MAX(ts) last FROM plays WHERE screen=? AND ok=0 AND ts>=? GROUP BY file HAVING n>=3 ORDER BY n DESC LIMIT 20', sid, since)
+    .map(r => ({ r, f: contentAny(r.file) })).filter(x => x.f && x.f.type === 'Vídeo')
+    .map(x => ({ id: x.f.id, name: x.f.name, n: x.r.n, last: x.r.last, qIgn: !!x.f.qIgn }));
+}
+/* saúde do ecrã nas últimas 24 h: sinais perdidos (só dentro do horário), reinícios e vídeos a falhar */
+function healthOf(sc) {
+  const now = Date.now(), lv = q1('SELECT first_seen FROM live WHERE screen=?', sc.id), from = Math.max(now - 864e5, lv && lv.first_seen ? lv.first_seen : now);
+  const got = new Set(q('SELECT minute FROM beats WHERE screen=? AND minute>=?', sc.id, Math.floor(from / 60000)).map(r => r.minute));
+  const gaps = []; let run0 = null;
+  const m1 = Math.floor(now / 60000) - 2;
+  for (let m = Math.ceil(from / 60000); m <= m1 + 1; m++) {
+    const miss = m <= m1 && !got.has(m) && expectedMinutes(sc, m * 60000, m * 60000 + 60000) > 0.5;
+    if (miss && run0 === null) run0 = m;
+    if (!miss && run0 !== null) { if (m - run0 >= 3) gaps.push({ ts: run0 * 60000, min: m - run0 }); run0 = null; }
+  }
+  const boots = q('SELECT ts,kind FROM boots WHERE screen=? AND ts>=? ORDER BY ts DESC LIMIT 30', sc.id, now - 864e5).map(r => ({ ts: r.ts, kind: r.kind }));
+  return { since: from, gaps: gaps.reverse(), boots, fails: failingVideos(sc.id, now - 864e5) };
 }
 /* comprovativo: o ecrã repõe só 1 ou 2 conteúdos (que servem ao ecrã), no máximo 2 minutos, para filmar o vídeo de prova.
    Tudo o resto pausa (spot da Enif incluído). As passagens do comprovativo não são guardadas, por isso não entram nos relatórios. */
@@ -541,6 +566,11 @@ function screenViews(withKeys) {
       const key = 'fail-' + s.id + '-' + ln.date;
       if (!resolved.has(key)) alerts.push({ id: key, sev: 'warn', screen: s.id, title: 'Falhas de reprodução', detail: pct + ' % das reproduções de hoje falharam neste ecrã.', time: fmtHM(now) });
     } else o.status = 'online';
+    if (age <= ONLINE_MS) failingVideos(s.id, now - 864e5).forEach(v => {
+      if (v.qIgn) return;
+      const key = 'vf-' + s.id + '-' + v.id + '-' + ln.date;
+      if (!resolved.has(key)) alerts.push({ id: key, sev: 'warn', screen: s.id, title: 'Vídeo a falhar', detail: 'O vídeo «' + v.name + '» falhou ' + v.n + ' vezes nas últimas 24 h neste ecrã. Veja a qualidade do vídeo em Conteúdos.', time: fmtHM(v.last) });
+    });
     // disponibilidade nos últimos 7 dias, só dentro do horário do ecrã
     const from = Math.max(lv.first_seen || lv.last_seen, now - 7 * 864e5), exp = expectedMinutes(s, from, now);
     if (exp >= 60) {
@@ -822,17 +852,30 @@ function playerApi(req, res, u, body) {
   if (req.method === 'POST' && p === '/api/player/heartbeat') {
     const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
     const now = Date.now(), w = Math.round(+body.w) || null, h = Math.round(+body.h) || null;
-    const gb = v => (+v > 1e6 ? +v / 1073741824 : +v), dk = body.disk && +body.disk.total > 0 ? { f: Math.round(gb(body.disk.free) * 10) / 10 || 0, t: Math.round(gb(body.disk.total) * 10) / 10 } : null; /* players antigos enviavam bytes */
-    run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h,disk_free,disk_total) VALUES(?,?,?,?,?,?,?,?,?,?,?)
-         ON CONFLICT(screen) DO UPDATE SET last_seen=excluded.last_seen, now_c=excluded.now_c, now_f=excluded.now_f, ver=excluded.ver, queue=excluded.queue, w=excluded.w, h=excluded.h,
-         disk_free=COALESCE(excluded.disk_free,disk_free), disk_total=COALESCE(excluded.disk_total,disk_total)`,
-      s.id, now, now, body.c || null, body.f || null, String(body.ver || ''), +body.queue || 0, w, h, dk ? dk.f : null, dk ? dk.t : null);
+    const gb = v => (+v > 1e6 ? +v / 1073741824 : +v); let dk = body.disk && +body.disk.total > 0 ? { f: Math.round(gb(body.disk.free) * 10) / 10 || 0, t: Math.round(gb(body.disk.total) * 10) / 10 } : null; /* players antigos enviavam bytes */
+    const prev = q1('SELECT boot,sys_ts FROM live WHERE screen=?', s.id), sysFresh = prev && prev.sys_ts && now - prev.sys_ts < 20 * 60000;   // com o disco real do Windows, o do browser fica de parte
+    if (dk && sysFresh) dk = null;
+    const boot = +body.boot > 1e12 && +body.boot <= now + 60000 ? Math.round(+body.boot) : null;
+    if (boot && (!prev || prev.boot !== boot)) run('INSERT OR IGNORE INTO boots(screen,ts,kind) VALUES(?,?,?)', s.id, boot, 'player');
+    run(`INSERT INTO live(screen,first_seen,last_seen,now_c,now_f,ver,queue,w,h,disk_free,disk_total,boot) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)
+         ON CONFLICT(screen) DO UPDATE SET first_seen=COALESCE(first_seen,excluded.first_seen), last_seen=excluded.last_seen, now_c=excluded.now_c, now_f=excluded.now_f, ver=excluded.ver, queue=excluded.queue, w=excluded.w, h=excluded.h,
+         disk_free=COALESCE(excluded.disk_free,disk_free), disk_total=COALESCE(excluded.disk_total,disk_total), boot=COALESCE(excluded.boot,boot)`,
+      s.id, now, now, body.c || null, body.f || null, String(body.ver || ''), +body.queue || 0, w, h, dk ? dk.f : null, dk ? dk.t : null, boot);
     if (+body.ack > 0) run('DELETE FROM cmds WHERE screen=? AND id<=?', s.id, +body.ack);
     run('INSERT OR IGNORE INTO beats(screen,minute) VALUES(?,?)', s.id, Math.floor(now / 60000));
     if (s.res === 'auto' && w && h && w >= 64 && h >= 64) putDoc('screens', s.id, Object.assign({}, s, { res: w + '×' + h }));
     const lv2 = q1('SELECT reload FROM live WHERE screen=?', s.id);
     const pv = proofView(proofRow(s.id));
     return send(res, 200, { ok: true, serverTime: now, reload: lv2 ? lv2.reload : 0, proof: pv ? { id: pv.t0, files: pv.files, until: pv.until, serverTime: now } : null, cmds: q('SELECT id,kind FROM cmds WHERE screen=? ORDER BY id', s.id) });
+  }
+  if (req.method === 'POST' && p === '/api/player/sysinfo') {              // enviado pelo Windows (tarefa do instalador): disco real e hora de arranque do PC
+    const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
+    const now = Date.now(), f = +body.diskFreeGB, t = +body.diskTotalGB, boot = Math.round(+body.boot || 0);
+    if (!(t > 0) || !(f >= 0) || f > t * 1.01) throw bad('Disco inválido.');
+    run('INSERT INTO live(screen,first_seen,disk_free,disk_total,sys_ts) VALUES(?,?,?,?,?) ON CONFLICT(screen) DO UPDATE SET disk_free=excluded.disk_free, disk_total=excluded.disk_total, sys_ts=excluded.sys_ts',
+      s.id, null, Math.round(f * 10) / 10, Math.round(t * 10) / 10, now);
+    if (boot > 1e12 && boot <= now + 60000) run('INSERT OR IGNORE INTO boots(screen,ts,kind) VALUES(?,?,?)', s.id, boot, 'pc');
+    return send(res, 200, { ok: true });
   }
   if (req.method === 'POST' && p === '/api/player/plays') {
     const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
@@ -906,7 +949,9 @@ async function upload(req, res, u) {
   const resTxt = html ? 'Responsivo' : (got.res || hint || 'Por detetar');
   const secs0 = got.secs || Math.round((+u.searchParams.get('secs') || 0) * 10) / 10;
   const dur = type === 'Imagem' ? 10 : (secs0 > 0 ? secs0 : 10);
+  const q = got.q || null, qIgn = u.searchParams.get('qign') === '1';
   const doc = { id, name, type, res: resTxt, dur: type === 'Imagem' ? '' : Math.round(dur) + ' s', secs: dur, size: sizeTxt(n), bytes: n, folder, ready: true, house: wantHouse, up: Date.now() };
+  if (q) doc.q = q; if (qIgn) doc.qIgn = true;
   try { doc.screens = checkContentScreens(doc, screenIds); } catch (e) { drop(); throw e; }
   db.exec('BEGIN');
   try { run('INSERT INTO files(id,mime,size) VALUES(?,?,?)', id, mime, n); putDoc('contents', id, doc); db.exec('COMMIT'); } catch (e) { db.exec('ROLLBACK'); drop(); throw e; }
@@ -1376,6 +1421,11 @@ const router = async (req, res) => {
       return send(res, 200, { fichas: fichasView() });
     }
   }
+  if ((r = /^\/api\/screens\/([\w.-]+)\/saude$/.exec(p)) && m === 'GET') {
+    const user = needUser(req, u); need(user, 'ecras.ver');
+    const sc = getDoc('screens', r[1]); if (!sc) throw new HttpError(404, 'Ecrã não existe');
+    return send(res, 200, healthOf(sc));
+  }
   if ((r = /^\/api\/screens\/([\w.-]+)\/falhas$/.exec(p)) && m === 'GET') {
     const user = needUser(req, u); need(user, 'ecras.ver');
     if (!getDoc('screens', r[1])) throw new HttpError(404, 'Ecrã não existe');
@@ -1435,12 +1485,21 @@ const server = http.createServer((req, res) => {
 // só existem as prioridades Alta e Normal: as campanhas antigas com «Baixa» passam a Normal
 for (const c of docs('campaigns')) { if (c.priority !== 'Alta' && c.priority !== 'Normal') { c.priority = 'Normal'; putDoc('campaigns', c.id, c); } }
 
+/* vídeos carregados antes desta funcionalidade: lê a qualidade em segundo plano, uma vez */
+async function qBackfill() {
+  for (const c of docs('contents')) {
+    if (c.type !== 'Vídeo' || c.q) continue;
+    const got = await M.probe(path.join(MEDIA, c.id), 'Vídeo');
+    c.q = got.q || { none: true }; putDoc('contents', c.id, c);
+  }
+}
 if (require.main === module) {
   if (SEED === 'falta') {
     console.error('\nFalta a conta de administrador. Crie o ficheiro enif-config.json ao lado do server.js com:\n\n  { "nome": "O seu nome", "email": "o.seu@email.pt", "palavraPasse": "uma palavra-passe forte" }\n\ne volte a arrancar. (Este ficheiro nunca vai para o GitHub.)\n');
     process.exit(1);
   }
   server.listen(PORT, () => {
+    qBackfill().catch(() => {});
     console.log('Enif DOOH a correr em http://localhost:' + PORT + '/');
     setTimeout(tick, 5000); setInterval(tick, 60000);
     if (SEED === 'criado') console.log('Conta de administrador criada. Pode apagar a palavra-passe do enif-config.json.');

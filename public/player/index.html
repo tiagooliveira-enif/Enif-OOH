@@ -142,7 +142,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '16';
+const VERSION = '17';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -187,9 +187,10 @@ function flush() {
   }).catch(function(e) {stats.net = 'sem ligação'; stats.sendErr = 'envio das passagens: ' + e.message;});
 }
 async function diskInfo() {try {if (navigator.storage && navigator.storage.estimate) {const e = await navigator.storage.estimate(); if (e.quota > 0) {const G = 1073741824; return {free:Math.max(0, Math.round((e.quota - (e.usage || 0)) / G * 10) / 10), total:Math.round(e.quota / G * 10) / 10};}}} catch (x) {/* sem ação */} return null;}
+const BOOT_AT = Date.now();
 async function heartbeat() {
   const body = {c:cur.c, f:cur.f, queue:queue.length, ver:VERSION, w:Math.round(screen.width * (window.devicePixelRatio || 1)), h:Math.round(screen.height * (window.devicePixelRatio || 1)), ack:acks};
-  const d = await diskInfo(); if (d)body.disk = d;
+  body.boot = BOOT_AT; const d = await diskInfo(); if (d)body.disk = d;
   return post('/api/player/heartbeat', body).then(function(r) {
     stats.net = 'ok'; stats.beatErr = ''; stats.beatAt = Date.now();
     const rl = ls('enif.reload');
