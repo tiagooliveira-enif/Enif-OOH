@@ -128,7 +128,8 @@ Set-Content -Path "$dir\sysinfo.ps1" -Value $sysPs1 -Encoding UTF8
 try {
   $acao = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$dir\sysinfo.ps1`""
   $gat = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(1) -RepetitionInterval (New-TimeSpan -Minutes 5)
-  Register-ScheduledTask -TaskName 'Enif sysinfo' -Action $acao -Trigger $gat -User 'SYSTEM' -RunLevel Highest -Force | Out-Null
+  $prin = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+  Register-ScheduledTask -TaskName 'Enif sysinfo' -Action $acao -Trigger $gat -Principal $prin -Force | Out-Null
 } catch { Write-Host 'Aviso: não foi possível criar a tarefa do disco (o disco mostrado será aproximado).' -ForegroundColor Yellow }
 
 # nunca suspender nem desligar o ecrã

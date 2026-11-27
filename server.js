@@ -880,8 +880,7 @@ function playerApi(req, res, u, body) {
     const s = screenAuth(body.code, body.key); if (!s) throw new HttpError(401, 'Código ou chave inválidos');
     const now = Date.now(), f = +body.diskFreeGB, t = +body.diskTotalGB, boot = Math.round(+body.boot || 0);
     if (!(t > 0) || !(f >= 0) || f > t * 1.01) throw bad('Disco inválido.');
-    run('INSERT INTO live(screen,first_seen,disk_free,disk_total,sys_ts) VALUES(?,?,?,?,?) ON CONFLICT(screen) DO UPDATE SET disk_free=excluded.disk_free, disk_total=excluded.disk_total, sys_ts=excluded.sys_ts',
-      s.id, null, Math.round(f * 10) / 10, Math.round(t * 10) / 10, now);
+    run('UPDATE live SET disk_free=?, disk_total=?, sys_ts=? WHERE screen=?', Math.round(f * 10) / 10, Math.round(t * 10) / 10, now, s.id);   // só atualiza ecrãs que já deram sinal de vida
     if (boot > 1e12 && boot <= now + 60000) run('INSERT OR IGNORE INTO boots(screen,ts,kind) VALUES(?,?,?)', s.id, boot, 'pc');
     return send(res, 200, { ok: true });
   }
