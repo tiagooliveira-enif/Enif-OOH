@@ -142,7 +142,7 @@ body {
 <script>
 (function() {
 'use strict';
-const VERSION = '21';
+const VERSION = '22';
 const Q = new URLSearchParams(location.search);
 const ls = function(k, v) {try {if (v === undefined) {const x = localStorage.getItem(k); return (x === null || x === undefined) ? null : x;} if (v === null)localStorage.removeItem(k); else localStorage.setItem(k, v);} catch (e) {return null;}};
 const code = Q.get('code') || ls('enif.code'), key = Q.get('key') || ls('enif.key');
@@ -409,8 +409,8 @@ async function loop() {
       const h = hourEntry(), l = h.e;
       if (h.k !== lastHour) {lastHour = h.k; idx = 0;}
       if (l === null || isOff()) {                                              // ecrã desligado (horário definido): preto total
-        guardOff(); clearAll(); await sleep(1000); continue;}
-      if (!l || !l.seq || !l.seq.length) {clearAll(); showBrand(PL.screen.venue); await sleep(5000); continue;}   // hora sem campanhas: não deixa o último conteúdo parado no ecrã
+        guardOff(); clearAll(); lastFrameAt = Date.now(); await sleep(1000); continue;}     // desligado pelo horário: está vivo, não é «preso»
+      if (!l || !l.seq || !l.seq.length) {clearAll(); showBrand(PL.screen.venue); lastFrameAt = Date.now(); await sleep(5000); continue;}   // hora sem campanhas: não deixa o último conteúdo parado no ecrã
       let tried = 0, played = false;
       while (tried < l.seq.length + 1 && !played) {
         let en;
