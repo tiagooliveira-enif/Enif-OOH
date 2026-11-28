@@ -47,8 +47,51 @@ if ($s) { '{0},{1}' -f $s.Bounds.X, $s.Bounds.Y } else { '0,0' }
   $calc = 'set "POS=0,0"' + "`r`n" + 'for /f %%p in (''powershell -NoProfile -ExecutionPolicy Bypass -File "' + $dir + '\posicao-ecra.ps1"'') do set "POS=%%p"'
   $pos = '--window-position=%POS% '
 }
+# garante que nada fica à frente do player: esconde a barra de tarefas do Windows e põe a janela do player por cima de tudo
+$inteiroPs1 = @'
+Add-Type @"
+using System;
+using System.Text;
+using System.Runtime.InteropServices;
+public class EnifTopo {
+  public delegate bool EnumProc(IntPtr h, IntPtr l);
+  [DllImport("user32.dll")] public static extern IntPtr FindWindow(string c, string t);
+  [DllImport("user32.dll")] public static extern IntPtr FindWindowEx(IntPtr p, IntPtr a, string c, string t);
+  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h, int n);
+  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumProc p, IntPtr l);
+  [DllImport("user32.dll")] public static extern int GetWindowText(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern int GetClassName(IntPtr h, StringBuilder s, int n);
+  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h, IntPtr after, int x, int y, int cx, int cy, uint f);
+  public static void Barras(bool principal) {
+    if (principal) { IntPtr t = FindWindow("Shell_TrayWnd", null); if (t != IntPtr.Zero) ShowWindow(t, 0); }
+    IntPtr s = IntPtr.Zero;
+    while ((s = FindWindowEx(IntPtr.Zero, s, "Shell_SecondaryTrayWnd", null)) != IntPtr.Zero) ShowWindow(s, 0);
+  }
+  public static void PlayerPorCima() {
+    EnumWindows(delegate(IntPtr h, IntPtr l) {
+      if (!IsWindowVisible(h)) return true;
+      StringBuilder c = new StringBuilder(64); GetClassName(h, c, 64);
+      if (c.ToString() != "Chrome_WidgetWin_1") return true;
+      StringBuilder t = new StringBuilder(256); GetWindowText(h, t, 256);
+      if (t.ToString().Contains("Estado do player Enif")) return true;
+      SetWindowPos(h, new IntPtr(-1), 0, 0, 0, 0, 0x0043);
+      return true;
+    }, IntPtr.Zero);
+  }
+}
+"@
+while ($true) {
+  try { [EnifTopo]::Barras(__PRINCIPAL__); [EnifTopo]::PlayerPorCima() } catch { }
+  Start-Sleep -Seconds 3
+}
+'@
+$inteiroPs1 = $inteiroPs1.Replace('__PRINCIPAL__', $(if ($SegundoEcra) { '$false' } else { '$true' }))
+Set-Content -Path "$dir\ecra-inteiro.ps1" -Value $inteiroPs1 -Encoding UTF8
 $bat = @'
 @echo off
+rem esconde a barra de tarefas e mantem o player por cima (uma so vez por arranque)
+start "" /min powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "__DIR__\ecra-inteiro.ps1"
 :loop
 :espera
 rem espera que o servidor responda antes de abrir o Edge (rede ainda sem ligacao, ou servidor a reiniciar):
